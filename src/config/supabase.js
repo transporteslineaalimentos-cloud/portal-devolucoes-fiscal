@@ -1,11 +1,14 @@
 import { createClient } from '@supabase/supabase-js';
 
-export const SB_URL = 'https://opcrtjdnpgqcjlksofjw.supabase.co';
-export const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9wY3J0amRucGdxY2psa3NvZmp3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0NTMwODYsImV4cCI6MjA5MDAyOTA4Nn0.ojJMzaInCSD4mrZEWrU1d9ziDVyIcp7NRm6RHx2uTGA';
+export const SB_URL = import.meta.env.VITE_SB_URL;
+export const SB_KEY = import.meta.env.VITE_SB_KEY;
+
+if (!SB_URL || !SB_KEY) {
+  console.error('[Config] VITE_SB_URL e VITE_SB_KEY precisam estar definidas nas env vars.');
+}
 
 export const supabase = createClient(SB_URL, SB_KEY);
 
-// ── Auth helpers ──────────────────────────────────────────────────────────────
 export function syncAuthToken() {
   try {
     const token   = localStorage.getItem('df_token');
@@ -41,7 +44,6 @@ export async function refreshToken() {
   return { token: d.access_token, refresh: d.refresh_token, user: d.user };
 }
 
-// ── DB helpers genéricos ──────────────────────────────────────────────────────
 async function safeQuery(promise, fallback = null) {
   try {
     const { data, error } = await promise;
@@ -53,16 +55,20 @@ async function safeQuery(promise, fallback = null) {
   }
 }
 
-// ── Portal users (torre_usuarios reutilizados) ────────────────────────────────
+// Busca perfil EXCLUSIVO do portal fiscal
 export async function dbGetUser(email) {
   syncAuthToken();
   return await safeQuery(
-    supabase.from('torre_usuarios').select('*').eq('email', email.toLowerCase()).single(),
+    supabase
+      .from('dev_fiscal_usuarios')
+      .select('*')
+      .eq('email', email.toLowerCase())
+      .eq('ativo', true)
+      .single(),
     null
   );
 }
 
-// ── Devoluções fiscais ────────────────────────────────────────────────────────
 const PAGE_SIZE = 40;
 
 export async function dbListDevolucoes({ page = 0, filters = {} }) {
@@ -100,18 +106,17 @@ export async function dbListDevolucoes({ page = 0, filters = {} }) {
 
 export async function dbGetDevolucaoDetail(id) {
   syncAuthToken();
-  // Busca a devolução completa
   const dev = await safeQuery(
     supabase.from('oobj_nfe_recebidas').select('*').eq('id', id).single(),
     null
   );
   if (!dev) return null;
 
-  // Busca a NF original de venda via historico_nfs
   let nfVenda = null;
   if (dev.chave_nfe_referenciada) {
     nfVenda = await safeQuery(
-      supabase.from('historico_nfs')
+      supabase
+        .from('historico_nfs')
         .select('nf_numero,nf_serie,nf_chave,destinatario_nome,destinatario_cnpj,cidade_destino,uf_destino,transportador_nome,transportador_cnpj,valor_produtos,pedido,centro_custo,dt_emissao,dt_entrega,romaneio_numero,cfop')
         .eq('nf_chave', dev.chave_nfe_referenciada)
         .limit(1)
@@ -125,27 +130,17 @@ export async function dbGetDevolucaoDetail(id) {
 
 export async function dbUpdateStatus(id, newStatus, obs, userName) {
   syncAuthToken();
-  // Busca raw_json atual para appender histórico
   const current = await safeQuery(
     supabase.from('oobj_nfe_recebidas').select('raw_json').eq('id', id).single(),
     null
   );
-  const raw = current?.raw_json || {};
+  const raw  = current?.raw_json || {};
   const hist = Array.isArray(raw.obs_historico) ? raw.obs_historico : [];
-  hist.push({
-    ts: new Date().toISOString(),
-    status: newStatus,
-    obs: obs || '',
-    user: userName || '',
-  });
+  hist.push({ ts: new Date().toISOString(), status: newStatus, obs: obs || '', user: userName || '' });
 
   const { error } = await supabase
     .from('oobj_nfe_recebidas')
-    .update({
-      status_portal: newStatus,
-      raw_json: { ...raw, obs_historico: hist },
-      updated_at: new Date().toISOString(),
-    })
+    .update({ status_portal: newStatus, raw_json: { ...raw, obs_historico: hist }, updated_at: new Date().toISOString() })
     .eq('id', id);
 
   if (error) throw new Error(error.message);
@@ -160,7 +155,6 @@ export async function dbGetXmlUrl(xmlPath) {
   return data?.signedUrl || null;
 }
 
-// ── KPIs ──────────────────────────────────────────────────────────────────────
 export async function dbGetKpis() {
   syncAuthToken();
   const [total, pendentes, emAnalise, concluidas] = await Promise.all([
@@ -170,14 +164,13 @@ export async function dbGetKpis() {
     supabase.from('oobj_nfe_recebidas').select('valor', { count: 'exact' }).eq('tipo', 'devolucao').in('status_portal', ['aprovada', 'rejeitada', 'concluida']),
   ]);
 
-  const soma = (rows) => (rows?.data || []).reduce((s, r) => s + parseFloat(r.valor || 0), 0);
-
+  const soma = (r) => (r?.data || []).reduce((s, x) => s + parseFloat(x.valor || 0), 0);
   return {
-    total_count:    total.count     || 0,
-    total_valor:    soma(total),
-    pendente_count: pendentes.count || 0,
-    pendente_valor: soma(pendentes),
-    analise_count:  emAnalise.count || 0,
-    concluida_count:concluidas.count|| 0,
+    total_count:     total.count      || 0,
+    total_valor:     soma(total),
+    pendente_count:  pendentes.count  || 0,
+    pendente_valor:  soma(pendentes),
+    analise_count:   emAnalise.count  || 0,
+    concluida_count: concluidas.count || 0,
   };
 }
