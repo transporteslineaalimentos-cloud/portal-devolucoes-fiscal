@@ -192,157 +192,38 @@ export async function dbGetXmlUrl(xmlPath) {
   return data?.signedUrl || null;
 }
 
+// Uma única chamada RPC que agrega tudo no banco (SECURITY DEFINER ignora RLS)
+async function fetchDashboardRPC() {
+  const { data, error } = await supabase.rpc('get_dashboard_data');
+  if (error) throw new Error(error.message);
+  return data;
+}
+
 export async function dbGetKpis() {
-  syncAuthToken();
-  const base = () => supabase
-    .from('oobj_nfe_recebidas')
-    .eq('tipo', 'devolucao')
-    .gte('dt_emissao', '2026-01-01');   // apenas NFs emitidas a partir de 2026
-
-  const [total, pendentes, emAnalise, concluidas] = await Promise.all([
-    base().select('valor', { count: 'exact' }),
-    base().select('valor', { count: 'exact' }).eq('status_portal', 'pendente'),
-    base().select('valor', { count: 'exact' }).eq('status_portal', 'em_analise'),
-    base().select('valor', { count: 'exact' }).in('status_portal', ['aprovada', 'rejeitada', 'concluida']),
-  ]);
-
-  const soma = (r) => (r?.data || []).reduce((s, x) => s + parseFloat(x.valor || 0), 0);
-  return {
-    total_count:     total.count      || 0,
-    total_valor:     soma(total),
-    pendente_count:  pendentes.count  || 0,
-    pendente_valor:  soma(pendentes),
-    analise_count:   emAnalise.count  || 0,
-    concluida_count: concluidas.count || 0,
+  const d = await fetchDashboardRPC();
+  return d?.kpis || {
+    total_count: 0, total_valor: 0,
+    pendente_count: 0, pendente_valor: 0,
+    analise_count: 0, concluida_count: 0,
   };
 }
 
 export async function dbGetDashboard() {
-  syncAuthToken();
-  const soma = (rows) => rows.reduce((s, x) => s + parseFloat(x.valor || 0), 0);
-
-  const [evolucaoRes, topClientesRes, topUfsRes, cfopsRes] = await Promise.all([
-    // Evolução mensal — buscamos todos os registros de 2026 com data e valor
-    supabase
-      .from('oobj_nfe_recebidas')
-      .select('dt_emissao, valor, cnpj_emitente')
-      .eq('tipo', 'devolucao')
-      .gte('dt_emissao', '2026-01-01')
-      .order('dt_emissao', { ascending: true }),
-
-    // Top clientes por valor
-    supabase
-      .from('oobj_nfe_recebidas')
-      .select('nome_emitente, cnpj_emitente, uf_emitente, valor')
-      .eq('tipo', 'devolucao')
-      .gte('dt_emissao', '2026-01-01')
-      .not('nome_emitente', 'is', null),
-
-    // Por UF
-    supabase
-      .from('oobj_nfe_recebidas')
-      .select('uf_emitente, valor')
-      .eq('tipo', 'devolucao')
-      .gte('dt_emissao', '2026-01-01')
-      .not('uf_emitente', 'is', null),
-
-    // CFOPs
-    supabase
-      .from('oobj_nfe_recebidas')
-      .select('cfops, valor')
-      .eq('tipo', 'devolucao')
-      .gte('dt_emissao', '2026-01-01')
-      .not('cfops', 'is', null),
-  ]);
-
-  const rows = evolucaoRes.data || [];
-  const clientes = topClientesRes.data || [];
-  const ufsRaw = topUfsRes.data || [];
-  const cfopsRaw = cfopsRes.data || [];
-
-  // --- Evolução mensal ---
-  const mesMap = {};
-  for (const r of rows) {
-    const mes = r.dt_emissao?.slice(0, 7);
-    if (!mes) continue;
-    if (!mesMap[mes]) mesMap[mes] = { mes, qtd: 0, valor: 0, clientes: new Set() };
-    mesMap[mes].qtd++;
-    mesMap[mes].valor += parseFloat(r.valor || 0);
-    mesMap[mes].clientes.add(r.cnpj_emitente);
-  }
-  const evolucao = Object.values(mesMap).map(m => ({
-    mes: m.mes,
-    qtd: m.qtd,
-    valor: Math.round(m.valor * 100) / 100,
-    clientes: m.clientes.size,
-  }));
-
-  // Pior mês por qtd e por valor
-  const piorMesQtd   = [...evolucao].sort((a, b) => b.qtd - a.qtd)[0]   || null;
-  const piorMesValor = [...evolucao].sort((a, b) => b.valor - a.valor)[0] || null;
-
-  // Variação mês a mês (último vs penúltimo)
-  const ultimos = evolucao.slice(-2);
-  const variacaoQtd = ultimos.length === 2 && ultimos[1].mes !== new Date().toISOString().slice(0, 7)
-    ? null // mês atual incompleto — não comparar
-    : null;
+  const d = await fetchDashboardRPC();
+  const evolucao = d?.evolucao || [];
   const mesAtual    = evolucao[evolucao.length - 1] || null;
   const mesAnterior = evolucao[evolucao.length - 2] || null;
-
-  // --- Top clientes ---
-  const clienteMap = {};
-  for (const r of clientes) {
-    const k = r.cnpj_emitente;
-    if (!clienteMap[k]) clienteMap[k] = { nome: r.nome_emitente, cnpj: k, uf: r.uf_emitente, qtd: 0, valor: 0 };
-    clienteMap[k].qtd++;
-    clienteMap[k].valor += parseFloat(r.valor || 0);
-  }
-  const topClientes = Object.values(clienteMap)
-    .sort((a, b) => b.valor - a.valor)
-    .slice(0, 10)
-    .map(c => ({ ...c, valor: Math.round(c.valor * 100) / 100 }));
-
-  // --- Top UFs ---
-  const ufMap = {};
-  for (const r of ufsRaw) {
-    const uf = r.uf_emitente;
-    if (!ufMap[uf]) ufMap[uf] = { uf, qtd: 0, valor: 0 };
-    ufMap[uf].qtd++;
-    ufMap[uf].valor += parseFloat(r.valor || 0);
-  }
-  const topUfs = Object.values(ufMap)
-    .sort((a, b) => b.valor - a.valor)
-    .slice(0, 8)
-    .map(u => ({ ...u, valor: Math.round(u.valor * 100) / 100 }));
-
-  // --- CFOPs ---
-  const cfopMap = {};
-  for (const r of cfopsRaw) {
-    for (const c of (r.cfops || [])) {
-      if (!cfopMap[c]) cfopMap[c] = { cfop: c, qtd: 0, valor: 0 };
-      cfopMap[c].qtd++;
-      cfopMap[c].valor += parseFloat(r.valor || 0);
-    }
-  }
-  const cfops = Object.values(cfopMap)
-    .sort((a, b) => b.qtd - a.qtd)
-    .map(c => ({ ...c, valor: Math.round(c.valor * 100) / 100 }));
-
-  // --- Totais gerais ---
-  const totalQtd   = rows.length;
-  const totalValor = Math.round(soma(rows) * 100) / 100;
-  const ticketMedio = totalQtd > 0 ? Math.round((totalValor / totalQtd) * 100) / 100 : 0;
-  const totalClientes = new Set(rows.map(r => r.cnpj_emitente).filter(Boolean)).size;
-
+  const piorMesQtd   = [...evolucao].sort((a, b) => b.qtd   - a.qtd)[0]   || null;
+  const piorMesValor = [...evolucao].sort((a, b) => b.valor - a.valor)[0] || null;
   return {
-    totais: { qtd: totalQtd, valor: totalValor, ticket_medio: ticketMedio, clientes: totalClientes },
+    totais:        d?.totais       || { qtd: 0, valor: 0, ticket_medio: 0, clientes: 0 },
     evolucao,
     piorMesQtd,
     piorMesValor,
     mesAtual,
     mesAnterior,
-    topClientes,
-    topUfs,
-    cfops,
+    topClientes:   d?.top_clientes || [],
+    topUfs:        d?.top_ufs      || [],
+    cfops:         d?.cfops        || [],
   };
 }
