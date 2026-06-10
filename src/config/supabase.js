@@ -114,15 +114,52 @@ export async function dbGetDevolucaoDetail(id) {
 
   let nfVenda = null;
   if (dev.chave_nfe_referenciada) {
-    nfVenda = await safeQuery(
+    // Fonte primária: active_webhooks (atualizada automaticamente pelo webhook do Active)
+    const aw = await safeQuery(
       supabase
-        .from('historico_nfs')
-        .select('nf_numero,nf_serie,nf_chave,destinatario_nome,destinatario_cnpj,cidade_destino,uf_destino,transportador_nome,transportador_cnpj,valor_produtos,pedido,centro_custo,dt_emissao,dt_entrega,romaneio_numero,cfop')
-        .eq('nf_chave', dev.chave_nfe_referenciada)
+        .from('active_webhooks')
+        .select('numero,serie,chave_nfe,destinatario_nome,destinatario_cnpj,remetente_cnpj,remetente_nome,natureza_operacao,cfop,data_emissao,data_entrega,valor_mercadoria,transportador_nome,transportador_cnpj,pedido,observacao,produtos')
+        .eq('chave_nfe', dev.chave_nfe_referenciada)
+        .eq('tipo', 'nota_fiscal')
         .limit(1)
         .single(),
       null
     );
+
+    if (aw) {
+      // Normalizar para o mesmo formato que o drawer espera
+      nfVenda = {
+        nf_numero:        aw.numero,
+        nf_serie:         aw.serie,
+        nf_chave:         aw.chave_nfe,
+        destinatario_nome:  aw.destinatario_nome,
+        destinatario_cnpj:  aw.destinatario_cnpj,
+        cidade_destino:   null,   // active_webhooks não tem esse campo separado
+        uf_destino:       null,
+        transportador_nome: aw.transportador_nome,
+        transportador_cnpj: aw.transportador_cnpj,
+        valor_produtos:   aw.valor_mercadoria,
+        pedido:           aw.pedido,
+        centro_custo:     null,
+        dt_emissao:       aw.data_emissao,
+        dt_entrega:       aw.data_entrega,
+        cfop:             aw.cfop,
+        nat_operacao:     aw.natureza_operacao,
+        fonte:            'active_webhooks',
+      };
+    } else {
+      // Fallback: historico_nfs (legado, cobre jan–abr/2026)
+      const hist = await safeQuery(
+        supabase
+          .from('historico_nfs')
+          .select('nf_numero,nf_serie,nf_chave,destinatario_nome,destinatario_cnpj,cidade_destino,uf_destino,transportador_nome,transportador_cnpj,valor_produtos,pedido,centro_custo,dt_emissao,dt_entrega,cfop')
+          .eq('nf_chave', dev.chave_nfe_referenciada)
+          .limit(1)
+          .single(),
+        null
+      );
+      if (hist) nfVenda = { ...hist, fonte: 'historico_nfs' };
+    }
   }
 
   return { dev, nfVenda };

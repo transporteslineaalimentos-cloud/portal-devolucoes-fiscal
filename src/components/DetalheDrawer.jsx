@@ -22,7 +22,7 @@ function Field({ label, value, fullWidth = false, mono = false }) {
   );
 }
 
-function SectionHead({ title, count }) {
+function SectionHead({ title, count, badge }) {
   return (
     <div style={{
       padding: '10px 22px', background: 'var(--surface-2)',
@@ -35,6 +35,11 @@ function SectionHead({ title, count }) {
       {count != null && (
         <span style={{ fontSize: 10, fontWeight: 700, background: 'var(--blue-dim)', color: 'var(--blue)', padding: '1px 7px', borderRadius: 20 }}>
           {count}
+        </span>
+      )}
+      {badge && (
+        <span style={{ fontSize: 9.5, fontWeight: 700, background: 'var(--blue-dim)', color: badge.color || 'var(--blue)', padding: '1px 7px', borderRadius: 20, letterSpacing: '.03em', marginLeft: 2 }}>
+          {badge.label}
         </span>
       )}
     </div>
@@ -212,19 +217,28 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
               <Field label="ICMS-ST" value={fmtBRL(dev.valor_st)}/>
             </div>
 
-            {/* NF Original */}
+            {/* NF Original de Venda */}
             {nfV ? (
               <>
-                <SectionHead title="NF original de venda" />
+                <SectionHead
+                  title="NF original de venda"
+                  badge={nfV.fonte === 'active_webhooks' ? { label: 'Active OnSupply', color: 'var(--blue)' } : { label: 'Histórico', color: 'var(--text-3)' }}
+                />
                 <div style={{ padding: '16px 22px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 20px' }}>
                   <Field label="NF / Série" value={`${nfV.nf_numero} · Série ${nfV.nf_serie}`}/>
                   <Field label="Data emissão" value={fmtDate(nfV.dt_emissao)}/>
-                  <Field label="Destinatário" value={nfV.destinatario_nome} fullWidth/>
-                  <Field label="Destino" value={nfV.cidade_destino && nfV.uf_destino ? `${nfV.cidade_destino} / ${nfV.uf_destino}` : '—'}/>
+                  <Field label="Destinatário (cliente)" value={nfV.destinatario_nome} fullWidth/>
+                  <Field label="CNPJ destinatário" value={fmtCNPJ(nfV.destinatario_cnpj)}/>
+                  {/* active_webhooks não tem cidade separada; historico_nfs tem */}
+                  {(nfV.cidade_destino || nfV.uf_destino) && (
+                    <Field label="Destino" value={[nfV.cidade_destino, nfV.uf_destino].filter(Boolean).join(' / ')}/>
+                  )}
+                  <Field label="Data entrega" value={fmtDate(nfV.dt_entrega)}/>
                   <Field label="Transportador" value={nfV.transportador_nome || '—'}/>
                   <Field label="Pedido" value={nfV.pedido || '—'}/>
-                  <Field label="Centro de custo" value={nfV.centro_custo || '—'}/>
-                  <Field label="Valor de venda" value={fmtBRL(nfV.valor_produtos)}/>
+                  {nfV.centro_custo && <Field label="Centro de custo" value={nfV.centro_custo}/>}
+                  {nfV.nat_operacao && <Field label="Natureza op." value={nfV.nat_operacao}/>}
+                  <Field label="Valor da venda" value={fmtBRL(nfV.valor_produtos)}/>
                   {nfV.nf_chave && (
                     <Field label="Chave NF-e de venda" value={nfV.nf_chave} mono fullWidth/>
                   )}
@@ -235,7 +249,7 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
                 <SectionHead title="NF original de venda" />
                 <div style={{ padding: '14px 22px' }}>
                   <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 8 }}>
-                    Não localizada no histórico de vendas. Chave referenciada:
+                    Chave referenciada não localizada no Active OnSupply. A NF de venda pode ser anterior à integração do webhook.
                   </div>
                   <div style={{ fontFamily: "'Courier New', monospace", fontSize: 10, color: 'var(--text-2)', background: 'var(--surface-2)', padding: '8px 12px', borderRadius: 6, wordBreak: 'break-all', border: '1px solid var(--border)' }}>
                     {dev.chave_nfe_referenciada}
