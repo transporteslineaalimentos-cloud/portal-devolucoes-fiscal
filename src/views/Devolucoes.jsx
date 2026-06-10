@@ -213,9 +213,18 @@ export default function Devolucoes({ user, initialFilters = {} }) {
                     <span style={{ fontSize: 9, fontWeight: 700, background: 'var(--yellow-dim)', color: 'var(--yellow)', padding: '1px 5px', borderRadius: 10, flexShrink: 0 }}>PARCIAL</span>
                   )}
                 </div>
-                <div className="ellipsis" style={{ fontSize: 10.5, color: 'var(--text-3)', marginTop: 1 }}>
-                  {row.motivo_devolucao || row.municipio_emitente || row.cnpj_emitente || ''}
-                </div>
+                {/* Motivo — linha separada com destaque */}
+                {row.motivo_devolucao ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 3 }}>
+                    <span style={{ fontSize: 9.5, fontWeight: 700, color: 'var(--red)', background: 'var(--red-dim)', padding: '1px 6px', borderRadius: 10, whiteSpace: 'nowrap' }}>
+                      {row.motivo_devolucao}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="ellipsis" style={{ fontSize: 10.5, color: 'var(--text-3)', marginTop: 1 }}>
+                    {row.municipio_emitente || row.cnpj_emitente || ''}
+                  </div>
+                )}
               </div>
 
               {/* NF Venda */}

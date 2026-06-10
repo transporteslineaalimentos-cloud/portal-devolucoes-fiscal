@@ -130,11 +130,11 @@ export async function dbGetDevolucaoDetail(id) {
 
   let nfVenda = null;
   if (dev.chave_nfe_referenciada) {
-    // Fonte primária: active_webhooks (atualizada automaticamente pelo webhook do Active)
+    // Fonte primária: active_webhooks
     const aw = await safeQuery(
       supabase
         .from('active_webhooks')
-        .select('numero,serie,chave_nfe,destinatario_nome,destinatario_cnpj,remetente_cnpj,remetente_nome,natureza_operacao,cfop,data_emissao,data_entrega,valor_mercadoria,transportador_nome,transportador_cnpj,pedido,observacao,produtos')
+        .select('numero,serie,chave_nfe,destinatario_nome,destinatario_cnpj,remetente_cnpj,remetente_nome,natureza_operacao,cfop,data_emissao,data_entrega,valor_mercadoria,transportador_nome,transportador_cnpj,pedido,observacao,payload_raw')
         .eq('chave_nfe', dev.chave_nfe_referenciada)
         .eq('tipo', 'nota_fiscal')
         .limit(1)
@@ -143,28 +143,48 @@ export async function dbGetDevolucaoDetail(id) {
     );
 
     if (aw) {
-      // Normalizar para o mesmo formato que o drawer espera
+      const payload = aw.payload_raw || {};
+      const dest    = payload.DESTINATARIO || {};
+
+      // data_entrega: primeiro tenta active_webhooks, depois busca na active_ocorrencias
+      let dtEntrega = aw.data_entrega;
+      if (!dtEntrega && aw.numero) {
+        const ocorr = await safeQuery(
+          supabase
+            .from('active_ocorrencias')
+            .select('data_entrega, data_ocorrencia, codigo_ocorrencia, descricao_ocorrencia, recebedor_nome')
+            .eq('nf_numero', aw.numero)
+            .not('data_entrega', 'is', null)
+            .in('codigo_ocorrencia', ['01', '107', '1', '7'])  // códigos de entrega realizada
+            .order('data_ocorrencia', { ascending: false })
+            .limit(1)
+            .single(),
+          null
+        );
+        if (ocorr) dtEntrega = ocorr.data_entrega || ocorr.data_ocorrencia;
+      }
+
       nfVenda = {
-        nf_numero:        aw.numero,
-        nf_serie:         aw.serie,
-        nf_chave:         aw.chave_nfe,
+        nf_numero:          aw.numero,
+        nf_serie:           aw.serie,
+        nf_chave:           aw.chave_nfe,
         destinatario_nome:  aw.destinatario_nome,
         destinatario_cnpj:  aw.destinatario_cnpj,
-        cidade_destino:   null,   // active_webhooks não tem esse campo separado
-        uf_destino:       null,
+        cidade_destino:     dest.CIDADE || null,
+        uf_destino:         dest.UF     || null,
         transportador_nome: aw.transportador_nome,
         transportador_cnpj: aw.transportador_cnpj,
-        valor_produtos:   aw.valor_mercadoria,
-        pedido:           aw.pedido,
-        centro_custo:     null,
-        dt_emissao:       aw.data_emissao,
-        dt_entrega:       aw.data_entrega,
-        cfop:             aw.cfop,
-        nat_operacao:     aw.natureza_operacao,
-        fonte:            'active_webhooks',
+        valor_produtos:     aw.valor_mercadoria,
+        pedido:             aw.pedido,
+        centro_custo:       payload.CENTRO_CUSTO || aw.observacao || null,
+        dt_emissao:         aw.data_emissao,
+        dt_entrega:         dtEntrega,
+        cfop:               aw.cfop,
+        nat_operacao:       aw.natureza_operacao,
+        fonte:              'active_webhooks',
       };
     } else {
-      // Fallback: historico_nfs (legado, cobre jan–abr/2026)
+      // Fallback: historico_nfs (legado jan–abr/2026)
       const hist = await safeQuery(
         supabase
           .from('historico_nfs')
