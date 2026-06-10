@@ -268,11 +268,11 @@ export async function dbGetDashboard() {
 }
 
 // Atualizar motivo e tipo (total/parcial) de uma devolução
-export async function dbUpdateMotivo(id, { motivo_devolucao, devolucao_total }) {
+export async function dbUpdateMotivo(id, { motivo_devolucao, devolucao_total, area_responsavel }) {
   syncAuthToken();
   const { error } = await supabase
     .from('oobj_nfe_recebidas')
-    .update({ motivo_devolucao, devolucao_total, updated_at: new Date().toISOString() })
+    .update({ motivo_devolucao, devolucao_total, area_responsavel, updated_at: new Date().toISOString() })
     .eq('id', id);
   if (error) throw new Error(error.message);
 }
@@ -326,4 +326,15 @@ export async function dbLancarDevolucaoManual(dados) {
     .single();
   if (error) throw new Error(error.message);
   return data;
+}
+
+// Buscar motivos cadastrados da tabela (para o dropdown do drawer)
+export async function dbGetMotivos() {
+  const { data } = await supabase
+    .from('motivos_devolucao')
+    .select('motivo, area')
+    .eq('ativo', true)
+    .order('area')
+    .order('motivo');
+  return data || [];
 }

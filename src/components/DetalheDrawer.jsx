@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react';
-import { dbGetDevolucaoDetail, dbUpdateStatus, dbGetXmlUrl, dbUpdateMotivo } from '../config/supabase';
+import { dbGetDevolucaoDetail, dbUpdateStatus, dbGetXmlUrl, dbUpdateMotivo, dbGetMotivos } from '../config/supabase';
 import { fmtBRL, fmtDate, fmtDateTime, fmtCNPJ, CNPJ_MAP, STATUS_CFG, STATUS_OPTIONS, Badge } from '../utils.jsx';
 
-const MOTIVOS = [
-  'Avaria no recebimento','Falta no recebimento','Mercadoria não solicitada',
-  'Desacordo com o pedido','Produto fora da validade','Desvio de qualidade',
-  'Erro de faturamento','Recusa na entrega','Outros',
-];
+const AREA_CORES = {
+  'COMERCIAL':         { color: 'var(--blue)',   bg: 'var(--blue-dim)' },
+  'TRANSPORTE':        { color: 'var(--yellow)',  bg: 'var(--yellow-dim)' },
+  'QUALIDADE':         { color: 'var(--purple)',  bg: 'var(--purple-dim)' },
+  'FISCAL':            { color: 'var(--red)',     bg: 'var(--red-dim)' },
+  'LOGÍSTICA REVERSA': { color: 'var(--green)',   bg: 'var(--green-dim)' },
+  'LOGÍSTICA':         { color: 'var(--green)',   bg: 'var(--green-dim)' },
+};
 
 const Ic = ({ d, size = 14, color = 'currentColor' }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
@@ -70,8 +73,13 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
   const [saveErr, setSaveErr]       = useState('');
   const [editMotivo, setEditMotivo] = useState(false);
   const [motivo, setMotivo]         = useState('');
-  const [devTotal, setDevTotal]     = useState(null);
   const [savingMotivo, setSavingMotivo] = useState(false);
+  const [motivosDB, setMotivosDB]   = useState([]);
+
+  // Carregar motivos do banco na primeira vez
+  useEffect(() => {
+    dbGetMotivos().then(setMotivosDB);
+  }, []);
 
   useEffect(() => {
     if (!id) return;
@@ -80,7 +88,6 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
       setData(d);
       setNewStatus(d?.dev?.status_portal || 'pendente');
       setMotivo(d?.dev?.motivo_devolucao || '');
-      setDevTotal(d?.dev?.devolucao_total ?? null);
       setLoading(false);
     }).catch(() => setLoading(false));
   }, [id]);
@@ -93,8 +100,13 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
   const handleSaveMotivo = async () => {
     setSavingMotivo(true);
     try {
-      await dbUpdateMotivo(id, { motivo_devolucao: motivo, devolucao_total: dev?.lancamento_manual ? true : false });
-      setData(prev => ({ ...prev, dev: { ...prev.dev, motivo_devolucao: motivo } }));
+      const areaMotivo = motivosDB.find(m => m.motivo === motivo)?.area || null;
+      await dbUpdateMotivo(id, {
+        motivo_devolucao: motivo,
+        devolucao_total: dev?.lancamento_manual ? true : false,
+        area_responsavel: areaMotivo,
+      });
+      setData(prev => ({ ...prev, dev: { ...prev.dev, motivo_devolucao: motivo, area_responsavel: areaMotivo } }));
       setEditMotivo(false); onSaved?.();
     } catch (e) { alert(e.message); }
     finally { setSavingMotivo(false); }
@@ -201,8 +213,29 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
                   <label className="input-label">Motivo</label>
                   <select value={motivo} onChange={e => setMotivo(e.target.value)} className="input">
                     <option value="">— Selecionar —</option>
-                    {MOTIVOS.map(m => <option key={m} value={m}>{m}</option>)}
+                    {/* Agrupar por área */}
+                    {Object.entries(
+                      motivosDB.reduce((acc, m) => {
+                        if (!acc[m.area]) acc[m.area] = [];
+                        acc[m.area].push(m.motivo);
+                        return acc;
+                      }, {})
+                    ).sort(([a],[b]) => a.localeCompare(b)).map(([area, motivos]) => (
+                      <optgroup key={area} label={`── ${area}`}>
+                        {motivos.map(m => <option key={m} value={m}>{m}</option>)}
+                      </optgroup>
+                    ))}
                   </select>
+                  {motivo && motivosDB.find(m => m.motivo === motivo) && (
+                    <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 10.5, color: 'var(--text-3)' }}>Área responsável:</span>
+                      {(() => {
+                        const area = motivosDB.find(m => m.motivo === motivo)?.area;
+                        const cfg = AREA_CORES[area] || { color: 'var(--text-2)', bg: 'var(--surface-3)' };
+                        return <span style={{ fontSize: 11, fontWeight: 700, color: cfg.color, background: cfg.bg, padding: '2px 8px', borderRadius: 20 }}>{area}</span>;
+                      })()}
+                    </div>
+                  )}
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button onClick={() => setEditMotivo(false)} className="btn btn-ghost btn-sm">Cancelar</button>
@@ -275,6 +308,16 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
                     ? <span style={{ color: 'var(--red)', fontWeight: 700 }}>{dev.motivo_devolucao}</span>
                     : <span style={{ color: 'var(--text-3)', fontStyle: 'italic', fontSize: 11.5 }}>Não classificado — clique em "Classificar motivo"</span>
                 }/>
+                {dev.area_responsavel && (() => {
+                  const cfg = AREA_CORES[dev.area_responsavel] || { color: 'var(--text-2)', bg: 'var(--surface-3)' };
+                  return (
+                    <DataItem label="Área responsável" value={
+                      <span style={{ fontSize: 12, fontWeight: 700, color: cfg.color, background: cfg.bg, padding: '3px 10px', borderRadius: 20, display: 'inline-block' }}>
+                        {dev.area_responsavel}
+                      </span>
+                    }/>
+                  );
+                })()}
                 <DataItem label="Tipo" value={
                   dev.lancamento_manual
                     ? <span style={{ color: 'var(--red)', fontWeight: 700 }}>● Total <span style={{ fontSize: 10, fontWeight: 500, color: 'var(--text-3)' }}>(lançamento manual)</span></span>

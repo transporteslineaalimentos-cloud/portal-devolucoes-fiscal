@@ -508,6 +508,78 @@ export default function Dashboard({ onGoTo }) {
 
       </div>
 
+      {/* ── Linha 5: Por área + Top motivos ─────────────── */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+
+        {/* Por área responsável */}
+        <Card title="Devoluções por área responsável" subtitle="Valor e quantidade acumulado 2026" noPad>
+          {(d.por_area || []).map((a, i) => {
+            const CORES = {
+              'COMERCIAL':         '#1E4DB7',
+              'TRANSPORTE':        '#D97706',
+              'QUALIDADE':         '#7C3AED',
+              'FISCAL':            '#DC2626',
+              'LOGÍSTICA REVERSA': '#16A34A',
+              'LOGÍSTICA':         '#16A34A',
+              'SEM CLASSIFICAÇÃO': '#9CA3AF',
+            };
+            const cor = CORES[a.area] || '#9CA3AF';
+            const maxVal = d.por_area[0]?.valor || 1;
+            const pct = Math.round((a.valor / (d.totais?.valor || 1)) * 100);
+            return (
+              <div key={a.area} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 18px', borderBottom: i < (d.por_area?.length||0)-1 ? '1px solid var(--border)' : 'none' }}>
+                <div style={{ width: 10, height: 10, borderRadius: '50%', background: cor, flexShrink: 0 }}/>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>{a.area}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                      <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-3)' }}>{pct}% · {a.qtd} NFs</span>
+                      <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>{fmtBRL(a.valor)}</span>
+                    </div>
+                  </div>
+                  <Bar valor={a.valor} max={maxVal} color={cor} height={5}/>
+                </div>
+              </div>
+            );
+          })}
+        </Card>
+
+        {/* Top motivos */}
+        <Card title="Top motivos de devolução" subtitle="Por quantidade de ocorrências" noPad>
+          {(d.top_motivos || []).map((m, i) => {
+            const CORES = {
+              'COMERCIAL':         '#1E4DB7',
+              'TRANSPORTE':        '#D97706',
+              'QUALIDADE':         '#7C3AED',
+              'FISCAL':            '#DC2626',
+              'LOGÍSTICA REVERSA': '#16A34A',
+              'LOGÍSTICA':         '#16A34A',
+              'SEM CLASSIFICAÇÃO': '#9CA3AF',
+            };
+            const cor = CORES[m.area] || '#9CA3AF';
+            const maxQtd = d.top_motivos[0]?.qtd || 1;
+            return (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 18px', borderBottom: i < (d.top_motivos?.length||0)-1 ? '1px solid var(--border)' : 'none' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
+                      <div style={{ width: 7, height: 7, borderRadius: '50%', background: cor, flexShrink: 0 }}/>
+                      <span className="ellipsis" style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--text)' }}>{m.motivo}</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, flexShrink: 0, alignItems: 'center' }}>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: cor, background: cor + '18', padding: '1px 6px', borderRadius: 20 }}>{m.area?.split(' ')[0]}</span>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-2)', minWidth: 28, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{m.qtd}x</span>
+                    </div>
+                  </div>
+                  <Bar valor={m.qtd} max={maxQtd} color={cor} height={4}/>
+                </div>
+              </div>
+            );
+          })}
+        </Card>
+
+      </div>
+
     </div>
   );
 }
