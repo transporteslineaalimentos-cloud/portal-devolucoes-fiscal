@@ -278,7 +278,26 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
               {/* Devolução */}
               <SectionCard title="NF-e de Devolução" icon="M9 14l-4-4 4-4M5 10h11a4 4 0 010 8h-1" color="var(--blue)">
                 <DataItem label="Número / Série" value={`${dev.nf_numero} · Série ${dev.nf_serie}`}/>
-                <DataItem label="Data de emissão" value={fmtDate(dev.dt_emissao)}/>
+                <DataItem label="Data de emissão" value={
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <span>{fmtDate(dev.dt_emissao)}</span>
+                    {dev.flag_emissao_entrega === 'divergente' && (
+                      <span style={{ fontSize: 10, fontWeight: 700, color: '#D97706', background: 'rgba(217,119,6,0.10)', padding: '2px 7px', borderRadius: 20 }}>
+                        ⚠ Data divergente da entrega
+                      </span>
+                    )}
+                    {dev.flag_emissao_entrega === 'no_ato' && (
+                      <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--green)', background: 'var(--green-dim)', padding: '2px 7px', borderRadius: 20 }}>
+                        ✓ Emitida no ato da entrega
+                      </span>
+                    )}
+                    {dev.flag_emissao_entrega === 'aguardando_entrega' && (
+                      <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-3)', background: 'var(--surface-3)', padding: '2px 7px', borderRadius: 20 }}>
+                        ⏳ Aguardando entrega
+                      </span>
+                    )}
+                  </div>
+                }/>
                 <DataItem label="CFOPs" value={
                   <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 2 }}>
                     {(dev.cfops || []).map(c => (

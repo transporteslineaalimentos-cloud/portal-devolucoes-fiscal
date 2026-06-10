@@ -84,7 +84,7 @@ export async function dbListDevolucoes({ page = 0, filters = {} }) {
       cfops, tipo, status_portal, xml_baixado, xml_path,
       chave_nfe_referenciada, itens, created_at,
       inf_complementar, motivo_devolucao, devolucao_total, lancamento_manual,
-      nf_venda_localizada
+      nf_venda_localizada, area_responsavel, flag_emissao_entrega
     `, { count: 'exact' })
     .eq('tipo', 'devolucao')
     .gte('dt_emissao', '2026-01-01')
@@ -101,6 +101,11 @@ export async function dbListDevolucoes({ page = 0, filters = {} }) {
   if (filters.lancamento_manual === 'manual') q = q.eq('lancamento_manual', true);
   if (filters.nf_venda === 'localizada')      q = q.eq('nf_venda_localizada', true);
   if (filters.nf_venda === 'nao_localizada')  q = q.eq('nf_venda_localizada', false);
+  if (filters.com_motivo === 'com')           q = q.not('motivo_devolucao', 'is', null);
+  if (filters.com_motivo === 'sem')           q = q.is('motivo_devolucao', null);
+  if (filters.flag_emissao === 'divergente')       q = q.eq('flag_emissao_entrega', 'divergente');
+  if (filters.flag_emissao === 'no_ato')           q = q.eq('flag_emissao_entrega', 'no_ato');
+  if (filters.flag_emissao === 'aguardando')        q = q.eq('flag_emissao_entrega', 'aguardando_entrega');
 
   // Busca — usa filtro separado encapsulado para não conflitar com outros filtros
   if (filters.search) {

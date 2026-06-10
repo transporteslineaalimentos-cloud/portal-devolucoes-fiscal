@@ -39,6 +39,7 @@ export default function Devolucoes({ user, initialFilters = {} }) {
   const [filters, setFilters] = useState({
     search: '', status: initialFilters.status || '',
     cnpj_dest: '', uf: '', dt_inicio: '', dt_fim: '',
+    com_motivo: '', flag_emissao: '',
   });
   const searchRef = useRef(null);
   const PAGE_SIZE = 40;
@@ -113,10 +114,18 @@ export default function Devolucoes({ user, initialFilters = {} }) {
               <option value="total">Somente Total</option>
               <option value="parcial">Somente Parcial</option>
             </select>
-            <select value={filters.lancamento_manual || ''} onChange={e => applyFilter({ lancamento_manual: e.target.value })}
-              className="input" style={{ width: 'auto', minWidth: 140 }}>
-              <option value="">Todas as origens</option>
-              <option value="manual">Somente Manuais</option>
+            <select value={filters.com_motivo || ''} onChange={e => applyFilter({ com_motivo: e.target.value })}
+              className="input" style={{ width: 'auto', minWidth: 170 }}>
+              <option value="">Motivo: todos</option>
+              <option value="com">✓ Com motivo classificado</option>
+              <option value="sem">✗ Sem motivo (pendente)</option>
+            </select>
+            <select value={filters.flag_emissao || ''} onChange={e => applyFilter({ flag_emissao: e.target.value })}
+              className="input" style={{ width: 'auto', minWidth: 190 }}>
+              <option value="">Data emissão: todas</option>
+              <option value="divergente">⚠ Emissão divergente da entrega</option>
+              <option value="no_ato">✓ Emitida no ato da entrega</option>
+              <option value="aguardando">⏳ Aguardando entrega</option>
             </select>
             <select value={filters.nf_venda || ''} onChange={e => applyFilter({ nf_venda: e.target.value })}
               className="input" style={{ width: 'auto', minWidth: 170 }}>
@@ -281,9 +290,29 @@ export default function Devolucoes({ user, initialFilters = {} }) {
                 </span>
               </div>
 
-              {/* Emissão */}
-              <div style={{ fontSize: 12, color: 'var(--text-2)', fontVariantNumeric: 'tabular-nums' }}>
-                {fmtDate(row.dt_emissao)}
+              {/* Emissão + flag */}
+              <div>
+                <div style={{ fontSize: 12, color: 'var(--text-2)', fontVariantNumeric: 'tabular-nums' }}>
+                  {fmtDate(row.dt_emissao)}
+                </div>
+                {row.flag_emissao_entrega === 'divergente' && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 2 }}>
+                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#D97706" strokeWidth="2.5" strokeLinecap="round"><path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+                    <span style={{ fontSize: 9, fontWeight: 700, color: '#D97706' }}>DATA DIVERGENTE</span>
+                  </div>
+                )}
+                {row.flag_emissao_entrega === 'aguardando_entrega' && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 2 }}>
+                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                    <span style={{ fontSize: 9, fontWeight: 600, color: 'var(--text-3)' }}>AG. ENTREGA</span>
+                  </div>
+                )}
+                {row.flag_emissao_entrega === 'no_ato' && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 2 }}>
+                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="var(--green)" strokeWidth="2.5" strokeLinecap="round"><path d="M20 6L9 17l-5-5"/></svg>
+                    <span style={{ fontSize: 9, fontWeight: 600, color: 'var(--green)' }}>NO ATO</span>
+                  </div>
+                )}
               </div>
 
               {/* Valor */}
