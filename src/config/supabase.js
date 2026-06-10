@@ -269,6 +269,8 @@ export async function dbGetDashboard() {
     topClientes:   d?.top_clientes || [],
     topUfs:        d?.top_ufs      || [],
     cfops:         d?.cfops        || [],
+    porArea:       d?.por_area     || [],
+    topMotivos:    d?.top_motivos  || [],
   };
 }
 

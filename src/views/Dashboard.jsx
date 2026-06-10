@@ -513,7 +513,7 @@ export default function Dashboard({ onGoTo }) {
 
         {/* Por área responsável */}
         <Card title="Devoluções por área responsável" subtitle="Valor e quantidade acumulado 2026" noPad>
-          {(d.por_area || []).map((a, i) => {
+          {(d.porArea || []).map((a, i) => {
             const CORES = {
               'COMERCIAL':         '#1E4DB7',
               'TRANSPORTE':        '#D97706',
@@ -524,10 +524,10 @@ export default function Dashboard({ onGoTo }) {
               'SEM CLASSIFICAÇÃO': '#9CA3AF',
             };
             const cor = CORES[a.area] || '#9CA3AF';
-            const maxVal = d.por_area[0]?.valor || 1;
+            const maxVal = d.porArea[0]?.valor || 1;
             const pct = Math.round((a.valor / (d.totais?.valor || 1)) * 100);
             return (
-              <div key={a.area} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 18px', borderBottom: i < (d.por_area?.length||0)-1 ? '1px solid var(--border)' : 'none' }}>
+              <div key={a.area} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 18px', borderBottom: i < (d.porArea?.length||0)-1 ? '1px solid var(--border)' : 'none' }}>
                 <div style={{ width: 10, height: 10, borderRadius: '50%', background: cor, flexShrink: 0 }}/>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
@@ -546,7 +546,7 @@ export default function Dashboard({ onGoTo }) {
 
         {/* Top motivos */}
         <Card title="Top motivos de devolução" subtitle="Por quantidade de ocorrências" noPad>
-          {(d.top_motivos || []).map((m, i) => {
+          {(d.topMotivos || []).map((m, i) => {
             const CORES = {
               'COMERCIAL':         '#1E4DB7',
               'TRANSPORTE':        '#D97706',
@@ -557,9 +557,9 @@ export default function Dashboard({ onGoTo }) {
               'SEM CLASSIFICAÇÃO': '#9CA3AF',
             };
             const cor = CORES[m.area] || '#9CA3AF';
-            const maxQtd = d.top_motivos[0]?.qtd || 1;
+            const maxQtd = d.topMotivos[0]?.qtd || 1;
             return (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 18px', borderBottom: i < (d.top_motivos?.length||0)-1 ? '1px solid var(--border)' : 'none' }}>
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 18px', borderBottom: i < (d.topMotivos?.length||0)-1 ? '1px solid var(--border)' : 'none' }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
