@@ -86,6 +86,7 @@ export async function dbListDevolucoes({ page = 0, filters = {} }) {
       chave_nfe_referenciada, itens, created_at
     `, { count: 'exact' })
     .eq('tipo', 'devolucao')
+    .gte('dt_emissao', '2026-01-01')   // apenas NFs de venda emitidas a partir de 2026
     .order('dt_emissao', { ascending: false })
     .range(from, to);
 
@@ -194,11 +195,16 @@ export async function dbGetXmlUrl(xmlPath) {
 
 export async function dbGetKpis() {
   syncAuthToken();
+  const base = () => supabase
+    .from('oobj_nfe_recebidas')
+    .eq('tipo', 'devolucao')
+    .gte('dt_emissao', '2026-01-01');   // apenas NFs emitidas a partir de 2026
+
   const [total, pendentes, emAnalise, concluidas] = await Promise.all([
-    supabase.from('oobj_nfe_recebidas').select('valor', { count: 'exact' }).eq('tipo', 'devolucao'),
-    supabase.from('oobj_nfe_recebidas').select('valor', { count: 'exact' }).eq('tipo', 'devolucao').eq('status_portal', 'pendente'),
-    supabase.from('oobj_nfe_recebidas').select('valor', { count: 'exact' }).eq('tipo', 'devolucao').eq('status_portal', 'em_analise'),
-    supabase.from('oobj_nfe_recebidas').select('valor', { count: 'exact' }).eq('tipo', 'devolucao').in('status_portal', ['aprovada', 'rejeitada', 'concluida']),
+    base().select('valor', { count: 'exact' }),
+    base().select('valor', { count: 'exact' }).eq('status_portal', 'pendente'),
+    base().select('valor', { count: 'exact' }).eq('status_portal', 'em_analise'),
+    base().select('valor', { count: 'exact' }).in('status_portal', ['aprovada', 'rejeitada', 'concluida']),
   ]);
 
   const soma = (r) => (r?.data || []).reduce((s, x) => s + parseFloat(x.valor || 0), 0);
