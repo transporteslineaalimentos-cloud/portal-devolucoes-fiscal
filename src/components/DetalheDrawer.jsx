@@ -1,6 +1,18 @@
 import { useEffect, useState } from 'react';
-import { dbGetDevolucaoDetail, dbUpdateStatus, dbGetXmlUrl } from '../config/supabase';
+import { dbGetDevolucaoDetail, dbUpdateStatus, dbGetXmlUrl, dbUpdateMotivo } from '../config/supabase';
 import { fmtBRL, fmtDate, fmtDateTime, fmtCNPJ, CNPJ_MAP, STATUS_CFG, STATUS_OPTIONS, Badge } from '../utils.jsx';
+
+const MOTIVOS_PADRAO = [
+  'Avaria no recebimento',
+  'Falta no recebimento',
+  'Mercadoria não solicitada',
+  'Desacordo com o pedido',
+  'Produto fora da validade',
+  'Desvio de qualidade',
+  'Erro de faturamento',
+  'Recusa na entrega',
+  'Outros',
+];
 
 const Ic = ({ d, size = 14, color = 'currentColor' }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
@@ -47,20 +59,26 @@ function SectionHead({ title, count, badge }) {
 }
 
 export default function DetalheDrawer({ id, user, onClose, onSaved }) {
-  const [data, setData]          = useState(null);
-  const [loading, setLoading]    = useState(true);
-  const [editStatus, setEdit]    = useState(false);
-  const [newStatus, setNewStatus]= useState('');
-  const [obs, setObs]            = useState('');
-  const [saving, setSaving]      = useState(false);
-  const [saveErr, setSaveErr]    = useState('');
+  const [data, setData]             = useState(null);
+  const [loading, setLoading]       = useState(true);
+  const [editStatus, setEdit]       = useState(false);
+  const [newStatus, setNewStatus]   = useState('');
+  const [obs, setObs]               = useState('');
+  const [saving, setSaving]         = useState(false);
+  const [saveErr, setSaveErr]       = useState('');
+  const [editMotivo, setEditMotivo] = useState(false);
+  const [motivo, setMotivo]         = useState('');
+  const [devTotal, setDevTotal]     = useState(null);
+  const [savingMotivo, setSavingMotivo] = useState(false);
 
   useEffect(() => {
     if (!id) return;
-    setLoading(true); setData(null); setEdit(false);
+    setLoading(true); setData(null); setEdit(false); setEditMotivo(false);
     dbGetDevolucaoDetail(id).then(d => {
       setData(d);
       setNewStatus(d?.dev?.status_portal || 'pendente');
+      setMotivo(d?.dev?.motivo_devolucao || '');
+      setDevTotal(d?.dev?.devolucao_total ?? null);
       setLoading(false);
     }).catch(() => setLoading(false));
   }, [id]);
@@ -70,6 +88,17 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
       const url = await dbGetXmlUrl(data.dev.xml_path);
       if (url) window.open(url, '_blank');
     } catch (e) { alert('Erro ao gerar link: ' + e.message); }
+  };
+
+  const handleSaveMotivo = async () => {
+    setSavingMotivo(true);
+    try {
+      await dbUpdateMotivo(id, { motivo_devolucao: motivo, devolucao_total: devTotal });
+      setData(prev => ({ ...prev, dev: { ...prev.dev, motivo_devolucao: motivo, devolucao_total: devTotal } }));
+      setEditMotivo(false);
+      onSaved?.();
+    } catch (e) { alert(e.message); }
+    finally { setSavingMotivo(false); }
   };
 
   const handleSaveStatus = async () => {
@@ -139,12 +168,53 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
                   XML
                 </button>
               )}
+              <button onClick={() => setEditMotivo(v => !v)}
+                className={`btn btn-sm ${editMotivo ? 'btn-primary' : 'btn-outline'}`}>
+                <Ic d="M7 8h10M7 12h6m-6 4h10M5 3h14a2 2 0 012 2v16l-4-2-4 2-4-2-4 2V5a2 2 0 012-2z" size={12}/>
+                Motivo
+              </button>
               <button onClick={() => setEdit(v => !v)}
                 className={`btn btn-sm ${editStatus ? 'btn-primary' : 'btn-outline'}`}>
                 <Ic d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" size={12}/>
                 Atualizar status
               </button>
             </div>
+
+            {/* Editor de motivo */}
+            {editMotivo && (
+              <div style={{ padding: '14px 22px', background: 'var(--surface-2)', borderBottom: '1px solid var(--border)' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 10 }}>
+                  <div>
+                    <label className="input-label">Motivo da devolução</label>
+                    <select value={motivo} onChange={e => setMotivo(e.target.value)} className="input">
+                      <option value="">— Selecionar —</option>
+                      {MOTIVOS_PADRAO.map(m => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                    {motivo === 'Outros' && (
+                      <input type="text" placeholder="Descreva o motivo..." className="input" style={{ marginTop: 6 }}
+                        onChange={e => setMotivo(e.target.value)}/>
+                    )}
+                  </div>
+                  <div>
+                    <label className="input-label">Tipo de devolução</label>
+                    <div style={{ display: 'flex', gap: 8, marginTop: 2 }}>
+                      {[{ v: true, l: 'Total' }, { v: false, l: 'Parcial' }, { v: null, l: 'Não definido' }].map(opt => (
+                        <button key={String(opt.v)} onClick={() => setDevTotal(opt.v)}
+                          className={`btn btn-sm ${devTotal === opt.v ? 'btn-primary' : 'btn-outline'}`}>
+                          {opt.l}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={() => setEditMotivo(false)} className="btn btn-ghost btn-sm">Cancelar</button>
+                  <button onClick={handleSaveMotivo} disabled={savingMotivo} className="btn btn-primary btn-sm">
+                    {savingMotivo ? 'Salvando...' : 'Salvar'}
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Editor de status */}
             {editStatus && (
@@ -190,6 +260,37 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
                   ))}
                 </span>
               } fullWidth/>
+              {/* Motivo e tipo de devolução */}
+              <Field label="Motivo da devolução" value={
+                dev.motivo_devolucao
+                  ? <span style={{ fontWeight: 600, color: 'var(--red)' }}>{dev.motivo_devolucao}</span>
+                  : <span style={{ color: 'var(--text-3)', fontStyle: 'italic' }}>Não informado — clique em "Motivo" para classificar</span>
+              } fullWidth/>
+              <Field label="Tipo" value={
+                <span style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 5,
+                  fontSize: 11, fontWeight: 700,
+                  color: dev.devolucao_total === true ? 'var(--red)' : dev.devolucao_total === false ? 'var(--yellow)' : 'var(--text-3)',
+                  background: dev.devolucao_total === true ? 'var(--red-dim)' : dev.devolucao_total === false ? 'var(--yellow-dim)' : 'var(--surface-3)',
+                  padding: '2px 8px', borderRadius: 20,
+                }}>
+                  {dev.devolucao_total === true ? '● Devolução Total' : dev.devolucao_total === false ? '◐ Devolução Parcial' : '— Não definido'}
+                </span>
+              }/>
+              {dev.lancamento_manual && (
+                <Field label="Origem" value={
+                  <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--purple)', background: 'var(--purple-dim)', padding: '2px 8px', borderRadius: 20 }}>
+                    ✎ Lançamento Manual
+                  </span>
+                }/>
+              )}
+              {dev.inf_complementar && (
+                <Field label="Informações complementares (XML)" value={
+                  <div style={{ fontSize: 11.5, color: 'var(--text-2)', lineHeight: 1.55, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                    {dev.inf_complementar}
+                  </div>
+                } fullWidth/>
+              )}
               <Field label="Empresa destinatária" value={CNPJ_MAP[dev.cnpj_destinatario] ? `${CNPJ_MAP[dev.cnpj_destinatario]} · ${fmtCNPJ(dev.cnpj_destinatario)}` : fmtCNPJ(dev.cnpj_destinatario)} fullWidth/>
               {dev.chave_nfe && (
                 <Field label="Chave de acesso" value={dev.chave_nfe} mono fullWidth/>

@@ -82,21 +82,37 @@ export async function dbListDevolucoes({ page = 0, filters = {} }) {
       municipio_emitente, uf_emitente, cnpj_emitente, cnpj_destinatario,
       nat_operacao, dt_emissao, valor, valor_produtos, valor_icms, valor_st,
       cfops, tipo, status_portal, xml_baixado, xml_path,
-      chave_nfe_referenciada, itens, created_at
+      chave_nfe_referenciada, itens, created_at,
+      inf_complementar, motivo_devolucao, devolucao_total, lancamento_manual
     `, { count: 'exact' })
     .eq('tipo', 'devolucao')
-    .gte('dt_emissao', '2026-01-01')   // apenas NFs de venda emitidas a partir de 2026
+    .gte('dt_emissao', '2026-01-01')
     .order('dt_emissao', { ascending: false })
     .range(from, to);
 
-  if (filters.status)    q = q.eq('status_portal', filters.status);
-  if (filters.cnpj_dest) q = q.eq('cnpj_destinatario', filters.cnpj_dest);
-  if (filters.uf)        q = q.eq('uf_emitente', filters.uf);
-  if (filters.dt_inicio) q = q.gte('dt_emissao', filters.dt_inicio);
-  if (filters.dt_fim)    q = q.lte('dt_emissao', filters.dt_fim);
+  if (filters.status)         q = q.eq('status_portal', filters.status);
+  if (filters.cnpj_dest)      q = q.eq('cnpj_destinatario', filters.cnpj_dest);
+  if (filters.uf)             q = q.eq('uf_emitente', filters.uf);
+  if (filters.dt_inicio)      q = q.gte('dt_emissao', filters.dt_inicio);
+  if (filters.dt_fim)         q = q.lte('dt_emissao', filters.dt_fim);
+  if (filters.devolucao_total === 'total')    q = q.eq('devolucao_total', true);
+  if (filters.devolucao_total === 'parcial')  q = q.eq('devolucao_total', false);
+  if (filters.lancamento_manual === 'manual') q = q.eq('lancamento_manual', true);
+
+  // Busca — usa filtro separado encapsulado para não conflitar com outros filtros
   if (filters.search) {
-    const s = filters.search.trim();
-    q = q.or(`nome_emitente.ilike.%${s}%,nf_numero::text.ilike.%${s}%`);
+    const s = filters.search.trim().replace(/\./g,'').replace(/\//g,'').replace(/-/g,'');
+    const isNum = /^\d+$/.test(s);
+    if (isNum && s.length <= 9) {
+      // número curto = número da NF
+      q = q.eq('nf_numero', parseInt(s, 10));
+    } else if (isNum && s.length >= 10) {
+      // número longo = CNPJ
+      q = q.ilike('cnpj_emitente', `%${s}%`);
+    } else {
+      // texto = nome do emitente ou município
+      q = q.or(`nome_emitente.ilike.%${filters.search.trim()}%,municipio_emitente.ilike.%${filters.search.trim()}%`);
+    }
   }
 
   const { data, error, count } = await q;
@@ -226,4 +242,65 @@ export async function dbGetDashboard() {
     topUfs:        d?.top_ufs      || [],
     cfops:         d?.cfops        || [],
   };
+}
+
+// Atualizar motivo e tipo (total/parcial) de uma devolução
+export async function dbUpdateMotivo(id, { motivo_devolucao, devolucao_total }) {
+  syncAuthToken();
+  const { error } = await supabase
+    .from('oobj_nfe_recebidas')
+    .update({ motivo_devolucao, devolucao_total, updated_at: new Date().toISOString() })
+    .eq('id', id);
+  if (error) throw new Error(error.message);
+}
+
+// Lançar devolução total manual (sem NFD emitida pelo cliente)
+export async function dbLancarDevolucaoManual(dados) {
+  syncAuthToken();
+
+  // Buscar dados da NF de venda na active_webhooks para preenchimento automático
+  let nfVenda = null;
+  if (dados.chave_nfe_referenciada) {
+    const { data } = await supabase
+      .from('active_webhooks')
+      .select('numero,serie,chave_nfe,destinatario_nome,destinatario_cnpj,remetente_cnpj,data_emissao,valor_mercadoria,transportador_nome,pedido')
+      .eq('chave_nfe', dados.chave_nfe_referenciada)
+      .eq('tipo', 'nota_fiscal')
+      .limit(1)
+      .single();
+    nfVenda = data;
+  }
+
+  const row = {
+    chave_nfe:              `MANUAL-${Date.now()}`,   // chave fictícia única
+    cnpj_destinatario:      dados.cnpj_destinatario || '05207076000297',
+    cnpj_emitente:          nfVenda?.destinatario_cnpj || dados.cnpj_emitente || null,
+    nome_emitente:          dados.nome_emitente || nfVenda?.destinatario_nome || null,
+    uf_emitente:            dados.uf_emitente || null,
+    municipio_emitente:     dados.municipio_emitente || null,
+    dt_emissao:             dados.dt_emissao || new Date().toISOString().slice(0, 10),
+    dt_recebimento_oobj:    new Date().toISOString(),
+    valor:                  parseFloat(dados.valor) || nfVenda ? parseFloat(nfVenda?.valor_mercadoria || 0) : 0,
+    valor_produtos:         parseFloat(dados.valor) || null,
+    nat_operacao:           'DEVOLUCAO TOTAL - LANÇAMENTO MANUAL',
+    cfops:                  ['6202'],  // CFOP padrão devolução interestadual
+    tipo:                   'devolucao',
+    status_portal:          'pendente',
+    devolucao_total:        true,
+    lancamento_manual:      true,
+    motivo_devolucao:       dados.motivo_devolucao || null,
+    inf_complementar:       dados.observacao || null,
+    chave_nfe_referenciada: dados.chave_nfe_referenciada || null,
+    nf_numero:              null,  // sem NFD emitida
+    xml_baixado:            false,
+    raw_json:               { lancado_por: dados.usuario, lancado_em: new Date().toISOString() },
+  };
+
+  const { data, error } = await supabase
+    .from('oobj_nfe_recebidas')
+    .insert(row)
+    .select('id')
+    .single();
+  if (error) throw new Error(error.message);
+  return data;
 }

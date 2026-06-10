@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { dbListDevolucoes } from '../config/supabase';
 import { fmtBRL, fmtDate, CNPJ_MAP, STATUS_CFG, Badge } from '../utils.jsx';
 import DetalheDrawer from '../components/DetalheDrawer.jsx';
+import ModalLancamentoManual from '../components/ModalLancamentoManual.jsx';
 
 const Ic = ({ d, size = 14, color = 'currentColor' }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
@@ -27,12 +28,13 @@ const CNPJ_OPTIONS = [
 ];
 
 export default function Devolucoes({ user, initialFilters = {} }) {
-  const [rows, setRows]       = useState([]);
-  const [total, setTotal]     = useState(0);
-  const [page, setPage]       = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState('');
-  const [selectedId, setSelected] = useState(null);
+  const [rows, setRows]         = useState([]);
+  const [total, setTotal]       = useState(0);
+  const [page, setPage]         = useState(0);
+  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState('');
+  const [selectedId, setSelected]     = useState(null);
+  const [showModal, setShowModal]     = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({
     search: '', status: initialFilters.status || '',
@@ -77,6 +79,11 @@ export default function Devolucoes({ user, initialFilters = {} }) {
               <Ic d="M6 18L18 6M6 6l12 12" size={12}/> Limpar
             </button>
           )}
+          <button onClick={() => setShowModal(true)} className="btn btn-sm"
+            style={{ background: 'var(--purple)', color: '#fff', flexShrink: 0 }}>
+            <Ic d="M12 5v14M5 12h14" size={13}/>
+            Lançar manual
+          </button>
           <button onClick={() => setShowFilters(v => !v)}
             className={`btn btn-sm ${showFilters ? 'btn-primary' : 'btn-outline'}`}>
             <Ic d="M4 6h16M7 12h10M10 18h4" size={13}/>
@@ -99,6 +106,17 @@ export default function Devolucoes({ user, initialFilters = {} }) {
             <select value={filters.cnpj_dest} onChange={e => applyFilter({ cnpj_dest: e.target.value })}
               className="input" style={{ width: 'auto', minWidth: 150 }}>
               {CNPJ_OPTIONS.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
+            </select>
+            <select value={filters.devolucao_total || ''} onChange={e => applyFilter({ devolucao_total: e.target.value })}
+              className="input" style={{ width: 'auto', minWidth: 140 }}>
+              <option value="">Total e Parcial</option>
+              <option value="total">Somente Total</option>
+              <option value="parcial">Somente Parcial</option>
+            </select>
+            <select value={filters.lancamento_manual || ''} onChange={e => applyFilter({ lancamento_manual: e.target.value })}
+              className="input" style={{ width: 'auto', minWidth: 140 }}>
+              <option value="">Todas as origens</option>
+              <option value="manual">Somente Manuais</option>
             </select>
             <input type="text" placeholder="UF" maxLength={2}
               value={filters.uf}
@@ -181,11 +199,22 @@ export default function Devolucoes({ user, initialFilters = {} }) {
 
               {/* Emitente */}
               <div style={{ overflow: 'hidden' }}>
-                <div className="ellipsis" style={{ fontSize: 12.5, color: 'var(--text)', fontWeight: 500 }}>
-                  {row.nome_emitente || '—'}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                  <div className="ellipsis" style={{ fontSize: 12.5, color: 'var(--text)', fontWeight: 500 }}>
+                    {row.nome_emitente || '—'}
+                  </div>
+                  {row.lancamento_manual && (
+                    <span style={{ fontSize: 9, fontWeight: 700, background: 'var(--purple-dim)', color: 'var(--purple)', padding: '1px 5px', borderRadius: 10, flexShrink: 0 }}>MANUAL</span>
+                  )}
+                  {row.devolucao_total === true && (
+                    <span style={{ fontSize: 9, fontWeight: 700, background: 'var(--red-dim)', color: 'var(--red)', padding: '1px 5px', borderRadius: 10, flexShrink: 0 }}>TOTAL</span>
+                  )}
+                  {row.devolucao_total === false && (
+                    <span style={{ fontSize: 9, fontWeight: 700, background: 'var(--yellow-dim)', color: 'var(--yellow)', padding: '1px 5px', borderRadius: 10, flexShrink: 0 }}>PARCIAL</span>
+                  )}
                 </div>
                 <div className="ellipsis" style={{ fontSize: 10.5, color: 'var(--text-3)', marginTop: 1 }}>
-                  {row.municipio_emitente || row.cnpj_emitente || ''}
+                  {row.motivo_devolucao || row.municipio_emitente || row.cnpj_emitente || ''}
                 </div>
               </div>
 
@@ -267,6 +296,14 @@ export default function Devolucoes({ user, initialFilters = {} }) {
         <DetalheDrawer id={selectedId} user={user}
           onClose={() => setSelected(null)}
           onSaved={() => load(filters, page)}
+        />
+      )}
+
+      {showModal && (
+        <ModalLancamentoManual
+          user={user}
+          onClose={() => setShowModal(false)}
+          onSaved={() => { load(filters, page); }}
         />
       )}
     </div>
