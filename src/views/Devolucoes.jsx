@@ -206,10 +206,10 @@ export default function Devolucoes({ user, initialFilters = {} }) {
                   {row.lancamento_manual && (
                     <span style={{ fontSize: 9, fontWeight: 700, background: 'var(--purple-dim)', color: 'var(--purple)', padding: '1px 5px', borderRadius: 10, flexShrink: 0 }}>MANUAL</span>
                   )}
-                  {row.devolucao_total === true && (
+                  {row.lancamento_manual === true && (
                     <span style={{ fontSize: 9, fontWeight: 700, background: 'var(--red-dim)', color: 'var(--red)', padding: '1px 5px', borderRadius: 10, flexShrink: 0 }}>TOTAL</span>
                   )}
-                  {row.devolucao_total === false && (
+                  {!row.lancamento_manual && (
                     <span style={{ fontSize: 9, fontWeight: 700, background: 'var(--yellow-dim)', color: 'var(--yellow)', padding: '1px 5px', borderRadius: 10, flexShrink: 0 }}>PARCIAL</span>
                   )}
                 </div>

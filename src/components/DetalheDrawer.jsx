@@ -93,8 +93,8 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
   const handleSaveMotivo = async () => {
     setSavingMotivo(true);
     try {
-      await dbUpdateMotivo(id, { motivo_devolucao: motivo, devolucao_total: devTotal });
-      setData(prev => ({ ...prev, dev: { ...prev.dev, motivo_devolucao: motivo, devolucao_total: devTotal } }));
+      await dbUpdateMotivo(id, { motivo_devolucao: motivo, devolucao_total: dev?.lancamento_manual ? true : false });
+      setData(prev => ({ ...prev, dev: { ...prev.dev, motivo_devolucao: motivo } }));
       setEditMotivo(false); onSaved?.();
     } catch (e) { alert(e.message); }
     finally { setSavingMotivo(false); }
@@ -134,10 +134,10 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
                     {dev?.lancamento_manual && (
                       <span style={{ fontSize: 9.5, fontWeight: 700, background: 'var(--purple-dim)', color: 'var(--purple)', padding: '2px 7px', borderRadius: 20 }}>MANUAL</span>
                     )}
-                    {dev?.devolucao_total === true && (
+                    {dev?.lancamento_manual === true && (
                       <span style={{ fontSize: 9.5, fontWeight: 700, background: 'var(--red-dim)', color: 'var(--red)', padding: '2px 7px', borderRadius: 20 }}>TOTAL</span>
                     )}
-                    {dev?.devolucao_total === false && (
+                    {!dev?.lancamento_manual && (
                       <span style={{ fontSize: 9.5, fontWeight: 700, background: 'var(--yellow-dim)', color: 'var(--yellow)', padding: '2px 7px', borderRadius: 20 }}>PARCIAL</span>
                     )}
                   </div>
@@ -196,31 +196,18 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
             {/* ── Editor motivo ──────────────────── */}
             {editMotivo && (
               <div style={{ background: 'var(--blue-dim)', border: '1px solid var(--blue-mid)', borderRadius: 10, padding: '14px 16px', marginBottom: 14 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--blue)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '.06em' }}>Classificar devolução</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
-                  <div>
-                    <label className="input-label">Motivo</label>
-                    <select value={motivo} onChange={e => setMotivo(e.target.value)} className="input">
-                      <option value="">— Selecionar —</option>
-                      {MOTIVOS.map(m => <option key={m} value={m}>{m}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="input-label">Tipo de devolução</label>
-                    <div style={{ display: 'flex', gap: 6, marginTop: 2 }}>
-                      {[{ v: true, l: 'Total' }, { v: false, l: 'Parcial' }, { v: null, l: 'N/A' }].map(opt => (
-                        <button key={String(opt.v)} onClick={() => setDevTotal(opt.v)}
-                          className={`btn btn-xs ${devTotal === opt.v ? 'btn-primary' : 'btn-outline'}`}>
-                          {opt.l}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--blue)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '.06em' }}>Classificar motivo da devolução</div>
+                <div style={{ marginBottom: 10 }}>
+                  <label className="input-label">Motivo</label>
+                  <select value={motivo} onChange={e => setMotivo(e.target.value)} className="input">
+                    <option value="">— Selecionar —</option>
+                    {MOTIVOS.map(m => <option key={m} value={m}>{m}</option>)}
+                  </select>
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button onClick={() => setEditMotivo(false)} className="btn btn-ghost btn-sm">Cancelar</button>
-                  <button onClick={handleSaveMotivo} disabled={savingMotivo} className="btn btn-primary btn-sm">
-                    {savingMotivo ? 'Salvando...' : 'Salvar classificação'}
+                  <button onClick={handleSaveMotivo} disabled={savingMotivo || !motivo} className="btn btn-primary btn-sm">
+                    {savingMotivo ? 'Salvando...' : 'Salvar'}
                   </button>
                 </div>
               </div>
@@ -286,14 +273,12 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
                 <DataItem label="Motivo" value={
                   dev.motivo_devolucao
                     ? <span style={{ color: 'var(--red)', fontWeight: 700 }}>{dev.motivo_devolucao}</span>
-                    : <span style={{ color: 'var(--text-3)', fontStyle: 'italic', fontSize: 11.5 }}>Não classificado</span>
+                    : <span style={{ color: 'var(--text-3)', fontStyle: 'italic', fontSize: 11.5 }}>Não classificado — clique em "Classificar motivo"</span>
                 }/>
                 <DataItem label="Tipo" value={
-                  dev.devolucao_total === true
-                    ? <span style={{ color: 'var(--red)', fontWeight: 700 }}>Total</span>
-                    : dev.devolucao_total === false
-                    ? <span style={{ color: 'var(--yellow)', fontWeight: 700 }}>Parcial</span>
-                    : <span style={{ color: 'var(--text-3)', fontStyle: 'italic', fontSize: 11.5 }}>Não definido</span>
+                  dev.lancamento_manual
+                    ? <span style={{ color: 'var(--red)', fontWeight: 700 }}>● Total <span style={{ fontSize: 10, fontWeight: 500, color: 'var(--text-3)' }}>(lançamento manual)</span></span>
+                    : <span style={{ color: 'var(--yellow)', fontWeight: 700 }}>◐ Parcial <span style={{ fontSize: 10, fontWeight: 500, color: 'var(--text-3)' }}>(NFD emitida pelo cliente)</span></span>
                 }/>
                 {dev.inf_complementar && (
                   <DataItem label="Obs. do XML" value={
@@ -339,11 +324,19 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
               </SectionCard>
             ) : dev.chave_nfe_referenciada ? (
               <SectionCard title="NF original de venda" icon="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" color="var(--text-3)">
-                <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 8, padding: '8px 0' }}>
-                  NF de venda não localizada. Pode ser anterior à integração do webhook do Active.
-                </div>
-                <div style={{ fontFamily: 'monospace', fontSize: 9.5, color: 'var(--text-2)', background: 'var(--surface-2)', padding: '8px 10px', borderRadius: 6, wordBreak: 'break-all', border: '1px solid var(--border)' }}>
-                  {dev.chave_nfe_referenciada}
+                <div style={{ padding: '10px 0' }}>
+                  <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 8, lineHeight: 1.5 }}>
+                    {(() => {
+                      const aamm = dev.chave_nfe_referenciada?.substring(2, 6);
+                      const ano = aamm ? `20${aamm.substring(0, 2)}` : null;
+                      return ano && parseInt(ano) < 2026
+                        ? `NF de venda emitida em ${ano} — anterior à integração do Active OnSupply. Não disponível no sistema.`
+                        : 'NF de venda não localizada no Active OnSupply. Pode estar em período de inicialização do webhook.';
+                    })()}
+                  </div>
+                  <div style={{ fontFamily: 'monospace', fontSize: 9.5, color: 'var(--text-3)', background: 'var(--surface-2)', padding: '8px 10px', borderRadius: 6, wordBreak: 'break-all', border: '1px solid var(--border)', letterSpacing: '.04em' }}>
+                    {dev.chave_nfe_referenciada}
+                  </div>
                 </div>
               </SectionCard>
             ) : null}
