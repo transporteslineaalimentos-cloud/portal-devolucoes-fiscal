@@ -2,16 +2,10 @@ import { useEffect, useState } from 'react';
 import { dbGetDevolucaoDetail, dbUpdateStatus, dbGetXmlUrl, dbUpdateMotivo } from '../config/supabase';
 import { fmtBRL, fmtDate, fmtDateTime, fmtCNPJ, CNPJ_MAP, STATUS_CFG, STATUS_OPTIONS, Badge } from '../utils.jsx';
 
-const MOTIVOS_PADRAO = [
-  'Avaria no recebimento',
-  'Falta no recebimento',
-  'Mercadoria não solicitada',
-  'Desacordo com o pedido',
-  'Produto fora da validade',
-  'Desvio de qualidade',
-  'Erro de faturamento',
-  'Recusa na entrega',
-  'Outros',
+const MOTIVOS = [
+  'Avaria no recebimento','Falta no recebimento','Mercadoria não solicitada',
+  'Desacordo com o pedido','Produto fora da validade','Desvio de qualidade',
+  'Erro de faturamento','Recusa na entrega','Outros',
 ];
 
 const Ic = ({ d, size = 14, color = 'currentColor' }) => (
@@ -21,43 +15,51 @@ const Ic = ({ d, size = 14, color = 'currentColor' }) => (
   </svg>
 );
 
-function Field({ label, value, fullWidth = false, mono = false }) {
-  return (
-    <div style={{ paddingBottom: 12, marginBottom: 12, borderBottom: '1px solid var(--border)', gridColumn: fullWidth ? '1 / -1' : undefined }}>
-      <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--text-3)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '.05em' }}>
-        {label}
-      </div>
-      <div style={{ fontSize: 12.5, color: 'var(--text)', fontWeight: 500, wordBreak: 'break-word', fontFamily: mono ? "'Courier New', monospace" : undefined, fontSize: mono ? 10 : undefined }}>
-        {value ?? '—'}
-      </div>
-    </div>
-  );
+// ── Layout helpers ────────────────────────────────────────
+function DataGrid({ children }) {
+  return <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>{children}</div>;
 }
 
-function SectionHead({ title, count, badge }) {
+function DataItem({ label, value, full, accent, large }) {
+  if (!value && value !== 0) return null;
   return (
     <div style={{
-      padding: '10px 22px', background: 'var(--surface-2)',
-      borderBottom: '1px solid var(--border)', borderTop: '1px solid var(--border)',
-      display: 'flex', alignItems: 'center', gap: 8,
+      gridColumn: full ? '1 / -1' : undefined,
+      padding: '10px 0',
+      borderBottom: '1px solid var(--border)',
     }}>
-      <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.10em', color: 'var(--text-3)' }}>
-        {title}
-      </span>
-      {count != null && (
-        <span style={{ fontSize: 10, fontWeight: 700, background: 'var(--blue-dim)', color: 'var(--blue)', padding: '1px 7px', borderRadius: 20 }}>
-          {count}
-        </span>
-      )}
-      {badge && (
-        <span style={{ fontSize: 9.5, fontWeight: 700, background: 'var(--blue-dim)', color: badge.color || 'var(--blue)', padding: '1px 7px', borderRadius: 20, letterSpacing: '.03em', marginLeft: 2 }}>
-          {badge.label}
-        </span>
-      )}
+      <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 4 }}>
+        {label}
+      </div>
+      <div style={{ fontSize: large ? 15 : 12.5, fontWeight: large ? 800 : 500, color: accent || 'var(--text)', fontVariantNumeric: 'tabular-nums', lineHeight: 1.4, wordBreak: 'break-word' }}>
+        {value}
+      </div>
     </div>
   );
 }
 
+function SectionCard({ title, icon, color = 'var(--blue)', children, action }) {
+  return (
+    <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', marginBottom: 12 }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '10px 16px', background: 'var(--surface-2)',
+        borderBottom: '1px solid var(--border)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ width: 24, height: 24, borderRadius: 6, background: color + '18', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <Ic d={icon} size={12} color={color}/>
+          </div>
+          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.01em' }}>{title}</span>
+        </div>
+        {action}
+      </div>
+      <div style={{ padding: '4px 16px 8px' }}>{children}</div>
+    </div>
+  );
+}
+
+// ── Componente principal ──────────────────────────────────
 export default function DetalheDrawer({ id, user, onClose, onSaved }) {
   const [data, setData]             = useState(null);
   const [loading, setLoading]       = useState(true);
@@ -84,10 +86,8 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
   }, [id]);
 
   const handleXml = async () => {
-    try {
-      const url = await dbGetXmlUrl(data.dev.xml_path);
-      if (url) window.open(url, '_blank');
-    } catch (e) { alert('Erro ao gerar link: ' + e.message); }
+    try { const url = await dbGetXmlUrl(data.dev.xml_path); if (url) window.open(url, '_blank'); }
+    catch (e) { alert('Erro: ' + e.message); }
   };
 
   const handleSaveMotivo = async () => {
@@ -95,8 +95,7 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
     try {
       await dbUpdateMotivo(id, { motivo_devolucao: motivo, devolucao_total: devTotal });
       setData(prev => ({ ...prev, dev: { ...prev.dev, motivo_devolucao: motivo, devolucao_total: devTotal } }));
-      setEditMotivo(false);
-      onSaved?.();
+      setEditMotivo(false); onSaved?.();
     } catch (e) { alert(e.message); }
     finally { setSavingMotivo(false); }
   };
@@ -106,101 +105,112 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
     try {
       await dbUpdateStatus(id, newStatus, obs, user?.name || user?.email || '');
       setData(prev => ({ ...prev, dev: { ...prev.dev, status_portal: newStatus } }));
-      setEdit(false); setObs('');
-      onSaved?.();
+      setEdit(false); setObs(''); onSaved?.();
     } catch (e) { setSaveErr(e.message); }
     finally { setSaving(false); }
   };
 
-  const dev  = data?.dev;
-  const nfV  = data?.nfVenda;
+  const dev = data?.dev;
+  const nfV = data?.nfVenda;
   const hist = dev?.raw_json?.obs_historico || [];
 
   return (
     <div className="drawer-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="drawer">
+      <div className="drawer" style={{ width: 600 }}>
 
-        {/* Cabeçalho */}
-        <div className="drawer-head">
-          <div>
-            <div className="drawer-head-title">
-              {loading ? 'Carregando...' : `NF-e ${dev?.nf_numero ?? '—'} · Série ${dev?.nf_serie ?? '—'}`}
+        {/* ── Cabeçalho ─────────────────────────── */}
+        <div style={{ padding: '16px 20px 12px', borderBottom: '1px solid var(--border)', flexShrink: 0, background: 'var(--surface)' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              {loading ? (
+                <div style={{ fontSize: 14, color: 'var(--text-3)' }}>Carregando...</div>
+              ) : (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
+                    <span style={{ fontSize: 16, fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.02em' }}>
+                      NF-e {dev?.nf_numero ?? '—'} · Série {dev?.nf_serie ?? '—'}
+                    </span>
+                    <Badge status={dev?.status_portal}/>
+                    {dev?.lancamento_manual && (
+                      <span style={{ fontSize: 9.5, fontWeight: 700, background: 'var(--purple-dim)', color: 'var(--purple)', padding: '2px 7px', borderRadius: 20 }}>MANUAL</span>
+                    )}
+                    {dev?.devolucao_total === true && (
+                      <span style={{ fontSize: 9.5, fontWeight: 700, background: 'var(--red-dim)', color: 'var(--red)', padding: '2px 7px', borderRadius: 20 }}>TOTAL</span>
+                    )}
+                    {dev?.devolucao_total === false && (
+                      <span style={{ fontSize: 9.5, fontWeight: 700, background: 'var(--yellow-dim)', color: 'var(--yellow)', padding: '2px 7px', borderRadius: 20 }}>PARCIAL</span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--text-2)', fontWeight: 500 }}>
+                    {dev?.nome_emitente}
+                    {dev?.municipio_emitente && ` · ${dev.municipio_emitente}`}
+                    {dev?.uf_emitente && ` / ${dev.uf_emitente}`}
+                  </div>
+                </>
+              )}
             </div>
-            {dev && (
-              <div className="drawer-head-sub">
-                {dev.nome_emitente}
-                {dev.uf_emitente ? ` · ${dev.municipio_emitente || ''} / ${dev.uf_emitente}` : ''}
-              </div>
-            )}
+            <button onClick={onClose} className="btn btn-ghost btn-sm" style={{ padding: 6, borderRadius: 6, flexShrink: 0 }}>
+              <Ic d="M18 6L6 18M6 6l12 12" size={16}/>
+            </button>
           </div>
-          <button onClick={onClose} className="btn btn-ghost btn-sm" style={{ padding: '6px', borderRadius: 6 }}>
-            <Ic d="M18 6L6 18M6 6l12 12" size={16}/>
-          </button>
-        </div>
 
-        {loading ? (
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)', gap: 10 }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" strokeWidth="2"
-              style={{ animation: 'spin 0.9s linear infinite' }}>
-              <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-              <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" strokeLinecap="round"/>
-            </svg>
-            Carregando detalhe...
-          </div>
-        ) : !dev ? (
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--red)', fontSize: 13 }}>
-            Erro ao carregar os dados.
-          </div>
-        ) : (
-          <div className="drawer-body">
-
-            {/* Status bar */}
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 10,
-              padding: '12px 22px', borderBottom: '1px solid var(--border)',
-              background: 'var(--surface)', flexWrap: 'wrap',
-            }}>
-              <Badge status={dev.status_portal} />
-              <div style={{ flex: 1 }}/>
+          {/* Barra de ações */}
+          {!loading && dev && (
+            <div style={{ display: 'flex', gap: 7, marginTop: 12, flexWrap: 'wrap' }}>
+              <button onClick={() => { setEditMotivo(v => !v); setEdit(false); }}
+                className={`btn btn-sm ${editMotivo ? 'btn-primary' : 'btn-outline'}`}>
+                <Ic d="M7 8h10M7 12h6" size={12}/>
+                {dev.motivo_devolucao ? 'Editar motivo' : 'Classificar motivo'}
+              </button>
+              <button onClick={() => { setEdit(v => !v); setEditMotivo(false); }}
+                className={`btn btn-sm ${editStatus ? 'btn-primary' : 'btn-outline'}`}>
+                <Ic d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" size={12}/>
+                Atualizar status
+              </button>
               {dev.xml_baixado && dev.xml_path && (
                 <button onClick={handleXml} className="btn btn-outline btn-sm">
                   <Ic d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" size={12}/>
                   XML
                 </button>
               )}
-              <button onClick={() => setEditMotivo(v => !v)}
-                className={`btn btn-sm ${editMotivo ? 'btn-primary' : 'btn-outline'}`}>
-                <Ic d="M7 8h10M7 12h6m-6 4h10M5 3h14a2 2 0 012 2v16l-4-2-4 2-4-2-4 2V5a2 2 0 012-2z" size={12}/>
-                Motivo
-              </button>
-              <button onClick={() => setEdit(v => !v)}
-                className={`btn btn-sm ${editStatus ? 'btn-primary' : 'btn-outline'}`}>
-                <Ic d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" size={12}/>
-                Atualizar status
-              </button>
             </div>
+          )}
+        </div>
 
-            {/* Editor de motivo */}
+        {loading ? (
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, color: 'var(--text-3)', fontSize: 13 }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" strokeWidth="2"
+              style={{ animation: 'spin 0.9s linear infinite' }}>
+              <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+              <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" strokeLinecap="round"/>
+            </svg>
+            Carregando...
+          </div>
+        ) : !dev ? (
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--red)', fontSize: 13 }}>
+            Erro ao carregar os dados.
+          </div>
+        ) : (
+          <div className="drawer-body" style={{ padding: '16px 20px' }}>
+
+            {/* ── Editor motivo ──────────────────── */}
             {editMotivo && (
-              <div style={{ padding: '14px 22px', background: 'var(--surface-2)', borderBottom: '1px solid var(--border)' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 10 }}>
+              <div style={{ background: 'var(--blue-dim)', border: '1px solid var(--blue-mid)', borderRadius: 10, padding: '14px 16px', marginBottom: 14 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--blue)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '.06em' }}>Classificar devolução</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
                   <div>
-                    <label className="input-label">Motivo da devolução</label>
+                    <label className="input-label">Motivo</label>
                     <select value={motivo} onChange={e => setMotivo(e.target.value)} className="input">
                       <option value="">— Selecionar —</option>
-                      {MOTIVOS_PADRAO.map(m => <option key={m} value={m}>{m}</option>)}
+                      {MOTIVOS.map(m => <option key={m} value={m}>{m}</option>)}
                     </select>
-                    {motivo === 'Outros' && (
-                      <input type="text" placeholder="Descreva o motivo..." className="input" style={{ marginTop: 6 }}
-                        onChange={e => setMotivo(e.target.value)}/>
-                    )}
                   </div>
                   <div>
                     <label className="input-label">Tipo de devolução</label>
-                    <div style={{ display: 'flex', gap: 8, marginTop: 2 }}>
-                      {[{ v: true, l: 'Total' }, { v: false, l: 'Parcial' }, { v: null, l: 'Não definido' }].map(opt => (
+                    <div style={{ display: 'flex', gap: 6, marginTop: 2 }}>
+                      {[{ v: true, l: 'Total' }, { v: false, l: 'Parcial' }, { v: null, l: 'N/A' }].map(opt => (
                         <button key={String(opt.v)} onClick={() => setDevTotal(opt.v)}
-                          className={`btn btn-sm ${devTotal === opt.v ? 'btn-primary' : 'btn-outline'}`}>
+                          className={`btn btn-xs ${devTotal === opt.v ? 'btn-primary' : 'btn-outline'}`}>
                           {opt.l}
                         </button>
                       ))}
@@ -210,16 +220,17 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button onClick={() => setEditMotivo(false)} className="btn btn-ghost btn-sm">Cancelar</button>
                   <button onClick={handleSaveMotivo} disabled={savingMotivo} className="btn btn-primary btn-sm">
-                    {savingMotivo ? 'Salvando...' : 'Salvar'}
+                    {savingMotivo ? 'Salvando...' : 'Salvar classificação'}
                   </button>
                 </div>
               </div>
             )}
 
-            {/* Editor de status */}
+            {/* ── Editor status ──────────────────── */}
             {editStatus && (
-              <div style={{ padding: '14px 22px', background: 'var(--surface-2)', borderBottom: '1px solid var(--border)' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 10 }}>
+              <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 10, padding: '14px 16px', marginBottom: 14 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-2)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '.06em' }}>Atualizar status</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
                   <div>
                     <label className="input-label">Novo status</label>
                     <select value={newStatus} onChange={e => setNewStatus(e.target.value)} className="input">
@@ -229,15 +240,9 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
                 </div>
                 <div style={{ marginBottom: 10 }}>
                   <label className="input-label">Observação (opcional)</label>
-                  <textarea value={obs} onChange={e => setObs(e.target.value)}
-                    placeholder="Descreva o motivo ou ação tomada..."
-                    className="input" rows={2} style={{ resize: 'vertical' }}/>
+                  <textarea value={obs} onChange={e => setObs(e.target.value)} className="input" rows={2} style={{ resize: 'vertical' }} placeholder="Motivo ou ação tomada..."/>
                 </div>
-                {saveErr && (
-                  <div style={{ color: 'var(--red)', fontSize: 11.5, marginBottom: 8, display: 'flex', gap: 6, alignItems: 'center' }}>
-                    <Ic d="M12 8v4m0 4h.01" size={12} color="var(--red)"/> {saveErr}
-                  </div>
-                )}
+                {saveErr && <div style={{ color: 'var(--red)', fontSize: 11.5, marginBottom: 8 }}>{saveErr}</div>}
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button onClick={() => setEdit(false)} className="btn btn-ghost btn-sm">Cancelar</button>
                   <button onClick={handleSaveStatus} disabled={saving} className="btn btn-primary btn-sm">
@@ -247,123 +252,107 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
               </div>
             )}
 
-            {/* NF de Devolução */}
-            <SectionHead title="NF-e de Devolução" />
-            <div style={{ padding: '16px 22px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 20px' }}>
-              <Field label="Número / Série" value={`${dev.nf_numero} · Série ${dev.nf_serie}`}/>
-              <Field label="Data de emissão" value={fmtDate(dev.dt_emissao)}/>
-              <Field label="Natureza da operação" value={dev.nat_operacao} fullWidth/>
-              <Field label="CFOPs" value={
-                <span style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
-                  {(dev.cfops || []).map(c => (
-                    <span key={c} style={{ background: 'var(--gold-dim)', color: 'var(--gold)', border: '1px solid rgba(154,123,79,0.25)', padding: '1px 7px', borderRadius: 4, fontSize: 11, fontWeight: 700 }}>{c}</span>
-                  ))}
-                </span>
-              } fullWidth/>
-              {/* Motivo e tipo de devolução */}
-              <Field label="Motivo da devolução" value={
-                dev.motivo_devolucao
-                  ? <span style={{ fontWeight: 600, color: 'var(--red)' }}>{dev.motivo_devolucao}</span>
-                  : <span style={{ color: 'var(--text-3)', fontStyle: 'italic' }}>Não informado — clique em "Motivo" para classificar</span>
-              } fullWidth/>
-              <Field label="Tipo" value={
-                <span style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 5,
-                  fontSize: 11, fontWeight: 700,
-                  color: dev.devolucao_total === true ? 'var(--red)' : dev.devolucao_total === false ? 'var(--yellow)' : 'var(--text-3)',
-                  background: dev.devolucao_total === true ? 'var(--red-dim)' : dev.devolucao_total === false ? 'var(--yellow-dim)' : 'var(--surface-3)',
-                  padding: '2px 8px', borderRadius: 20,
-                }}>
-                  {dev.devolucao_total === true ? '● Devolução Total' : dev.devolucao_total === false ? '◐ Devolução Parcial' : '— Não definido'}
-                </span>
-              }/>
-              {dev.lancamento_manual && (
-                <Field label="Origem" value={
-                  <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--purple)', background: 'var(--purple-dim)', padding: '2px 8px', borderRadius: 20 }}>
-                    ✎ Lançamento Manual
-                  </span>
+            {/* ── Bloco 1: Devolução + Emitente (lado a lado) ── */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+
+              {/* Devolução */}
+              <SectionCard title="NF-e de Devolução" icon="M9 14l-4-4 4-4M5 10h11a4 4 0 010 8h-1" color="var(--blue)">
+                <DataItem label="Número / Série" value={`${dev.nf_numero} · Série ${dev.nf_serie}`}/>
+                <DataItem label="Data de emissão" value={fmtDate(dev.dt_emissao)}/>
+                <DataItem label="CFOPs" value={
+                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 2 }}>
+                    {(dev.cfops || []).map(c => (
+                      <span key={c} style={{ background: 'var(--gold-dim)', color: 'var(--gold)', border: '1px solid rgba(154,123,79,0.25)', padding: '1px 6px', borderRadius: 4, fontSize: 11, fontWeight: 700 }}>{c}</span>
+                    ))}
+                  </div>
                 }/>
-              )}
-              {dev.inf_complementar && (
-                <Field label="Informações complementares (XML)" value={
-                  <div style={{ fontSize: 11.5, color: 'var(--text-2)', lineHeight: 1.55, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                    {dev.inf_complementar}
-                  </div>
-                } fullWidth/>
-              )}
-              <Field label="Empresa destinatária" value={CNPJ_MAP[dev.cnpj_destinatario] ? `${CNPJ_MAP[dev.cnpj_destinatario]} · ${fmtCNPJ(dev.cnpj_destinatario)}` : fmtCNPJ(dev.cnpj_destinatario)} fullWidth/>
-              {dev.chave_nfe && (
-                <Field label="Chave de acesso" value={dev.chave_nfe} mono fullWidth/>
-              )}
+                <DataItem label="Natureza" value={dev.nat_operacao}/>
+                <DataItem label="Empresa dest." value={CNPJ_MAP[dev.cnpj_destinatario] ? `${CNPJ_MAP[dev.cnpj_destinatario]}` : fmtCNPJ(dev.cnpj_destinatario)}/>
+              </SectionCard>
+
+              {/* Emitente */}
+              <SectionCard title="Quem devolveu" icon="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" color="var(--text-2)">
+                <DataItem label="Razão social" value={dev.nome_emitente}/>
+                <DataItem label="CNPJ" value={fmtCNPJ(dev.cnpj_emitente)}/>
+                <DataItem label="Município / UF" value={dev.municipio_emitente && dev.uf_emitente ? `${dev.municipio_emitente} / ${dev.uf_emitente}` : dev.uf_emitente}/>
+              </SectionCard>
             </div>
 
-            {/* Emitente */}
-            <SectionHead title="Emitente — quem devolveu" />
-            <div style={{ padding: '16px 22px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 20px' }}>
-              <Field label="Razão social" value={dev.nome_emitente} fullWidth/>
-              <Field label="CNPJ" value={fmtCNPJ(dev.cnpj_emitente)}/>
-              <Field label="Município / UF" value={dev.municipio_emitente && dev.uf_emitente ? `${dev.municipio_emitente} / ${dev.uf_emitente}` : dev.uf_emitente || '—'}/>
+            {/* ── Bloco 2: Motivo + Valores (lado a lado) ── */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+
+              {/* Motivo */}
+              <SectionCard title="Classificação" icon="M7 8h10M7 12h6" color="var(--red)">
+                <DataItem label="Motivo" value={
+                  dev.motivo_devolucao
+                    ? <span style={{ color: 'var(--red)', fontWeight: 700 }}>{dev.motivo_devolucao}</span>
+                    : <span style={{ color: 'var(--text-3)', fontStyle: 'italic', fontSize: 11.5 }}>Não classificado</span>
+                }/>
+                <DataItem label="Tipo" value={
+                  dev.devolucao_total === true
+                    ? <span style={{ color: 'var(--red)', fontWeight: 700 }}>Total</span>
+                    : dev.devolucao_total === false
+                    ? <span style={{ color: 'var(--yellow)', fontWeight: 700 }}>Parcial</span>
+                    : <span style={{ color: 'var(--text-3)', fontStyle: 'italic', fontSize: 11.5 }}>Não definido</span>
+                }/>
+                {dev.inf_complementar && (
+                  <DataItem label="Obs. do XML" value={
+                    <div style={{ fontSize: 11, color: 'var(--text-2)', lineHeight: 1.5, marginTop: 2 }}>{dev.inf_complementar}</div>
+                  }/>
+                )}
+              </SectionCard>
+
+              {/* Valores */}
+              <SectionCard title="Valores" icon="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" color="var(--green)">
+                <DataItem label="Total da NF" value={fmtBRL(dev.valor)} accent="var(--text)" large/>
+                <DataItem label="Valor dos produtos" value={fmtBRL(dev.valor_produtos)}/>
+                <DataItem label="ICMS" value={fmtBRL(dev.valor_icms)}/>
+                <DataItem label="ICMS-ST" value={fmtBRL(dev.valor_st)}/>
+              </SectionCard>
             </div>
 
-            {/* Valores */}
-            <SectionHead title="Valores" />
-            <div style={{ padding: '16px 22px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 20px' }}>
-              <Field label="Total da NF" value={
-                <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--text)', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}>
-                  {fmtBRL(dev.valor)}
-                </span>
-              }/>
-              <Field label="Valor dos produtos" value={fmtBRL(dev.valor_produtos)}/>
-              <Field label="ICMS" value={fmtBRL(dev.valor_icms)}/>
-              <Field label="ICMS-ST" value={fmtBRL(dev.valor_st)}/>
-            </div>
-
-            {/* NF Original de Venda */}
+            {/* ── Bloco 3: NF original de venda ── */}
             {nfV ? (
-              <>
-                <SectionHead
-                  title="NF original de venda"
-                  badge={nfV.fonte === 'active_webhooks' ? { label: 'Active OnSupply', color: 'var(--blue)' } : { label: 'Histórico', color: 'var(--text-3)' }}
-                />
-                <div style={{ padding: '16px 22px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 20px' }}>
-                  <Field label="NF / Série" value={`${nfV.nf_numero} · Série ${nfV.nf_serie}`}/>
-                  <Field label="Data emissão" value={fmtDate(nfV.dt_emissao)}/>
-                  <Field label="Destinatário (cliente)" value={nfV.destinatario_nome} fullWidth/>
-                  <Field label="CNPJ destinatário" value={fmtCNPJ(nfV.destinatario_cnpj)}/>
-                  {/* active_webhooks não tem cidade separada; historico_nfs tem */}
-                  {(nfV.cidade_destino || nfV.uf_destino) && (
-                    <Field label="Destino" value={[nfV.cidade_destino, nfV.uf_destino].filter(Boolean).join(' / ')}/>
-                  )}
-                  <Field label="Data entrega" value={fmtDate(nfV.dt_entrega)}/>
-                  <Field label="Transportador" value={nfV.transportador_nome || '—'}/>
-                  <Field label="Pedido" value={nfV.pedido || '—'}/>
-                  {nfV.centro_custo && <Field label="Centro de custo" value={nfV.centro_custo}/>}
-                  {nfV.nat_operacao && <Field label="Natureza op." value={nfV.nat_operacao}/>}
-                  <Field label="Valor da venda" value={fmtBRL(nfV.valor_produtos)}/>
-                  {nfV.nf_chave && (
-                    <Field label="Chave NF-e de venda" value={nfV.nf_chave} mono fullWidth/>
-                  )}
+              <SectionCard
+                title="NF original de venda"
+                icon="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                color="var(--purple)"
+                action={
+                  <span style={{ fontSize: 9.5, fontWeight: 700, background: 'var(--blue-dim)', color: 'var(--blue)', padding: '2px 7px', borderRadius: 20 }}>
+                    {nfV.fonte === 'active_webhooks' ? 'Active OnSupply' : 'Histórico'}
+                  </span>
+                }
+              >
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
+                  <DataItem label="NF / Série" value={`${nfV.nf_numero} · Série ${nfV.nf_serie}`}/>
+                  <DataItem label="Data emissão" value={fmtDate(nfV.dt_emissao)}/>
+                  <DataItem label="Data entrega" value={fmtDate(nfV.dt_entrega)} accent={nfV.dt_entrega ? 'var(--green)' : undefined}/>
+                  <DataItem label="Valor da venda" value={fmtBRL(nfV.valor_produtos)} accent="var(--blue)"/>
+                  <DataItem label="Destinatário" value={nfV.destinatario_nome} full/>
+                  <DataItem label="CNPJ" value={fmtCNPJ(nfV.destinatario_cnpj)}/>
+                  <DataItem label="Destino" value={nfV.cidade_destino && nfV.uf_destino ? `${nfV.cidade_destino} / ${nfV.uf_destino}` : nfV.uf_destino}/>
+                  <DataItem label="Transportador" value={nfV.transportador_nome} full/>
+                  <DataItem label="Pedido" value={nfV.pedido}/>
+                  <DataItem label="Centro de custo" value={nfV.centro_custo}/>
+                  {nfV.nf_chave && <DataItem label="Chave NF-e" value={<span style={{ fontFamily: 'monospace', fontSize: 9.5, wordBreak: 'break-all' }}>{nfV.nf_chave}</span>} full/>}
                 </div>
-              </>
+              </SectionCard>
             ) : dev.chave_nfe_referenciada ? (
-              <>
-                <SectionHead title="NF original de venda" />
-                <div style={{ padding: '14px 22px' }}>
-                  <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 8 }}>
-                    Chave referenciada não localizada no Active OnSupply. A NF de venda pode ser anterior à integração do webhook.
-                  </div>
-                  <div style={{ fontFamily: "'Courier New', monospace", fontSize: 10, color: 'var(--text-2)', background: 'var(--surface-2)', padding: '8px 12px', borderRadius: 6, wordBreak: 'break-all', border: '1px solid var(--border)' }}>
-                    {dev.chave_nfe_referenciada}
-                  </div>
+              <SectionCard title="NF original de venda" icon="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" color="var(--text-3)">
+                <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 8, padding: '8px 0' }}>
+                  NF de venda não localizada. Pode ser anterior à integração do webhook do Active.
                 </div>
-              </>
+                <div style={{ fontFamily: 'monospace', fontSize: 9.5, color: 'var(--text-2)', background: 'var(--surface-2)', padding: '8px 10px', borderRadius: 6, wordBreak: 'break-all', border: '1px solid var(--border)' }}>
+                  {dev.chave_nfe_referenciada}
+                </div>
+              </SectionCard>
             ) : null}
 
-            {/* Itens */}
+            {/* ── Bloco 4: Itens devolvidos ── */}
             {Array.isArray(dev.itens) && dev.itens.length > 0 && (
-              <>
-                <SectionHead title="Itens devolvidos" count={dev.itens.length} />
-                <div style={{ overflowX: 'auto' }}>
+              <SectionCard title="Itens devolvidos" icon="M4 6h16M4 10h16M4 14h16M4 18h16" color="var(--gold)"
+                action={<span style={{ fontSize: 10, fontWeight: 700, background: 'var(--gold-dim)', color: 'var(--gold)', padding: '2px 7px', borderRadius: 20 }}>{dev.itens.length} {dev.itens.length === 1 ? 'item' : 'itens'}</span>}>
+                <div style={{ overflowX: 'auto', marginTop: 4 }}>
                   <table className="items-table">
                     <thead>
                       <tr>
@@ -377,62 +366,54 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
                     <tbody>
                       {dev.itens.map((it, i) => (
                         <tr key={i}>
-                          <td style={{ color: 'var(--text-3)', width: 32 }}>{it.item}</td>
-                          <td style={{ width: 60 }}>
-                            <span style={{ background: 'var(--gold-dim)', color: 'var(--gold)', padding: '1px 6px', borderRadius: 4, fontSize: 10.5, fontWeight: 700 }}>
-                              {it.cfop}
-                            </span>
+                          <td style={{ color: 'var(--text-3)', width: 28 }}>{it.item}</td>
+                          <td style={{ width: 56 }}>
+                            <span style={{ background: 'var(--gold-dim)', color: 'var(--gold)', padding: '1px 6px', borderRadius: 4, fontSize: 10.5, fontWeight: 700 }}>{it.cfop}</span>
                           </td>
-                          <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500 }} title={it.descricao}>
-                            {it.descricao}
-                          </td>
-                          <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
-                            {it.quantidade} <span style={{ color: 'var(--text-3)' }}>{it.unidade}</span>
-                          </td>
-                          <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 700, color: 'var(--text)' }}>
-                            {fmtBRL(it.valor_total)}
-                          </td>
+                          <td style={{ maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500 }} title={it.descricao}>{it.descricao}</td>
+                          <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{it.quantidade} <span style={{ color: 'var(--text-3)' }}>{it.unidade}</span></td>
+                          <td style={{ textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{fmtBRL(it.valor_total)}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-              </>
+              </SectionCard>
             )}
 
-            {/* Histórico */}
+            {/* ── Bloco 5: Chave de acesso ── */}
+            {dev.chave_nfe && (
+              <SectionCard title="Chave de acesso" icon="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" color="var(--text-3)">
+                <div style={{ fontFamily: 'monospace', fontSize: 10, color: 'var(--text-2)', padding: '8px 0', wordBreak: 'break-all', letterSpacing: '.04em', lineHeight: 1.6 }}>
+                  {dev.chave_nfe}
+                </div>
+              </SectionCard>
+            )}
+
+            {/* ── Bloco 6: Histórico ── */}
             {hist.length > 0 && (
-              <>
-                <SectionHead title="Histórico de status" count={hist.length} />
-                <div style={{ padding: '16px 22px' }}>
+              <SectionCard title="Histórico de status" icon="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" color="var(--text-2)"
+                action={<span style={{ fontSize: 10, fontWeight: 700, background: 'var(--surface-3)', color: 'var(--text-3)', padding: '2px 7px', borderRadius: 20 }}>{hist.length}</span>}>
+                <div style={{ paddingTop: 8 }}>
                   {[...hist].reverse().map((h, i) => {
                     const cfg = STATUS_CFG[h.status] || {};
                     return (
-                      <div key={i} style={{ display: 'flex', gap: 12, marginBottom: 14, position: 'relative' }}>
-                        <div style={{
-                          width: 10, height: 10, borderRadius: '50%',
-                          background: cfg.dot || 'var(--border-2)',
-                          flexShrink: 0, marginTop: 3,
-                          border: `2px solid ${cfg.border || 'var(--border)'}`,
-                        }}/>
+                      <div key={i} style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
+                        <div style={{ width: 8, height: 8, borderRadius: '50%', background: cfg.dot || 'var(--border-2)', flexShrink: 0, marginTop: 4, border: `2px solid ${cfg.border || 'var(--border)'}` }}/>
                         <div>
                           <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', marginBottom: 2 }}>
                             {cfg.l || h.status}
-                            <span style={{ fontWeight: 400, color: 'var(--text-3)', marginLeft: 8 }}>
-                              {h.user && `por ${h.user} · `}{fmtDateTime(h.ts)}
+                            <span style={{ fontWeight: 400, color: 'var(--text-3)', marginLeft: 8, fontSize: 11 }}>
+                              {h.user && `${h.user} · `}{fmtDateTime(h.ts)}
                             </span>
                           </div>
-                          {h.obs && (
-                            <div style={{ fontSize: 11.5, color: 'var(--text-2)', lineHeight: 1.5, marginTop: 2 }}>
-                              {h.obs}
-                            </div>
-                          )}
+                          {h.obs && <div style={{ fontSize: 11.5, color: 'var(--text-2)', lineHeight: 1.45 }}>{h.obs}</div>}
                         </div>
                       </div>
                     );
                   })}
                 </div>
-              </>
+              </SectionCard>
             )}
 
           </div>
