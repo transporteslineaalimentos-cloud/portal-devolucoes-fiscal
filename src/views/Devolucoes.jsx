@@ -118,6 +118,12 @@ export default function Devolucoes({ user, initialFilters = {} }) {
               <option value="">Todas as origens</option>
               <option value="manual">Somente Manuais</option>
             </select>
+            <select value={filters.nf_venda || ''} onChange={e => applyFilter({ nf_venda: e.target.value })}
+              className="input" style={{ width: 'auto', minWidth: 170 }}>
+              <option value="">NF venda: todas</option>
+              <option value="localizada">✓ NF venda localizada</option>
+              <option value="nao_localizada">✗ NF venda não localizada</option>
+            </select>
             <input type="text" placeholder="UF" maxLength={2}
               value={filters.uf}
               onChange={e => applyFilter({ uf: e.target.value.toUpperCase() })}
@@ -229,10 +235,33 @@ export default function Devolucoes({ user, initialFilters = {} }) {
 
               {/* NF Venda */}
               <div>
-                {nfVendaNum
-                  ? <div style={{ fontSize: 12.5, color: 'var(--blue)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{nfVendaNum}</div>
-                  : <div style={{ fontSize: 11, color: 'var(--text-3)' }}>—</div>
-                }
+                {row.nf_venda_localizada === true ? (
+                  <>
+                    <div style={{ fontSize: 12.5, color: 'var(--blue)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+                      {row.chave_nfe_referenciada
+                        ? String(parseInt(row.chave_nfe_referenciada.slice(25, 34), 10) || '')
+                        : '—'}
+                    </div>
+                    <div style={{ fontSize: 9.5, color: 'var(--green)', fontWeight: 700, marginTop: 1, display: 'flex', alignItems: 'center', gap: 3 }}>
+                      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+                      NF venda localizada
+                    </div>
+                  </>
+                ) : row.nf_venda_localizada === false ? (
+                  <>
+                    <div style={{ fontSize: 11, color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums' }}>
+                      {row.chave_nfe_referenciada
+                        ? String(parseInt(row.chave_nfe_referenciada.slice(25, 34), 10) || '—')
+                        : '—'}
+                    </div>
+                    <div style={{ fontSize: 9.5, color: 'var(--yellow)', fontWeight: 700, marginTop: 1, display: 'flex', alignItems: 'center', gap: 3 }}>
+                      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M12 8v4m0 4h.01"/><circle cx="12" cy="12" r="10"/></svg>
+                      Sem vínculo
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ fontSize: 11, color: 'var(--text-3)' }}>—</div>
+                )}
                 {row.cnpj_destinatario && (
                   <div style={{ fontSize: 10, color: 'var(--gold)', marginTop: 1, fontWeight: 600 }}>
                     {CNPJ_MAP[row.cnpj_destinatario] || ''}

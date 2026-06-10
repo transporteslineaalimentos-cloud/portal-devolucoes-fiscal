@@ -83,7 +83,8 @@ export async function dbListDevolucoes({ page = 0, filters = {} }) {
       nat_operacao, dt_emissao, valor, valor_produtos, valor_icms, valor_st,
       cfops, tipo, status_portal, xml_baixado, xml_path,
       chave_nfe_referenciada, itens, created_at,
-      inf_complementar, motivo_devolucao, devolucao_total, lancamento_manual
+      inf_complementar, motivo_devolucao, devolucao_total, lancamento_manual,
+      nf_venda_localizada
     `, { count: 'exact' })
     .eq('tipo', 'devolucao')
     .gte('dt_emissao', '2026-01-01')
@@ -98,6 +99,8 @@ export async function dbListDevolucoes({ page = 0, filters = {} }) {
   if (filters.devolucao_total === 'total')    q = q.eq('devolucao_total', true);
   if (filters.devolucao_total === 'parcial')  q = q.eq('devolucao_total', false);
   if (filters.lancamento_manual === 'manual') q = q.eq('lancamento_manual', true);
+  if (filters.nf_venda === 'localizada')      q = q.eq('nf_venda_localizada', true);
+  if (filters.nf_venda === 'nao_localizada')  q = q.eq('nf_venda_localizada', false);
 
   // Busca — usa filtro separado encapsulado para não conflitar com outros filtros
   if (filters.search) {
