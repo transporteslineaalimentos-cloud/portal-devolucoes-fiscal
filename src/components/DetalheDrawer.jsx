@@ -280,11 +280,6 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
                     ? <span style={{ color: 'var(--red)', fontWeight: 700 }}>● Total <span style={{ fontSize: 10, fontWeight: 500, color: 'var(--text-3)' }}>(lançamento manual)</span></span>
                     : <span style={{ color: 'var(--yellow)', fontWeight: 700 }}>◐ Parcial <span style={{ fontSize: 10, fontWeight: 500, color: 'var(--text-3)' }}>(NFD emitida pelo cliente)</span></span>
                 }/>
-                {dev.inf_complementar && (
-                  <DataItem label="Obs. do XML" value={
-                    <div style={{ fontSize: 11, color: 'var(--text-2)', lineHeight: 1.5, marginTop: 2 }}>{dev.inf_complementar}</div>
-                  }/>
-                )}
               </SectionCard>
 
               {/* Valores */}
@@ -295,6 +290,19 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
                 <DataItem label="ICMS-ST" value={fmtBRL(dev.valor_st)}/>
               </SectionCard>
             </div>
+
+            {/* ── Observações do XML — largura total ── */}
+            {dev.inf_complementar && (
+              <SectionCard
+                title="Observações da NFD (XML)"
+                icon="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                color="var(--text-2)"
+              >
+                <div style={{ padding: '10px 0', fontSize: 11.5, color: 'var(--text-2)', lineHeight: 1.65, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                  {dev.inf_complementar}
+                </div>
+              </SectionCard>
+            )}
 
             {/* ── Bloco 3: NF original de venda ── */}
             {nfV ? (
