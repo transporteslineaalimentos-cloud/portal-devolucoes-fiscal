@@ -1,11 +1,10 @@
 import { createClient } from '@supabase/supabase-js';
 
-export const SB_URL = import.meta.env.VITE_SB_URL;
-export const SB_KEY = import.meta.env.VITE_SB_KEY;
+// Env vars do Vite (configuradas na Vercel) com fallback direto para garantir conexão
+const SB_URL = import.meta.env.VITE_SB_URL || 'https://opcrtjdnpgqcjlksofjw.supabase.co';
+const SB_KEY = import.meta.env.VITE_SB_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9wY3J0amRucGdxY2psa3NvZmp3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0NTMwODYsImV4cCI6MjA5MDAyOTA4Nn0.ojJMzaInCSD4mrZEWrU1d9ziDVyIcp7NRm6RHx2uTGA';
 
-if (!SB_URL || !SB_KEY) {
-  console.error('[Config] VITE_SB_URL e VITE_SB_KEY precisam estar definidas nas env vars.');
-}
+export { SB_URL, SB_KEY };
 
 export const supabase = createClient(SB_URL, SB_KEY);
 
