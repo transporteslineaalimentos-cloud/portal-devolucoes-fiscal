@@ -491,26 +491,46 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
                   <table className="items-table">
                     <thead>
                       <tr>
-                        <th>#</th>
-                        <th>CFOP</th>
+                        <th>Código</th>
                         <th>Produto</th>
+                        <th>CFOP</th>
                         <th style={{ textAlign: 'right' }}>Qtd</th>
+                        <th style={{ textAlign: 'right' }}>Vl. Unit.</th>
                         <th style={{ textAlign: 'right' }}>Total</th>
                       </tr>
                     </thead>
                     <tbody>
                       {dev.itens.map((it, i) => (
                         <tr key={i}>
-                          <td style={{ color: 'var(--text-3)', width: 28 }}>{it.item}</td>
-                          <td style={{ width: 56 }}>
-                            <span style={{ background: 'var(--gold-dim)', color: 'var(--gold)', padding: '1px 6px', borderRadius: 4, fontSize: 10.5, fontWeight: 700 }}>{it.cfop}</span>
+                          <td style={{ fontFamily: 'monospace', fontSize: 10.5, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>
+                            {it.codigo || '—'}
                           </td>
-                          <td style={{ maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500 }} title={it.descricao}>{it.descricao}</td>
-                          <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{it.quantidade} <span style={{ color: 'var(--text-3)' }}>{it.unidade}</span></td>
-                          <td style={{ textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{fmtBRL(it.valor_total)}</td>
+                          <td style={{ fontWeight: 500 }} title={it.descricao}>{it.descricao}</td>
+                          <td style={{ width: 52 }}>
+                            {it.cfop && <span style={{ background: 'var(--gold-dim)', color: 'var(--gold)', padding: '1px 6px', borderRadius: 4, fontSize: 10.5, fontWeight: 700 }}>{it.cfop}</span>}
+                          </td>
+                          <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                            {it.quantidade} <span style={{ color: 'var(--text-3)' }}>{it.unidade}</span>
+                          </td>
+                          <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: 'var(--text-2)' }}>
+                            {it.valor_unitario != null ? fmtBRL(it.valor_unitario) : '—'}
+                          </td>
+                          <td style={{ textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+                            {fmtBRL(it.valor_total)}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
+                    <tfoot>
+                      <tr style={{ background: 'var(--surface-2)' }}>
+                        <td colSpan={5} style={{ padding: '7px 10px', fontSize: 11, fontWeight: 700, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '.04em' }}>
+                          Total devolvido
+                        </td>
+                        <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 800, fontVariantNumeric: 'tabular-nums', color: 'var(--blue)', fontSize: 13 }}>
+                          {fmtBRL(dev.itens.reduce((s, it) => s + (Number(it.valor_total) || 0), 0))}
+                        </td>
+                      </tr>
+                    </tfoot>
                   </table>
                 </div>
               </SectionCard>
