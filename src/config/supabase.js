@@ -159,21 +159,21 @@ export async function dbGetDevolucaoDetail(id) {
       const dest    = payload.DESTINATARIO || {};
 
       // data_entrega: pega a PRIMEIRA ocorrência de entrega (mais antiga = entrega real)
-      // MAX pegava a segunda tentativa/reentrega, que é incorreto
+      // Usa COALESCE(data_entrega, data_ocorrencia) pois muitos registros têm data_entrega null
       let dtEntrega = aw.data_entrega;
       if (!dtEntrega && aw.numero) {
         const ocorr = await safeQuery(
           supabase
             .from('active_ocorrencias')
-            .select('data_entrega, data_ocorrencia, codigo_ocorrencia, descricao_ocorrencia, recebedor_nome')
+            .select('data_entrega, data_ocorrencia, codigo_ocorrencia')
             .eq('nf_numero', aw.numero)
-            .not('data_entrega', 'is', null)
-            .in('codigo_ocorrencia', ['01', '107', '1', '7'])
+            .in('codigo_ocorrencia', ['01', '107', '1', '7', '124'])  // 124 = Entregue conforme cliente
             .order('data_ocorrencia', { ascending: true })   // PRIMEIRO registro de entrega
             .limit(1)
             .single(),
           null
         );
+        // Usar data_entrega se existir, senão data_ocorrencia
         if (ocorr) dtEntrega = ocorr.data_entrega || ocorr.data_ocorrencia;
       }
 
