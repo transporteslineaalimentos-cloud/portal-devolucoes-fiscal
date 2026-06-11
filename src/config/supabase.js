@@ -88,6 +88,7 @@ export async function dbListDevolucoes({ page = 0, filters = {} }) {
     `, { count: 'exact' })
     .eq('tipo', 'devolucao')
     .gte('dt_emissao', '2026-01-01')
+    .not('status_sefaz', 'eq', 'CANCELADA')   // ocultar canceladas
     .order('dt_emissao', { ascending: false })
     .range(from, to);
 
@@ -154,7 +155,8 @@ export async function dbGetDevolucaoDetail(id) {
       const payload = aw.payload_raw || {};
       const dest    = payload.DESTINATARIO || {};
 
-      // data_entrega: primeiro tenta active_webhooks, depois busca na active_ocorrencias
+      // data_entrega: pega a PRIMEIRA ocorrência de entrega (mais antiga = entrega real)
+      // MAX pegava a segunda tentativa/reentrega, que é incorreto
       let dtEntrega = aw.data_entrega;
       if (!dtEntrega && aw.numero) {
         const ocorr = await safeQuery(
@@ -163,8 +165,8 @@ export async function dbGetDevolucaoDetail(id) {
             .select('data_entrega, data_ocorrencia, codigo_ocorrencia, descricao_ocorrencia, recebedor_nome')
             .eq('nf_numero', aw.numero)
             .not('data_entrega', 'is', null)
-            .in('codigo_ocorrencia', ['01', '107', '1', '7'])  // códigos de entrega realizada
-            .order('data_ocorrencia', { ascending: false })
+            .in('codigo_ocorrencia', ['01', '107', '1', '7'])
+            .order('data_ocorrencia', { ascending: true })   // PRIMEIRO registro de entrega
             .limit(1)
             .single(),
           null

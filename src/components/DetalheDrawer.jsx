@@ -9,7 +9,80 @@ const AREA_CORES = {
   'FISCAL':            { color: 'var(--red)',     bg: 'var(--red-dim)' },
   'LOGÍSTICA REVERSA': { color: 'var(--green)',   bg: 'var(--green-dim)' },
   'LOGÍSTICA':         { color: 'var(--green)',   bg: 'var(--green-dim)' },
+  'CONTROLADORIA':     { color: '#0891B2',        bg: 'rgba(8,145,178,0.10)' },
 };
+
+// Autocomplete de motivo com busca por digitação
+function MotivoAutocomplete({ value, onChange, motivos }) {
+  const [query, setQuery]   = useState(value || '');
+  const [open, setOpen]     = useState(false);
+  const ref                 = useState(() => ({ current: null }))[0];
+
+  // Sincronizar quando value muda externamente
+  useEffect(() => { setQuery(value || ''); }, [value]);
+
+  const filtrados = query.length >= 1
+    ? motivos.filter(m => m.motivo.toLowerCase().includes(query.toLowerCase())).slice(0, 12)
+    : motivos.slice(0, 12);
+
+  const selecionar = (m) => {
+    onChange(m.motivo);
+    setQuery(m.motivo);
+    setOpen(false);
+  };
+
+  return (
+    <div style={{ position: 'relative' }} ref={r => ref.current = r}>
+      <div style={{ position: 'relative' }}>
+        <input
+          type="text"
+          value={query}
+          onChange={e => { setQuery(e.target.value); onChange(''); setOpen(true); }}
+          onFocus={() => setOpen(true)}
+          onBlur={() => setTimeout(() => setOpen(false), 150)}
+          placeholder="Digite para filtrar motivos..."
+          className="input"
+          style={{ paddingRight: 28 }}
+          autoComplete="off"
+        />
+        {value && (
+          <button onClick={() => { onChange(''); setQuery(''); }}
+            style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', fontSize: 14, lineHeight: 1 }}>
+            ×
+          </button>
+        )}
+      </div>
+      {open && filtrados.length > 0 && (
+        <div style={{
+          position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 999,
+          background: 'var(--surface)', border: '1px solid var(--border)',
+          borderRadius: 8, boxShadow: 'var(--shadow-md)',
+          maxHeight: 260, overflowY: 'auto', marginTop: 3,
+        }}>
+          {filtrados.map((m, i) => {
+            const cfg = AREA_CORES[m.area] || { color: 'var(--text-2)', bg: 'var(--surface-3)' };
+            return (
+              <div key={m.motivo}
+                onMouseDown={() => selecionar(m)}
+                style={{
+                  padding: '9px 12px', cursor: 'pointer',
+                  background: m.motivo === value ? 'var(--blue-dim)' : 'transparent',
+                  borderBottom: i < filtrados.length - 1 ? '1px solid var(--border)' : 'none',
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-2)'}
+                onMouseLeave={e => e.currentTarget.style.background = m.motivo === value ? 'var(--blue-dim)' : 'transparent'}
+              >
+                <span style={{ fontSize: 12.5, color: 'var(--text)', fontWeight: m.motivo === value ? 700 : 400 }}>{m.motivo}</span>
+                <span style={{ fontSize: 9.5, fontWeight: 700, color: cfg.color, background: cfg.bg, padding: '2px 7px', borderRadius: 20, flexShrink: 0 }}>{m.area}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 const Ic = ({ d, size = 14, color = 'currentColor' }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
@@ -211,21 +284,11 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
                 <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--blue)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '.06em' }}>Classificar motivo da devolução</div>
                 <div style={{ marginBottom: 10 }}>
                   <label className="input-label">Motivo</label>
-                  <select value={motivo} onChange={e => setMotivo(e.target.value)} className="input">
-                    <option value="">— Selecionar —</option>
-                    {/* Agrupar por área */}
-                    {Object.entries(
-                      motivosDB.reduce((acc, m) => {
-                        if (!acc[m.area]) acc[m.area] = [];
-                        acc[m.area].push(m.motivo);
-                        return acc;
-                      }, {})
-                    ).sort(([a],[b]) => a.localeCompare(b)).map(([area, motivos]) => (
-                      <optgroup key={area} label={`── ${area}`}>
-                        {motivos.map(m => <option key={m} value={m}>{m}</option>)}
-                      </optgroup>
-                    ))}
-                  </select>
+                  <MotivoAutocomplete
+                    value={motivo}
+                    onChange={setMotivo}
+                    motivos={motivosDB}
+                  />
                   {motivo && motivosDB.find(m => m.motivo === motivo) && (
                     <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span style={{ fontSize: 10.5, color: 'var(--text-3)' }}>Área responsável:</span>
