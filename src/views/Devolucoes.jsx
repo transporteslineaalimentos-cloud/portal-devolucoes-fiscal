@@ -11,7 +11,7 @@ const Ic = ({ d, size = 14, color = 'currentColor' }) => (
   </svg>
 );
 
-const COLS = '88px 1fr 90px 70px 110px 108px 60px';
+const COLS = '88px 1fr 90px 60px 110px 100px 90px 60px';
 
 const STATUS_OPTIONS = [
   { v: '',           l: 'Todos os status' },
@@ -39,7 +39,7 @@ export default function Devolucoes({ user, initialFilters = {} }) {
   const [filters, setFilters] = useState({
     search: '', status: initialFilters.status || '',
     cnpj_dest: '', uf: '', dt_inicio: '', dt_fim: '',
-    com_motivo: '', flag_emissao: '',
+    com_motivo: '', flag_emissao: '', lancado: '',
   });
   const searchRef = useRef(null);
   const PAGE_SIZE = 40;
@@ -127,6 +127,12 @@ export default function Devolucoes({ user, initialFilters = {} }) {
               <option value="no_ato">✓ Emitida no ato da entrega</option>
               <option value="aguardando">⏳ Aguardando entrega</option>
             </select>
+            <select value={filters.lancado || ''} onChange={e => applyFilter({ lancado: e.target.value })}
+              className="input" style={{ width: 'auto', minWidth: 190 }}>
+              <option value="">Protheus: todas</option>
+              <option value="sim">✓ Lançada no Protheus</option>
+              <option value="nao">✗ Não lançada no Protheus</option>
+            </select>
             <select value={filters.nf_venda || ''} onChange={e => applyFilter({ nf_venda: e.target.value })}
               className="input" style={{ width: 'auto', minWidth: 170 }}>
               <option value="">NF venda: todas</option>
@@ -160,6 +166,7 @@ export default function Devolucoes({ user, initialFilters = {} }) {
           <span>UF</span>
           <span>Emissão</span>
           <span style={{ textAlign: 'right' }}>Valor</span>
+          <span style={{ textAlign: 'center' }}>Protheus</span>
           <span style={{ textAlign: 'center' }}>Status</span>
         </div>
 
@@ -318,6 +325,14 @@ export default function Devolucoes({ user, initialFilters = {} }) {
               {/* Valor */}
               <div style={{ textAlign: 'right', fontSize: 12.5, fontWeight: 700, color: 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>
                 {fmtBRL(row.valor)}
+              </div>
+
+              {/* Protheus */}
+              <div style={{ display: 'flex', justifyContent: 'center' }}>
+                {row.lancado_protheus
+                  ? <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--green)', background: 'var(--green-dim)', padding: '2px 8px', borderRadius: 20, whiteSpace: 'nowrap' }}>✓ Lançada</span>
+                  : <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-3)', background: 'var(--surface-3)', padding: '2px 8px', borderRadius: 20, whiteSpace: 'nowrap' }}>Pendente</span>
+                }
               </div>
 
               {/* Status */}

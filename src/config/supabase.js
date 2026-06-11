@@ -84,7 +84,8 @@ export async function dbListDevolucoes({ page = 0, filters = {} }) {
       cfops, tipo, status_portal, xml_baixado, xml_path,
       chave_nfe_referenciada, itens, created_at,
       inf_complementar, motivo_devolucao, devolucao_total, lancamento_manual,
-      nf_venda_localizada, area_responsavel, flag_emissao_entrega
+      nf_venda_localizada, area_responsavel, flag_emissao_entrega,
+      lancado_protheus, dt_lancamento_protheus
     `, { count: 'exact' })
     .eq('tipo', 'devolucao')
     .gte('dt_emissao', '2026-01-01')
@@ -106,7 +107,9 @@ export async function dbListDevolucoes({ page = 0, filters = {} }) {
   if (filters.com_motivo === 'sem')           q = q.is('motivo_devolucao', null);
   if (filters.flag_emissao === 'divergente')       q = q.eq('flag_emissao_entrega', 'divergente');
   if (filters.flag_emissao === 'no_ato')           q = q.eq('flag_emissao_entrega', 'no_ato');
-  if (filters.flag_emissao === 'aguardando')        q = q.eq('flag_emissao_entrega', 'aguardando_entrega');
+  if (filters.flag_emissao === 'aguardando')       q = q.eq('flag_emissao_entrega', 'aguardando_entrega');
+  if (filters.lancado === 'sim')   q = q.eq('lancado_protheus', true);
+  if (filters.lancado === 'nao')   q = q.or('lancado_protheus.is.null,lancado_protheus.eq.false');
 
   // Busca — usa filtro separado encapsulado para não conflitar com outros filtros
   if (filters.search) {

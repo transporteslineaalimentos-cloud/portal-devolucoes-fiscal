@@ -384,7 +384,13 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
 
               {/* Motivo */}
-              <SectionCard title="Classificação" icon="M7 8h10M7 12h6" color="var(--red)">
+              <SectionCard title="Classificação" icon="M7 8h10M7 12h6" color="var(--red)"
+                action={
+                  dev.lancado_protheus
+                    ? <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--green)', background: 'var(--green-dim)', padding: '2px 8px', borderRadius: 20 }}>✓ Lançada Protheus</span>
+                    : <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-3)', background: 'var(--surface-3)', padding: '2px 8px', borderRadius: 20 }}>Pendente Protheus</span>
+                }
+              >
                 <DataItem label="Motivo" value={
                   dev.motivo_devolucao
                     ? <span style={{ color: 'var(--red)', fontWeight: 700 }}>{dev.motivo_devolucao}</span>
@@ -405,6 +411,9 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
                     ? <span style={{ color: 'var(--red)', fontWeight: 700 }}>● Total <span style={{ fontSize: 10, fontWeight: 500, color: 'var(--text-3)' }}>(lançamento manual)</span></span>
                     : <span style={{ color: 'var(--yellow)', fontWeight: 700 }}>◐ Parcial <span style={{ fontSize: 10, fontWeight: 500, color: 'var(--text-3)' }}>(NFD emitida pelo cliente)</span></span>
                 }/>
+                {dev.lancado_protheus && dev.dt_lancamento_protheus && (
+                  <DataItem label="Data lançamento Protheus" value={fmtDate(dev.dt_lancamento_protheus)} accent="var(--green)"/>
+                )}
               </SectionCard>
 
               {/* Valores */}
