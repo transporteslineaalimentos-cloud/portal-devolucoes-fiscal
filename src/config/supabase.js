@@ -340,6 +340,99 @@ export async function dbLancarDevolucaoManual(dados) {
   return data;
 }
 
+// ── Cobranças de transportador ─────────────────────────────
+
+export async function dbGetCobrancasCount() {
+  syncAuthToken();
+  const { count } = await supabase
+    .from('oobj_nfe_recebidas')
+    .select('id', { count: 'exact', head: true })
+    .eq('status_cobranca', 'pendente_cobranca_transportador');
+  return count || 0;
+}
+
+export async function dbListCobrancas({ page = 0, filters = {} }) {
+  syncAuthToken();
+  const from = page * PAGE_SIZE;
+  const to   = from + PAGE_SIZE - 1;
+
+  let q = supabase
+    .from('oobj_nfe_recebidas')
+    .select(`
+      id, nf_numero, nf_serie, nome_emitente, municipio_emitente, uf_emitente,
+      dt_emissao, valor, motivo_devolucao, area_responsavel,
+      chave_nfe_referenciada, dt_lancamento_protheus,
+      status_cobranca, nf_debito, data_cobranca, cobrado_por, obs_cobranca,
+      transportador_cobranca, transportador_cnpj_cobranca
+    `, { count: 'exact' })
+    .not('status_cobranca', 'is', null)
+    .order('status_cobranca', { ascending: true }) // pendentes primeiro
+    .order('dt_emissao', { ascending: false })
+    .range(from, to);
+
+  if (filters.status_cobranca) q = q.eq('status_cobranca', filters.status_cobranca);
+  if (filters.transportador)   q = q.ilike('transportador_cobranca', `%${filters.transportador}%`);
+  if (filters.search) {
+    const s = filters.search.trim();
+    const isNum = /^\d+$/.test(s);
+    if (isNum) q = q.eq('nf_numero', parseInt(s, 10));
+    else q = q.or(`nome_emitente.ilike.%${s}%,transportador_cobranca.ilike.%${s}%`);
+  }
+
+  const { data, error, count } = await q;
+  if (error) throw new Error(error.message);
+  return { rows: data || [], total: count || 0, pageSize: PAGE_SIZE };
+}
+
+// Registrar a baixa da cobrança ao transportador (NF de débito)
+export async function dbRegistrarCobranca(id, { nf_debito, obs_cobranca, userName }) {
+  syncAuthToken();
+  const { error } = await supabase
+    .from('oobj_nfe_recebidas')
+    .update({
+      status_cobranca: 'cobrado',
+      nf_debito: nf_debito || null,
+      obs_cobranca: obs_cobranca || null,
+      data_cobranca: new Date().toISOString(),
+      cobrado_por: userName || null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id);
+  if (error) throw new Error(error.message);
+}
+
+// Marcar como isento de cobrança (sem gerar NF de débito)
+export async function dbIsentarCobranca(id, { obs_cobranca, userName }) {
+  syncAuthToken();
+  const { error } = await supabase
+    .from('oobj_nfe_recebidas')
+    .update({
+      status_cobranca: 'isento',
+      obs_cobranca: obs_cobranca || null,
+      data_cobranca: new Date().toISOString(),
+      cobrado_por: userName || null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id);
+  if (error) throw new Error(error.message);
+}
+
+// Reabrir uma cobrança já registrada (volta para pendente)
+export async function dbReabrirCobranca(id) {
+  syncAuthToken();
+  const { error } = await supabase
+    .from('oobj_nfe_recebidas')
+    .update({
+      status_cobranca: 'pendente_cobranca_transportador',
+      nf_debito: null,
+      data_cobranca: null,
+      cobrado_por: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id);
+  if (error) throw new Error(error.message);
+}
+
 // Buscar motivos cadastrados da tabela (para o dropdown do drawer)
 export async function dbGetMotivos() {
   const { data } = await supabase

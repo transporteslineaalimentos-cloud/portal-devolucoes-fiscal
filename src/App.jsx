@@ -1,14 +1,17 @@
-import { Suspense, lazy, useState } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import Login from './views/Login';
 import Sidebar from './components/Sidebar';
 import Dashboard from './views/Dashboard';
+import { dbGetCobrancasCount } from './config/supabase';
 
 const Devolucoes = lazy(() => import('./views/Devolucoes'));
+const Cobrancas  = lazy(() => import('./views/Cobrancas'));
 
 const PAGE_META = {
   dashboard:  { title: 'Dashboard',          sub: null },
   devolucoes: { title: 'Devoluções Fiscais',  sub: 'NF-e recebidas classificadas por CFOP · sincronizado a cada hora' },
+  cobrancas:  { title: 'Cobranças',          sub: 'Devoluções com responsabilidade do transportador já lançadas no Protheus' },
 };
 
 function Fallback() {
@@ -23,6 +26,16 @@ function Portal() {
   const { user, logout } = useAuth();
   const [tab, setTab] = useState('dashboard');
   const [tabFilters, setTabFilters] = useState({});
+  const [counts, setCounts] = useState({});
+
+  const refreshCounts = async () => {
+    try {
+      const n = await dbGetCobrancasCount();
+      setCounts(c => ({ ...c, cobrancas: n }));
+    } catch { /* ignore */ }
+  };
+
+  useEffect(() => { refreshCounts(); }, []);
 
   const changeTab = (id, filters = {}) => {
     setTab(id);
@@ -34,7 +47,7 @@ function Portal() {
 
   return (
     <div className="app-layout">
-      <Sidebar tab={tab} onChange={changeTab} user={user} onLogout={logout} />
+      <Sidebar tab={tab} onChange={changeTab} user={user} onLogout={logout} counts={counts} />
       <div className="app-main">
 
         {/* Topbar */}
@@ -74,6 +87,12 @@ function Portal() {
           {tab === 'devolucoes' && (
             <Suspense fallback={<Fallback />}>
               <Devolucoes user={user} initialFilters={tabFilters.devolucoes || {}} />
+            </Suspense>
+          )}
+          {tab === 'cobrancas' && (
+            <Suspense fallback={<Fallback />}>
+              <Cobrancas user={user} initialFilters={tabFilters.cobrancas || {}}
+                onChanged={refreshCounts} />
             </Suspense>
           )}
         </main>

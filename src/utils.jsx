@@ -35,6 +35,27 @@ export const STATUS_CFG = {
 
 export const STATUS_OPTIONS = Object.entries(STATUS_CFG).map(([v, c]) => ({ v, l: c.l }));
 
+export const STATUS_COBRANCA_CFG = {
+  pendente_cobranca_transportador: { l: 'Pendente cobrança',  dot: '#D97706', color: '#92400E', bg: '#FFFBEB', border: '#FDE68A' },
+  cobrado:                          { l: 'Cobrado',            dot: '#16A34A', color: '#14532D', bg: '#F0FDF4', border: '#BBF7D0' },
+  isento:                           { l: 'Isento',             dot: '#9CA3AF', color: '#4B5563', bg: '#F3F4F6', border: '#E5E7EB' },
+};
+
+export function BadgeCobranca({ status }) {
+  const cfg = STATUS_COBRANCA_CFG[status] || STATUS_COBRANCA_CFG.pendente_cobranca_transportador;
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 5,
+      fontSize: 10.5, fontWeight: 600, color: cfg.color,
+      background: cfg.bg, border: `1px solid ${cfg.border}`,
+      padding: '2px 8px', borderRadius: 20, whiteSpace: 'nowrap',
+    }}>
+      <span style={{ width: 5, height: 5, borderRadius: '50%', background: cfg.dot, flexShrink: 0 }}/>
+      {cfg.l}
+    </span>
+  );
+}
+
 export function Badge({ status }) {
   const cfg = STATUS_CFG[status] || STATUS_CFG.pendente;
   return (
