@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { dbGetKpis, dbGetDashboard } from '../config/supabase';
-import { fmtBRL, fmtCNPJ } from '../utils.jsx';
+import { fmtBRL } from '../utils.jsx';
 
 // ─── Ícone SVG inline ────────────────────────────────────
 const Ic = ({ d, size = 16, color = 'currentColor', stroke = 1.8 }) => (
@@ -17,19 +17,14 @@ const fmtMes = (s) => {
   const nomes = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
   return `${nomes[parseInt(m,10)-1]}/${y.slice(2)}`;
 };
+const fmtBRLk = (v) => {
+  if (v == null) return '—';
+  if (Math.abs(v) >= 1000) return `R$ ${(v/1000).toFixed(0)}k`;
+  return fmtBRL(v);
+};
 const pct = (a, b) => b === 0 ? null : Math.round(((a - b) / b) * 100);
 const clamp = (v, min, max) => Math.min(Math.max(v, min), max);
-
-const CFOP_DESC = {
-  '5201': 'Dev. venda p/ industrialização (estadual)',
-  '5202': 'Dev. venda p/ comercialização (estadual)',
-  '5410': 'Dev. de compra com ST (estadual)',
-  '5411': 'Dev. de venda com ST (estadual)',
-  '6201': 'Dev. venda p/ industrialização (interestadual)',
-  '6202': 'Dev. venda p/ comercialização (interestadual)',
-  '6410': 'Dev. de compra com ST (interestadual)',
-  '6411': 'Dev. de venda com ST (interestadual)',
-};
+const todayISO = () => new Date().toISOString().slice(0, 10);
 
 // ─── Barra horizontal simples ────────────────────────────
 function Bar({ valor, max, color = 'var(--blue)', height = 6 }) {
@@ -73,7 +68,7 @@ function Card({ title, subtitle, children, action, noPad = false, accent }) {
       <div style={{
         padding: '14px 18px', borderBottom: '1px solid var(--border)',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        background: 'var(--surface)',
+        background: 'var(--surface)', gap: 12,
       }}>
         <div>
           <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.01em' }}>{title}</div>
@@ -114,102 +109,188 @@ function KpiMini({ label, value, sub, color, icon, delta, deltaInv }) {
   );
 }
 
-// ─── Gráfico de barras verticais SVG ─────────────────────
-function BarChart({ data, valueKey, labelKey, color = 'var(--blue)', colorAlt, height = 140 }) {
-  if (!data?.length) return null;
-  const maxVal = Math.max(...data.map(d => d[valueKey]), 1);
-  const barW = 100 / data.length;
+// ─── Gráfico de linha (HTML overlay, sem distorção) ──────
+function TrendChart({ data, valueKey, labelKey, color = 'var(--blue)', height = 130, formatValue = fmtBRLk }) {
   const [hovered, setHovered] = useState(null);
+  if (!data?.length) return <div style={{ height, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)', fontSize: 12 }}>Sem dados</div>;
+
+  const vals = data.map(d => d[valueKey]);
+  const maxVal = Math.max(...vals, 1);
+  const minVal = Math.min(...vals, 0);
+  const range = (maxVal - minVal) || 1;
+  const padTop = 12; // % de respiro no topo para o tooltip não cortar
+
+  const pts = data.map((d, i) => ({
+    xPct: data.length > 1 ? (i / (data.length - 1)) * 100 : 50,
+    yPct: padTop + (1 - (d[valueKey] - minVal) / range) * (100 - padTop - 6),
+    d,
+  }));
+
+  const pathD = pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.xPct} ${p.yPct}`).join(' ');
+  const areaD = `${pathD} L ${pts[pts.length - 1].xPct} 100 L ${pts[0].xPct} 100 Z`;
+  const gradId = `grad-${color.replace(/[^a-zA-Z]/g, '')}`;
 
   return (
-    <div style={{ position: 'relative' }}>
-      <svg viewBox={`0 0 100 ${height}`} preserveAspectRatio="none"
-        style={{ width: '100%', height, display: 'block', overflow: 'visible' }}>
-        {data.map((d, i) => {
-          const barH = (d[valueKey] / maxVal) * (height - 20);
-          const x = i * barW + barW * 0.15;
-          const w = barW * 0.7;
-          const y = height - 16 - barH;
-          const isPior = data.indexOf(data.slice().sort((a,b) => b[valueKey]-a[valueKey])[0]) === i;
-          const fill = colorAlt && isPior ? colorAlt : color;
-          return (
-            <g key={i} onMouseEnter={() => setHovered(i)} onMouseLeave={() => setHovered(null)}>
-              <rect x={x} y={y} width={w} height={barH}
-                fill={fill} rx="2" opacity={hovered === i ? 1 : 0.85}
-                style={{ transition: 'opacity 120ms, y 400ms, height 400ms' }}/>
-              <text x={x + w/2} y={height - 3} textAnchor="middle"
-                fontSize="4.5" fill="var(--text-3)" fontFamily="Inter,sans-serif">
-                {d[labelKey]}
-              </text>
-              {hovered === i && (
-                <text x={x + w/2} y={y - 3} textAnchor="middle"
-                  fontSize="4.5" fill={fill} fontWeight="700" fontFamily="Inter,sans-serif">
-                  {typeof d[valueKey] === 'number' && d[valueKey] > 1000
-                    ? `R$${(d[valueKey]/1000).toFixed(0)}k`
-                    : d[valueKey]}
-                </text>
-              )}
-            </g>
-          );
-        })}
+    <div style={{ position: 'relative', height, marginTop: 4 }}>
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none"
+        style={{ width: '100%', height: '100%', display: 'block' }}>
+        <defs>
+          <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity="0.18"/>
+            <stop offset="100%" stopColor={color} stopOpacity="0"/>
+          </linearGradient>
+        </defs>
+        <path d={areaD} fill={`url(#${gradId})`} stroke="none"/>
+        <path d={pathD} fill="none" stroke={color} strokeWidth="1.6" vectorEffect="non-scaling-stroke"
+          strokeLinejoin="round" strokeLinecap="round"/>
       </svg>
+
+      {/* Pontos + tooltip — HTML, não distorce */}
+      {pts.map((p, i) => (
+        <div key={i}
+          onMouseEnter={() => setHovered(i)} onMouseLeave={() => setHovered(null)}
+          style={{
+            position: 'absolute', left: `${p.xPct}%`, top: `${p.yPct}%`,
+            transform: 'translate(-50%, -50%)', cursor: 'pointer',
+            width: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+          <div style={{
+            width: hovered === i ? 8 : 6, height: hovered === i ? 8 : 6, borderRadius: '50%',
+            background: color, border: '2px solid var(--surface)',
+            boxShadow: '0 0 0 1px ' + color + '40',
+            transition: 'width 120ms, height 120ms',
+          }}/>
+          {hovered === i && (
+            <div style={{
+              position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)',
+              marginBottom: 6, padding: '4px 8px', borderRadius: 6,
+              background: 'var(--text)', color: 'var(--surface)',
+              fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap', pointerEvents: 'none',
+              boxShadow: 'var(--shadow-sm)', zIndex: 2,
+            }}>
+              {formatValue(p.d[valueKey])}
+            </div>
+          )}
+        </div>
+      ))}
+
+      {/* Eixo X */}
+      <div style={{ position: 'absolute', bottom: -20, left: 0, right: 0, display: 'flex', justifyContent: 'space-between' }}>
+        {data.map((d, i) => (
+          <span key={i} style={{
+            fontSize: 10, color: hovered === i ? color : 'var(--text-3)',
+            fontWeight: hovered === i ? 700 : 500, flex: 1, textAlign: 'center',
+            transition: 'color 120ms',
+          }}>
+            {d[labelKey]}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }
 
-// ─── Linha de tendência SVG ───────────────────────────────
-function LineChart({ data, valueKey, labelKey, color = 'var(--blue)', height = 100 }) {
-  if (!data?.length) return null;
-  const maxVal = Math.max(...data.map(d => d[valueKey]), 1);
-  const minVal = Math.min(...data.map(d => d[valueKey]), 0);
-  const range = maxVal - minVal || 1;
-  const pad = 8;
-  const W = 200, H = height;
-
-  const pts = data.map((d, i) => ({
-    x: pad + (i / Math.max(data.length - 1, 1)) * (W - pad*2),
-    y: pad + (1 - (d[valueKey] - minVal) / range) * (H - pad*2),
-    d,
-  }));
-
-  const path = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
-  const area = `${path} L${pts[pts.length-1].x.toFixed(1)},${H} L${pts[0].x.toFixed(1)},${H} Z`;
+// ─── Gráfico de barras verticais (HTML, sem distorção) ───
+function ColumnChart({ data, valueKey, labelKey, color = 'var(--purple)', highlightColor, height = 130, formatValue = (v) => v }) {
   const [hovered, setHovered] = useState(null);
+  if (!data?.length) return <div style={{ height, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)', fontSize: 12 }}>Sem dados</div>;
+
+  const maxVal = Math.max(...data.map(d => d[valueKey]), 1);
+  const maxIdx = data.reduce((best, d, i) => d[valueKey] > data[best][valueKey] ? i : best, 0);
 
   return (
-    <div style={{ position: 'relative' }}>
-      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none"
-        style={{ width: '100%', height, display: 'block' }}>
-        <defs>
-          <linearGradient id="lg1" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={color} stopOpacity="0.15"/>
-            <stop offset="100%" stopColor={color} stopOpacity="0"/>
-          </linearGradient>
-        </defs>
-        <path d={area} fill="url(#lg1)"/>
-        <path d={path} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round"/>
-        {pts.map((p, i) => (
-          <circle key={i} cx={p.x} cy={p.y} r={hovered === i ? 3 : 2}
-            fill={color} stroke="white" strokeWidth="1"
-            style={{ cursor: 'pointer', transition: 'r 120ms' }}
-            onMouseEnter={() => setHovered(i)} onMouseLeave={() => setHovered(null)}/>
-        ))}
-        {hovered != null && pts[hovered] && (
-          <text x={pts[hovered].x} y={pts[hovered].y - 5} textAnchor="middle"
-            fontSize="7" fill={color} fontWeight="700" fontFamily="Inter,sans-serif">
-            {typeof pts[hovered].d[valueKey] === 'number' && pts[hovered].d[valueKey] > 1000
-              ? `R$${(pts[hovered].d[valueKey]/1000).toFixed(0)}k`
-              : pts[hovered].d[valueKey]}
-          </text>
-        )}
-      </svg>
-      {/* Labels no eixo X */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+    <div style={{ position: 'relative', height, marginTop: 4, paddingBottom: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-end', height: '100%', gap: '6%' }}>
+        {data.map((d, i) => {
+          const h = Math.max((d[valueKey] / maxVal) * 100, 2);
+          const isHighlight = highlightColor && i === maxIdx;
+          const fill = isHighlight ? highlightColor : color;
+          return (
+            <div key={i}
+              onMouseEnter={() => setHovered(i)} onMouseLeave={() => setHovered(null)}
+              style={{ flex: 1, height: '100%', display: 'flex', alignItems: 'flex-end', position: 'relative', cursor: 'pointer' }}>
+              {hovered === i && (
+                <div style={{
+                  position: 'absolute', bottom: `calc(${h}% + 8px)`, left: '50%', transform: 'translateX(-50%)',
+                  padding: '4px 8px', borderRadius: 6, background: 'var(--text)', color: 'var(--surface)',
+                  fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap', pointerEvents: 'none',
+                  boxShadow: 'var(--shadow-sm)', zIndex: 2,
+                }}>
+                  {formatValue(d[valueKey])}
+                </div>
+              )}
+              <div style={{
+                width: '100%', height: `${h}%`, borderRadius: '4px 4px 0 0',
+                background: fill, opacity: hovered === i ? 1 : 0.85,
+                transition: 'height 500ms ease, opacity 120ms',
+              }}/>
+            </div>
+          );
+        })}
+      </div>
+      {/* Eixo X */}
+      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, display: 'flex', gap: '6%' }}>
         {data.map((d, i) => (
-          <span key={i} style={{ fontSize: 9.5, color: 'var(--text-3)', fontWeight: 500, flex: 1, textAlign: 'center' }}>
+          <span key={i} style={{
+            flex: 1, textAlign: 'center', fontSize: 10, fontWeight: 500,
+            color: hovered === i ? color : 'var(--text-3)',
+          }}>
             {d[labelKey]}
           </span>
         ))}
+      </div>
+    </div>
+  );
+}
+
+const AREA_CORES = {
+  'COMERCIAL':         '#1E4DB7',
+  'TRANSPORTE':        '#D97706',
+  'QUALIDADE':         '#7C3AED',
+  'FISCAL':            '#DC2626',
+  'LOGÍSTICA REVERSA': '#16A34A',
+  'LOGÍSTICA':         '#16A34A',
+  'SEM CLASSIFICAÇÃO': '#9CA3AF',
+};
+
+function shiftMonths(n) {
+  const d = new Date();
+  d.setMonth(d.getMonth() + n);
+  return d.toISOString().slice(0, 10);
+}
+function startOfMonth() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`;
+}
+
+// ─── Filtro de período ────────────────────────────────────
+function PeriodFilter({ value, onChange }) {
+  const presets = [
+    { key: '2026', label: '2026',            inicio: '2026-01-01', fim: todayISO() },
+    { key: '6m',   label: 'Últimos 6 meses', inicio: shiftMonths(-6), fim: todayISO() },
+    { key: '3m',   label: 'Últimos 3 meses', inicio: shiftMonths(-3), fim: todayISO() },
+    { key: 'mes',  label: 'Mês atual',       inicio: startOfMonth(),  fim: todayISO() },
+  ];
+
+  const activePreset = presets.find(p => p.inicio === value.inicio && p.fim === value.fim);
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+      {presets.map(p => (
+        <button key={p.key}
+          onClick={() => onChange({ inicio: p.inicio, fim: p.fim })}
+          className={`btn btn-sm ${activePreset?.key === p.key ? 'btn-primary' : 'btn-outline'}`}>
+          {p.label}
+        </button>
+      ))}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <input type="date" value={value.inicio} max={value.fim}
+          onChange={e => onChange({ ...value, inicio: e.target.value })}
+          className="input" style={{ width: 130, fontSize: 11.5, padding: '5px 8px' }}/>
+        <span style={{ color: 'var(--text-3)', fontSize: 11 }}>até</span>
+        <input type="date" value={value.fim} min={value.inicio} max={todayISO()}
+          onChange={e => onChange({ ...value, fim: e.target.value })}
+          className="input" style={{ width: 130, fontSize: 11.5, padding: '5px 8px' }}/>
       </div>
     </div>
   );
@@ -220,23 +301,14 @@ export default function Dashboard({ onGoTo }) {
   const [kpis, setKpis]     = useState(null);
   const [dash, setDash]     = useState(null);
   const [loading, setLoading] = useState(true);
+  const [periodo, setPeriodo] = useState({ inicio: '2026-01-01', fim: todayISO() });
 
   useEffect(() => {
-    Promise.all([dbGetKpis(), dbGetDashboard()])
+    setLoading(true);
+    Promise.all([dbGetKpis(periodo), dbGetDashboard(periodo)])
       .then(([k, d]) => { setKpis(k); setDash(d); })
       .finally(() => setLoading(false));
-  }, []);
-
-  if (loading) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '80px 0', gap: 12, color: 'var(--text-3)' }}>
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" strokeWidth="2"
-        style={{ animation: 'spin 0.9s linear infinite' }}>
-        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-        <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" strokeLinecap="round"/>
-      </svg>
-      Carregando dashboard...
-    </div>
-  );
+  }, [periodo]);
 
   const k = kpis || {};
   const d = dash || {};
@@ -244,9 +316,25 @@ export default function Dashboard({ onGoTo }) {
   const evComLabel = ev.map(m => ({ ...m, label: fmtMes(m.mes) }));
   const mesAtual = d.mesAtual;
   const mesAnt   = d.mesAnterior;
+  const cob = d.cobrancas || {};
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+      {/* ── Filtro de período ───────────────────────────── */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        <PeriodFilter value={periodo} onChange={setPeriodo}/>
+        {loading && (
+          <span style={{ fontSize: 11, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" strokeWidth="2"
+              style={{ animation: 'spin 0.9s linear infinite' }}>
+              <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+              <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" strokeLinecap="round"/>
+            </svg>
+            Atualizando...
+          </span>
+        )}
+      </div>
 
       {/* ── Linha 1: KPIs principais ─────────────────────── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
@@ -274,11 +362,11 @@ export default function Dashboard({ onGoTo }) {
           icon="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
         />
         <KpiMini
-          label="Pior mês — valor"
-          value={d.piorMesValor ? fmtMes(d.piorMesValor.mes) : '—'}
-          sub={d.piorMesValor ? `${fmtBRL(d.piorMesValor.valor)} · ${d.piorMesValor.qtd} NFs` : null}
+          label="Pendente cobrança transportador"
+          value={cob.pendente_count?.toLocaleString('pt-BR') ?? '—'}
+          sub={fmtBRL(cob.pendente_valor)}
           color="var(--red)"
-          icon="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+          icon="M3 6h13l3 5v6h-3m-7 0H3V6zm10 11a2 2 0 104 0 2 2 0 00-4 0zM7 17a2 2 0 104 0 2 2 0 00-4 0z"
         />
       </div>
 
@@ -290,9 +378,9 @@ export default function Dashboard({ onGoTo }) {
           subtitle="R$ por mês de emissão da NF de devolução"
           accent="var(--blue)"
         >
-          <LineChart data={evComLabel} valueKey="valor" labelKey="label" color="var(--blue)" height={110}/>
+          <TrendChart data={evComLabel} valueKey="valor" labelKey="label" color="var(--blue)" height={130} formatValue={fmtBRL}/>
           {mesAtual && mesAnt && (
-            <div style={{ display: 'flex', gap: 16, marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+            <div style={{ display: 'flex', gap: 16, marginTop: 32, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
               <div>
                 <div style={{ fontSize: 10, color: 'var(--text-3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 3 }}>{fmtMes(mesAnt.mes)}</div>
                 <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>{fmtBRL(mesAnt.valor)}</div>
@@ -314,8 +402,8 @@ export default function Dashboard({ onGoTo }) {
           subtitle="Número de devoluções por mês"
           accent="var(--purple)"
         >
-          <BarChart data={evComLabel} valueKey="qtd" labelKey="label" color="var(--purple)" colorAlt="var(--red)" height={110}/>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+          <ColumnChart data={evComLabel} valueKey="qtd" labelKey="label" color="var(--purple)" highlightColor="var(--red)" height={130} formatValue={(v) => `${v} NFs`}/>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginTop: 32, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
             {[
               { label: 'Pior mês (qtd)', value: d.piorMesQtd ? `${fmtMes(d.piorMesQtd.mes)} · ${d.piorMesQtd.qtd} NFs` : '—', color: 'var(--red)' },
               { label: 'Pior mês (valor)', value: d.piorMesValor ? `${fmtMes(d.piorMesValor.mes)} · ${fmtBRL(d.piorMesValor.valor)}` : '—', color: 'var(--red)' },
@@ -330,10 +418,10 @@ export default function Dashboard({ onGoTo }) {
         </Card>
       </div>
 
-      {/* ── Linha 3: Top clientes + Top UFs ─────────────────── */}
+      {/* ── Linha 3: Top clientes + Top UFs / Cobranças ─────── */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
 
-        <Card title="Top 10 clientes por valor devolvido" subtitle="Acumulado 2026" noPad>
+        <Card title="Top 10 clientes por valor devolvido" subtitle="Acumulado no período" noPad>
           {(d.topClientes || []).map((c, i) => {
             const maxVal = d.topClientes[0]?.valor || 1;
             const pctShare = Math.round((c.valor / (d.totais?.valor || 1)) * 100);
@@ -342,7 +430,6 @@ export default function Dashboard({ onGoTo }) {
                 display: 'flex', alignItems: 'center', gap: 12,
                 padding: '10px 18px', borderBottom: i < 9 ? '1px solid var(--border)' : 'none',
               }}>
-                {/* Rank */}
                 <div style={{
                   width: 22, height: 22, borderRadius: 6, flexShrink: 0,
                   background: i < 3 ? ['var(--red-dim)','var(--yellow-dim)','var(--blue-dim)'][i] : 'var(--surface-3)',
@@ -352,7 +439,6 @@ export default function Dashboard({ onGoTo }) {
                 }}>
                   {i + 1}
                 </div>
-                {/* Nome + barra */}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                     <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70%' }}>
@@ -378,7 +464,7 @@ export default function Dashboard({ onGoTo }) {
           {/* Top UFs */}
           <Card title="Top 8 estados por valor" subtitle="Origem das devoluções">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {(d.topUfs || []).map((u, i) => {
+              {(d.topUfs || []).map((u) => {
                 const maxVal = d.topUfs[0]?.valor || 1;
                 return (
                   <div key={u.uf} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -392,21 +478,38 @@ export default function Dashboard({ onGoTo }) {
             </div>
           </Card>
 
-          {/* CFOPs */}
-          <Card title="Distribuição por CFOP" subtitle="Tipo de operação de devolução">
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
-              {(d.cfops || []).map((c, i) => {
-                const maxQtd = d.cfops[0]?.qtd || 1;
+          {/* Cobranças a transportadores */}
+          <Card title="Cobranças a transportadores" subtitle="Devoluções de responsabilidade do transporte, já lançadas no Protheus" noPad
+            action={
+              <button onClick={() => onGoTo?.('cobrancas')} className="btn btn-outline btn-sm">
+                Ver tudo
+              </button>
+            }>
+            <div style={{ display: 'flex', gap: 1, padding: '14px 18px', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 10, color: 'var(--text-3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 4 }}>Pendentes</div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--red)', fontVariantNumeric: 'tabular-nums' }}>{fmtBRL(cob.pendente_valor)}</div>
+                <div style={{ fontSize: 10.5, color: 'var(--text-3)', marginTop: 2 }}>{cob.pendente_count ?? 0} NFs</div>
+              </div>
+              <div style={{ width: 1, background: 'var(--border)' }}/>
+              <div style={{ flex: 1, paddingLeft: 14 }}>
+                <div style={{ fontSize: 10, color: 'var(--text-3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 4 }}>Já cobradas</div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--green)', fontVariantNumeric: 'tabular-nums' }}>{fmtBRL(cob.cobrado_valor)}</div>
+                <div style={{ fontSize: 10.5, color: 'var(--text-3)', marginTop: 2 }}>{cob.cobrado_count ?? 0} NFs</div>
+              </div>
+            </div>
+            <div style={{ padding: '10px 0' }}>
+              {(cob.top_transportadores || []).length === 0 && (
+                <div style={{ padding: '10px 18px', fontSize: 11.5, color: 'var(--text-3)', fontStyle: 'italic' }}>Nenhuma cobrança pendente no período.</div>
+              )}
+              {(cob.top_transportadores || []).map((t) => {
+                const maxVal = cob.top_transportadores[0]?.valor || 1;
                 return (
-                  <div key={c.cfop} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span style={{
-                      background: 'var(--gold-dim)', color: 'var(--gold)',
-                      border: '1px solid rgba(154,123,79,0.25)',
-                      padding: '1px 7px', borderRadius: 4, fontSize: 11, fontWeight: 700,
-                      flexShrink: 0, minWidth: 44, textAlign: 'center',
-                    }}>{c.cfop}</span>
-                    <Bar valor={c.qtd} max={maxQtd} color="var(--gold)" height={5}/>
-                    <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-2)', flexShrink: 0, minWidth: 40, textAlign: 'right' }}>{c.qtd}x</span>
+                  <div key={t.transportador} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 18px' }}>
+                    <span className="ellipsis" style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--text)', flex: '0 0 38%' }}>{t.transportador}</span>
+                    <Bar valor={t.valor} max={maxVal} color="var(--gold)" height={5}/>
+                    <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text)', fontVariantNumeric: 'tabular-nums', flexShrink: 0, minWidth: 70, textAlign: 'right' }}>{fmtBRL(t.valor)}</span>
+                    <span style={{ fontSize: 10, color: 'var(--text-3)', flexShrink: 0, minWidth: 34, textAlign: 'right' }}>{t.qtd}x</span>
                   </div>
                 );
               })}
@@ -416,116 +519,73 @@ export default function Dashboard({ onGoTo }) {
         </div>
       </div>
 
-      {/* ── Linha 4: Detalhe mensal + status ──────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 14 }}>
-
-        <Card title="Detalhe por mês" subtitle="Quantidade, valor total e clientes distintos por mês de 2026" noPad>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-            <thead>
-              <tr style={{ background: 'var(--surface-2)' }}>
-                {['Mês','NFs','Valor total','Clientes','Ticket médio','vs mês anterior'].map((h, i) => (
-                  <th key={h} style={{
-                    padding: '9px 16px', textAlign: i > 0 ? 'right' : 'left',
-                    fontSize: 10, fontWeight: 700, color: 'var(--text-3)',
-                    textTransform: 'uppercase', letterSpacing: '.07em',
-                    borderBottom: '1px solid var(--border)',
-                  }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {ev.map((m, i) => {
-                const ant = ev[i - 1];
-                const varV = ant ? pct(m.valor, ant.valor) : null;
-                const isMax = m.valor === Math.max(...ev.map(e => e.valor));
-                const ticket = m.qtd > 0 ? m.valor / m.qtd : 0;
-                return (
-                  <tr key={m.mes} style={{ background: isMax ? 'rgba(220,38,38,0.04)' : undefined }}>
-                    <td style={{ padding: '10px 16px', fontWeight: 700, color: 'var(--text)', borderBottom: '1px solid var(--border)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        {fmtMes(m.mes)}
-                        {isMax && (
-                          <span style={{ fontSize: 9, fontWeight: 700, background: 'var(--red-dim)', color: 'var(--red)', padding: '1px 6px', borderRadius: 20 }}>PIOR</span>
-                        )}
-                      </div>
-                    </td>
-                    <td style={{ padding: '10px 16px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 600, borderBottom: '1px solid var(--border)' }}>{m.qtd}</td>
-                    <td style={{ padding: '10px 16px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 700, color: 'var(--text)', borderBottom: '1px solid var(--border)' }}>{fmtBRL(m.valor)}</td>
-                    <td style={{ padding: '10px 16px', textAlign: 'right', color: 'var(--text-2)', borderBottom: '1px solid var(--border)' }}>{m.clientes}</td>
-                    <td style={{ padding: '10px 16px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: 'var(--text-2)', borderBottom: '1px solid var(--border)' }}>{fmtBRL(ticket)}</td>
-                    <td style={{ padding: '10px 16px', textAlign: 'right', borderBottom: '1px solid var(--border)' }}>
-                      {varV != null
-                        ? <Delta atual={m.valor} anterior={ant.valor} invertido/>
-                        : <span style={{ color: 'var(--text-3)', fontSize: 11 }}>—</span>
-                      }
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-            <tfoot>
-              <tr style={{ background: 'var(--surface-2)' }}>
-                <td style={{ padding: '10px 16px', fontWeight: 800, color: 'var(--text)', fontSize: 12 }}>Total 2026</td>
-                <td style={{ padding: '10px 16px', textAlign: 'right', fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{d.totais?.qtd}</td>
-                <td style={{ padding: '10px 16px', textAlign: 'right', fontWeight: 800, color: 'var(--blue)', fontVariantNumeric: 'tabular-nums' }}>{fmtBRL(d.totais?.valor)}</td>
-                <td style={{ padding: '10px 16px', textAlign: 'right', fontWeight: 600, color: 'var(--text-2)' }}>{d.totais?.clientes}</td>
-                <td style={{ padding: '10px 16px', textAlign: 'right', fontWeight: 600, color: 'var(--text-2)', fontVariantNumeric: 'tabular-nums' }}>{fmtBRL(d.totais?.ticket_medio)}</td>
-                <td/>
-              </tr>
-            </tfoot>
-          </table>
-        </Card>
-
-        {/* Status */}
-        <Card title="Por status" subtitle="Situação atual">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, minWidth: 180 }}>
-            {[
-              { label: 'Pendente',    count: k.pendente_count,  color: '#9CA3AF', bg: '#F3F4F6' },
-              { label: 'Em análise',  count: k.analise_count,   color: '#D97706', bg: '#FFFBEB' },
-              { label: 'Concluídas',  count: k.concluida_count, color: '#16A34A', bg: '#F0FDF4' },
-            ].map(s => (
-              <div key={s.label} style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '10px 14px', borderRadius: 8,
-                background: s.bg, border: `1px solid ${s.color}22`,
-                gap: 16,
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: s.color, flexShrink: 0 }}/>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>{s.label}</span>
-                </div>
-                <span style={{ fontSize: 18, fontWeight: 800, color: s.color, fontVariantNumeric: 'tabular-nums' }}>
-                  {(s.count ?? 0).toLocaleString('pt-BR')}
-                </span>
-              </div>
-            ))}
-            <div style={{ marginTop: 4, padding: '10px 14px', background: 'var(--blue-dim)', borderRadius: 8, border: '1px solid var(--blue-mid)', textAlign: 'center' }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--blue)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 4 }}>Total</div>
-              <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--blue)', fontVariantNumeric: 'tabular-nums' }}>{k.total_count?.toLocaleString('pt-BR') ?? '—'}</div>
-            </div>
-          </div>
-        </Card>
-
-      </div>
+      {/* ── Linha 4: Detalhe mensal ──────────────────────── */}
+      <Card title="Detalhe por mês" subtitle="Quantidade, valor total e clientes distintos por mês, no período selecionado" noPad>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+          <thead>
+            <tr style={{ background: 'var(--surface-2)' }}>
+              {['Mês','NFs','Valor total','Clientes','Ticket médio','vs mês anterior'].map((h, i) => (
+                <th key={h} style={{
+                  padding: '9px 16px', textAlign: i > 0 ? 'right' : 'left',
+                  fontSize: 10, fontWeight: 700, color: 'var(--text-3)',
+                  textTransform: 'uppercase', letterSpacing: '.07em',
+                  borderBottom: '1px solid var(--border)',
+                }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {ev.map((m, i) => {
+              const ant = ev[i - 1];
+              const varV = ant ? pct(m.valor, ant.valor) : null;
+              const isMax = m.valor === Math.max(...ev.map(e => e.valor));
+              const ticket = m.qtd > 0 ? m.valor / m.qtd : 0;
+              return (
+                <tr key={m.mes} style={{ background: isMax ? 'rgba(220,38,38,0.04)' : undefined }}>
+                  <td style={{ padding: '10px 16px', fontWeight: 700, color: 'var(--text)', borderBottom: '1px solid var(--border)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      {fmtMes(m.mes)}
+                      {isMax && (
+                        <span style={{ fontSize: 9, fontWeight: 700, background: 'var(--red-dim)', color: 'var(--red)', padding: '1px 6px', borderRadius: 20 }}>PIOR</span>
+                      )}
+                    </div>
+                  </td>
+                  <td style={{ padding: '10px 16px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 600, borderBottom: '1px solid var(--border)' }}>{m.qtd}</td>
+                  <td style={{ padding: '10px 16px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 700, color: 'var(--text)', borderBottom: '1px solid var(--border)' }}>{fmtBRL(m.valor)}</td>
+                  <td style={{ padding: '10px 16px', textAlign: 'right', color: 'var(--text-2)', borderBottom: '1px solid var(--border)' }}>{m.clientes}</td>
+                  <td style={{ padding: '10px 16px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: 'var(--text-2)', borderBottom: '1px solid var(--border)' }}>{fmtBRL(ticket)}</td>
+                  <td style={{ padding: '10px 16px', textAlign: 'right', borderBottom: '1px solid var(--border)' }}>
+                    {varV != null
+                      ? <Delta atual={m.valor} anterior={ant.valor} invertido/>
+                      : <span style={{ color: 'var(--text-3)', fontSize: 11 }}>—</span>
+                    }
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+          <tfoot>
+            <tr style={{ background: 'var(--surface-2)' }}>
+              <td style={{ padding: '10px 16px', fontWeight: 800, color: 'var(--text)', fontSize: 12 }}>Total do período</td>
+              <td style={{ padding: '10px 16px', textAlign: 'right', fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{d.totais?.qtd}</td>
+              <td style={{ padding: '10px 16px', textAlign: 'right', fontWeight: 800, color: 'var(--blue)', fontVariantNumeric: 'tabular-nums' }}>{fmtBRL(d.totais?.valor)}</td>
+              <td style={{ padding: '10px 16px', textAlign: 'right', fontWeight: 600, color: 'var(--text-2)' }}>{d.totais?.clientes}</td>
+              <td style={{ padding: '10px 16px', textAlign: 'right', fontWeight: 600, color: 'var(--text-2)', fontVariantNumeric: 'tabular-nums' }}>{fmtBRL(d.totais?.ticket_medio)}</td>
+              <td/>
+            </tr>
+          </tfoot>
+        </table>
+      </Card>
 
       {/* ── Linha 5: Por área + Top motivos ─────────────── */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
 
         {/* Por área responsável */}
-        <Card title="Devoluções por área responsável" subtitle="Valor e quantidade acumulado 2026" noPad>
+        <Card title="Devoluções por área responsável" subtitle="Valor e quantidade no período" noPad>
           {(d.porArea || []).map((a, i) => {
-            const CORES = {
-              'COMERCIAL':         '#1E4DB7',
-              'TRANSPORTE':        '#D97706',
-              'QUALIDADE':         '#7C3AED',
-              'FISCAL':            '#DC2626',
-              'LOGÍSTICA REVERSA': '#16A34A',
-              'LOGÍSTICA':         '#16A34A',
-              'SEM CLASSIFICAÇÃO': '#9CA3AF',
-            };
-            const cor = CORES[a.area] || '#9CA3AF';
+            const cor = AREA_CORES[a.area] || '#9CA3AF';
             const maxVal = d.porArea[0]?.valor || 1;
-            const pct = Math.round((a.valor / (d.totais?.valor || 1)) * 100);
+            const pctV = Math.round((a.valor / (d.totais?.valor || 1)) * 100);
             return (
               <div key={a.area} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 18px', borderBottom: i < (d.porArea?.length||0)-1 ? '1px solid var(--border)' : 'none' }}>
                 <div style={{ width: 10, height: 10, borderRadius: '50%', background: cor, flexShrink: 0 }}/>
@@ -533,7 +593,7 @@ export default function Dashboard({ onGoTo }) {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
                     <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>{a.area}</span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                      <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-3)' }}>{pct}% · {a.qtd} NFs</span>
+                      <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-3)' }}>{pctV}% · {a.qtd} NFs</span>
                       <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>{fmtBRL(a.valor)}</span>
                     </div>
                   </div>
@@ -545,19 +605,10 @@ export default function Dashboard({ onGoTo }) {
         </Card>
 
         {/* Top motivos */}
-        <Card title="Top motivos de devolução" subtitle="Por quantidade de ocorrências" noPad>
+        <Card title="Top motivos de devolução" subtitle="Por valor devolvido no período" noPad>
           {(d.topMotivos || []).map((m, i) => {
-            const CORES = {
-              'COMERCIAL':         '#1E4DB7',
-              'TRANSPORTE':        '#D97706',
-              'QUALIDADE':         '#7C3AED',
-              'FISCAL':            '#DC2626',
-              'LOGÍSTICA REVERSA': '#16A34A',
-              'LOGÍSTICA':         '#16A34A',
-              'SEM CLASSIFICAÇÃO': '#9CA3AF',
-            };
-            const cor = CORES[m.area] || '#9CA3AF';
-            const maxQtd = d.topMotivos[0]?.qtd || 1;
+            const cor = AREA_CORES[m.area] || '#9CA3AF';
+            const maxVal = d.topMotivos[0]?.valor || 1;
             return (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 18px', borderBottom: i < (d.topMotivos?.length||0)-1 ? '1px solid var(--border)' : 'none' }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -568,10 +619,11 @@ export default function Dashboard({ onGoTo }) {
                     </div>
                     <div style={{ display: 'flex', gap: 8, flexShrink: 0, alignItems: 'center' }}>
                       <span style={{ fontSize: 10, fontWeight: 700, color: cor, background: cor + '18', padding: '1px 6px', borderRadius: 20 }}>{m.area?.split(' ')[0]}</span>
-                      <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-2)', minWidth: 28, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{m.qtd}x</span>
+                      <span style={{ fontSize: 10, color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums' }}>{m.qtd}x</span>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', minWidth: 64, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{fmtBRL(m.valor)}</span>
                     </div>
                   </div>
-                  <Bar valor={m.qtd} max={maxQtd} color={cor} height={4}/>
+                  <Bar valor={m.valor} max={maxVal} color={cor} height={4}/>
                 </div>
               </div>
             );

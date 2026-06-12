@@ -242,14 +242,17 @@ export async function dbGetXmlUrl(xmlPath) {
 }
 
 // Uma única chamada RPC que agrega tudo no banco (SECURITY DEFINER ignora RLS)
-async function fetchDashboardRPC() {
-  const { data, error } = await supabase.rpc('get_dashboard_data');
+async function fetchDashboardRPC({ inicio, fim } = {}) {
+  const params = {};
+  if (inicio) params.p_inicio = inicio;
+  if (fim)    params.p_fim    = fim;
+  const { data, error } = await supabase.rpc('get_dashboard_data', params);
   if (error) throw new Error(error.message);
   return data;
 }
 
-export async function dbGetKpis() {
-  const d = await fetchDashboardRPC();
+export async function dbGetKpis(periodo) {
+  const d = await fetchDashboardRPC(periodo);
   return d?.kpis || {
     total_count: 0, total_valor: 0,
     pendente_count: 0, pendente_valor: 0,
@@ -257,8 +260,8 @@ export async function dbGetKpis() {
   };
 }
 
-export async function dbGetDashboard() {
-  const d = await fetchDashboardRPC();
+export async function dbGetDashboard(periodo) {
+  const d = await fetchDashboardRPC(periodo);
   const evolucao = d?.evolucao || [];
   const mesAtual    = evolucao[evolucao.length - 1] || null;
   const mesAnterior = evolucao[evolucao.length - 2] || null;
@@ -273,9 +276,9 @@ export async function dbGetDashboard() {
     mesAnterior,
     topClientes:   d?.top_clientes || [],
     topUfs:        d?.top_ufs      || [],
-    cfops:         d?.cfops        || [],
     porArea:       d?.por_area     || [],
     topMotivos:    d?.top_motivos  || [],
+    cobrancas:     d?.cobrancas    || { pendente_count: 0, pendente_valor: 0, cobrado_count: 0, cobrado_valor: 0, top_transportadores: [] },
   };
 }
 
