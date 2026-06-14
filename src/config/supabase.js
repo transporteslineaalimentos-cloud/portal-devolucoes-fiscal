@@ -95,9 +95,26 @@ export async function dbListDevolucoes({ page = 0, filters = {} }) {
 
   if (filters.status)         q = q.eq('status_portal', filters.status);
   if (filters.cnpj_dest)      q = q.eq('cnpj_destinatario', filters.cnpj_dest);
+  if (filters.cnpj_emitente)  q = q.eq('cnpj_emitente', filters.cnpj_emitente);
   if (filters.uf)             q = q.eq('uf_emitente', filters.uf);
   if (filters.dt_inicio)      q = q.gte('dt_emissao', filters.dt_inicio);
   if (filters.dt_fim)         q = q.lte('dt_emissao', filters.dt_fim);
+  if (filters.mes) {
+    // mes no formato 'YYYY-MM' → intervalo do mês
+    const [y, m] = filters.mes.split('-').map(Number);
+    const ini = `${filters.mes}-01`;
+    const fimDate = new Date(y, m, 0); // último dia do mês
+    const fim = `${y}-${String(m).padStart(2,'0')}-${String(fimDate.getDate()).padStart(2,'0')}`;
+    q = q.gte('dt_emissao', ini).lte('dt_emissao', fim);
+  }
+  if (filters.area) {
+    if (filters.area === 'SEM CLASSIFICAÇÃO') q = q.is('area_responsavel', null);
+    else q = q.eq('area_responsavel', filters.area);
+  }
+  if (filters.motivo) {
+    if (filters.motivo === 'SEM MOTIVO') q = q.is('motivo_devolucao', null);
+    else q = q.eq('motivo_devolucao', filters.motivo);
+  }
   if (filters.devolucao_total === 'total')    q = q.eq('devolucao_total', true);
   if (filters.devolucao_total === 'parcial')  q = q.eq('devolucao_total', false);
   if (filters.lancamento_manual === 'manual') q = q.eq('lancamento_manual', true);

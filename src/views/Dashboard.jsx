@@ -110,14 +110,16 @@ function Card({ title, subtitle, children, action, noPad = false }) {
 }
 
 /* ─── KPI — borda neutra, identidade só no ícone ──────────── */
-function KpiMini({ label, value, sub, hue, icon, delta, deltaInv }) {
+function KpiMini({ label, value, sub, hue, icon, delta, deltaInv, onClick }) {
   return (
-    <div style={{
+    <div onClick={onClick} className={onClick ? 'kpi-clickable' : undefined}
+      style={{
       background: 'var(--surface)',
       border: '1px solid var(--border)',
       borderRadius: 10,
       padding: '18px 20px',
       boxShadow: '0 1px 2px rgba(15,25,35,0.04)',
+      cursor: onClick ? 'pointer' : 'default',
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
         <span style={T.overline}>{label}</span>
@@ -141,7 +143,7 @@ function KpiMini({ label, value, sub, hue, icon, delta, deltaInv }) {
 }
 
 /* ─── Gráfico de linha — gridlines + gradiente fade-out ───── */
-function TrendChart({ data, valueKey, labelKey, color = PAL.accent, height = 150, formatValue = fmtBRL }) {
+function TrendChart({ data, valueKey, labelKey, color = PAL.accent, height = 150, formatValue = fmtBRL, onPointClick }) {
   const [hovered, setHovered] = useState(null);
   if (!data?.length) return <Empty height={height}/>;
 
@@ -185,15 +187,16 @@ function TrendChart({ data, valueKey, labelKey, color = PAL.accent, height = 150
       {pts.map((p, i) => (
         <div key={i}
           onMouseEnter={() => setHovered(i)} onMouseLeave={() => setHovered(null)}
+          onClick={onPointClick ? () => onPointClick(p.d, i) : undefined}
           style={{
             position: 'absolute', left: `${p.xPct}%`, top: `${p.yPct}%`,
-            transform: 'translate(-50%, -50%)', cursor: 'default',
+            transform: 'translate(-50%, -50%)', cursor: onPointClick ? 'pointer' : 'default',
             width: 18, height: 18, display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
           <div style={{
             width: hovered === i ? 7 : 5, height: hovered === i ? 7 : 5, borderRadius: '50%',
-            background: 'var(--surface)', border: `1.5px solid ${color}`,
-            transition: 'width 100ms, height 100ms',
+            background: hovered === i ? color : 'var(--surface)', border: `1.5px solid ${color}`,
+            transition: 'width 100ms, height 100ms, background 100ms',
           }}/>
           {hovered === i && (
             <div style={{
@@ -226,7 +229,7 @@ function TrendChart({ data, valueKey, labelKey, color = PAL.accent, height = 150
 }
 
 /* ─── Gráfico de colunas — tons suaves, pior mês destacado ── */
-function ColumnChart({ data, valueKey, labelKey, color = PAL.accent, highlightColor = PAL.red, height = 150, formatValue = (v) => v }) {
+function ColumnChart({ data, valueKey, labelKey, color = PAL.accent, highlightColor = PAL.red, height = 150, formatValue = (v) => v, onColumnClick }) {
   const [hovered, setHovered] = useState(null);
   if (!data?.length) return <Empty height={height}/>;
 
@@ -246,7 +249,8 @@ function ColumnChart({ data, valueKey, labelKey, color = PAL.accent, highlightCo
           return (
             <div key={i}
               onMouseEnter={() => setHovered(i)} onMouseLeave={() => setHovered(null)}
-              style={{ flex: 1, height: '100%', display: 'flex', alignItems: 'flex-end', position: 'relative', cursor: 'default' }}>
+              onClick={onColumnClick ? () => onColumnClick(d, i) : undefined}
+              style={{ flex: 1, height: '100%', display: 'flex', alignItems: 'flex-end', position: 'relative', cursor: onColumnClick ? 'pointer' : 'default' }}>
               {hovered === i && (
                 <div style={{
                   position: 'absolute', bottom: `calc(${h}% + 9px)`, left: '50%', transform: 'translateX(-50%)',
@@ -380,6 +384,14 @@ export default function Dashboard({ onGoTo }) {
   const mesAnt   = d.mesAnterior;
   const cob = d.cobrancas || {};
 
+  // Drill-down: abre Devoluções com período atual + filtro específico
+  const goDev = (extra = {}) => {
+    const base = { dt_inicio: periodo.inicio, dt_fim: periodo.fim };
+    // Se filtra por mês específico, ignora o range do período (o mês é mais preciso)
+    if (extra.mes) { delete base.dt_inicio; delete base.dt_fim; }
+    onGoTo?.('devolucoes', { ...base, ...extra });
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
@@ -409,6 +421,7 @@ export default function Dashboard({ onGoTo }) {
           icon="M9 14l-4-4 4-4M5 10h11a4 4 0 010 8h-1"
           delta={mesAtual && mesAnt ? { atual: mesAtual.qtd, anterior: mesAnt.qtd } : null}
           deltaInv
+          onClick={() => goDev()}
         />
         <KpiMini
           label="Pendentes de análise"
@@ -416,6 +429,7 @@ export default function Dashboard({ onGoTo }) {
           sub={fmtBRL(k.pendente_valor)}
           hue={PAL.amber}
           icon="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+          onClick={() => goDev({ status: 'pendente' })}
         />
         <KpiMini
           label="Ticket médio"
@@ -423,6 +437,7 @@ export default function Dashboard({ onGoTo }) {
           sub={`${nf(d.totais?.clientes)} clientes distintos`}
           hue={PAL.violet}
           icon="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+          onClick={() => goDev()}
         />
         <KpiMini
           label="Cobrança transportador"
@@ -430,6 +445,7 @@ export default function Dashboard({ onGoTo }) {
           sub={`${fmtBRL(cob.pendente_valor)} pendente`}
           hue={PAL.red}
           icon="M3 6h13l3 5v6h-3m-7 0H3V6zm10 11a2 2 0 104 0 2 2 0 00-4 0zM7 17a2 2 0 104 0 2 2 0 00-4 0z"
+          onClick={() => onGoTo?.('cobrancas', { status_cobranca: 'pendente_cobranca_transportador' })}
         />
       </div>
 
@@ -437,7 +453,8 @@ export default function Dashboard({ onGoTo }) {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
 
         <Card title="Valor devolvido" subtitle="R$ por mês de emissão da NF de devolução">
-          <TrendChart data={evComLabel} valueKey="valor" labelKey="label" color={PAL.accent} height={150} formatValue={fmtBRL}/>
+          <TrendChart data={evComLabel} valueKey="valor" labelKey="label" color={PAL.accent} height={150} formatValue={fmtBRL}
+            onPointClick={(pt) => goDev({ mes: pt.mes })}/>
           {mesAtual && mesAnt && (
             <div style={{ display: 'flex', gap: 20, marginTop: 18, paddingTop: 14, borderTop: '1px solid var(--surface-3)' }}>
               <div>
@@ -456,7 +473,8 @@ export default function Dashboard({ onGoTo }) {
         </Card>
 
         <Card title="Quantidade de NFs" subtitle="Devoluções emitidas por mês">
-          <ColumnChart data={evComLabel} valueKey="qtd" labelKey="label" color={PAL.accent} highlightColor={PAL.red} height={150} formatValue={(v) => `${v} NFs`}/>
+          <ColumnChart data={evComLabel} valueKey="qtd" labelKey="label" color={PAL.accent} highlightColor={PAL.red} height={150} formatValue={(v) => `${v} NFs`}
+            onColumnClick={(c) => goDev({ mes: c.mes })}/>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginTop: 18, paddingTop: 14, borderTop: '1px solid var(--surface-3)' }}>
             {[
               { label: 'Pior mês · qtd',   value: d.piorMesQtd ? `${fmtMes(d.piorMesQtd.mes)} — ${d.piorMesQtd.qtd} NFs` : '—' },
@@ -482,12 +500,14 @@ export default function Dashboard({ onGoTo }) {
               const maxVal = arr[0]?.valor || 1;
               const share = Math.round((c.valor / (d.totais?.valor || 1)) * 100);
               return (
-                <div key={c.cnpj} style={{
+                <div key={c.cnpj} className="drill-row" style={{
                   display: 'grid',
                   gridTemplateColumns: '24px minmax(0,1fr) 64px 104px',
                   alignItems: 'center', columnGap: 12,
                   padding: '9px 0', ...rowBorder(i, arr.length),
-                }}>
+                }}
+                onClick={() => goDev({ cnpj_emitente: c.cnpj })}
+                title={`Ver devoluções de ${c.nome}`}>
                   <span style={{ fontSize: 11, fontWeight: 600, color: i < 3 ? 'var(--text-2)' : 'var(--text-3)', fontVariantNumeric: 'tabular-nums' }}>
                     {String(i + 1).padStart(2, '0')}
                   </span>
@@ -516,12 +536,14 @@ export default function Dashboard({ onGoTo }) {
               {(d.topUfs || []).map((u, i, arr) => {
                 const maxVal = arr[0]?.valor || 1;
                 return (
-                  <div key={u.uf} style={{
+                  <div key={u.uf} className="drill-row" style={{
                     display: 'grid',
                     gridTemplateColumns: '32px minmax(0,1fr) 100px 56px',
                     alignItems: 'center', columnGap: 12,
                     padding: '8px 0', ...rowBorder(i, arr.length),
-                  }}>
+                  }}
+                  onClick={() => goDev({ uf: u.uf })}
+                  title={`Ver devoluções de ${u.uf}`}>
                     <span style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--text-2)', letterSpacing: '.02em' }}>{u.uf}</span>
                     <Bar valor={u.valor} max={maxVal} color={PAL.accent} height={4}/>
                     <span style={{ ...T.value, fontSize: 12.5, textAlign: 'right' }}>{fmtBRL(u.valor)}</span>
@@ -545,14 +567,16 @@ export default function Dashboard({ onGoTo }) {
               </button>
             }>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderBottom: '1px solid var(--surface-3)' }}>
-              <div style={{ padding: '12px 20px', borderRight: '1px solid var(--surface-3)' }}>
+              <div className="drill-row" style={{ padding: '12px 20px', borderRight: '1px solid var(--surface-3)' }}
+                onClick={() => onGoTo?.('cobrancas', { status_cobranca: 'pendente_cobranca_transportador' })}>
                 <div style={{ ...T.overline, marginBottom: 5 }}>Pendentes</div>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 7 }}>
                   <span style={{ fontSize: 17, fontWeight: 650, color: 'var(--text)', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }}>{fmtBRL(cob.pendente_valor)}</span>
                   <span style={T.meta}>{nf(cob.pendente_count)} NFs</span>
                 </div>
               </div>
-              <div style={{ padding: '12px 20px' }}>
+              <div className="drill-row" style={{ padding: '12px 20px' }}
+                onClick={() => onGoTo?.('cobrancas', { status_cobranca: 'cobrado' })}>
                 <div style={{ ...T.overline, marginBottom: 5 }}>Já cobradas</div>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 7 }}>
                   <span style={{ fontSize: 17, fontWeight: 650, color: PAL.green, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }}>{fmtBRL(cob.cobrado_valor)}</span>
@@ -567,12 +591,14 @@ export default function Dashboard({ onGoTo }) {
               {(cob.top_transportadores || []).map((t, i, arr) => {
                 const maxVal = arr[0]?.valor || 1;
                 return (
-                  <div key={t.transportador} style={{
+                  <div key={t.transportador} className="drill-row" style={{
                     display: 'grid',
                     gridTemplateColumns: 'minmax(0,42%) minmax(0,1fr) 96px 40px',
                     alignItems: 'center', columnGap: 12,
                     padding: '8px 0', ...rowBorder(i, arr.length),
-                  }}>
+                  }}
+                  onClick={() => onGoTo?.('cobrancas', { status_cobranca: 'pendente_cobranca_transportador', transportador: t.transportador })}
+                  title={`Ver cobranças de ${t.transportador}`}>
                     <span className="ellipsis" style={{ fontSize: 12, fontWeight: 500, color: 'var(--text)' }}>{t.transportador}</span>
                     <Bar valor={t.valor} max={maxVal} color={PAL.amber} height={4}/>
                     <span style={{ ...T.value, fontSize: 12.5, textAlign: 'right' }}>{fmtBRL(t.valor)}</span>
@@ -608,7 +634,8 @@ export default function Dashboard({ onGoTo }) {
               const ticket = m.qtd > 0 ? m.valor / m.qtd : 0;
               const cell = { padding: '10px 20px', textAlign: 'right', borderBottom: '1px solid var(--surface-3)', fontVariantNumeric: 'tabular-nums' };
               return (
-                <tr key={m.mes}>
+                <tr key={m.mes} className="drill-row" style={{ cursor: 'pointer' }}
+                  onClick={() => goDev({ mes: m.mes })} title={`Ver devoluções de ${fmtMes(m.mes)}`}>
                   <td style={{ ...cell, textAlign: 'left', fontWeight: 600, color: 'var(--text)' }}>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                       {fmtMes(m.mes)}
@@ -653,12 +680,14 @@ export default function Dashboard({ onGoTo }) {
               const maxVal = arr[0]?.valor || 1;
               const share = Math.round((a.valor / (d.totais?.valor || 1)) * 100);
               return (
-                <div key={a.area} style={{
+                <div key={a.area} className="drill-row" style={{
                   display: 'grid',
                   gridTemplateColumns: '8px minmax(0,1fr) 80px 104px',
                   alignItems: 'center', columnGap: 12,
                   padding: '10px 0', ...rowBorder(i, arr.length),
-                }}>
+                }}
+                onClick={() => goDev({ area: a.area })}
+                title={`Ver devoluções da área ${a.area}`}>
                   <span style={{ width: 8, height: 8, borderRadius: '50%', background: cor, opacity: 0.85 }}/>
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text)', marginBottom: 5 }}>{a.area}</div>
@@ -678,12 +707,14 @@ export default function Dashboard({ onGoTo }) {
               const cor = AREA_CORES[m.area] || PAL.gray;
               const maxVal = arr[0]?.valor || 1;
               return (
-                <div key={i} style={{
+                <div key={i} className="drill-row" style={{
                   display: 'grid',
                   gridTemplateColumns: '8px minmax(0,1fr) 44px 104px',
                   alignItems: 'center', columnGap: 12,
                   padding: '8px 0', ...rowBorder(i, arr.length),
-                }}>
+                }}
+                onClick={() => goDev(m.motivo === 'SEM MOTIVO' ? { com_motivo: 'sem' } : { motivo: m.motivo })}
+                title={`Ver devoluções: ${m.motivo}`}>
                   <span style={{ width: 8, height: 8, borderRadius: '50%', background: cor, opacity: 0.85 }}/>
                   <div style={{ minWidth: 0 }}>
                     <div className="ellipsis" style={{ fontSize: 12, fontWeight: 500, color: 'var(--text)', marginBottom: 5 }}>{m.motivo}</div>

@@ -28,11 +28,27 @@ export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
   const [selectedRow, setSelectedRow] = useState(null);
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({
-    search: '', status_cobranca: initialFilters.status_cobranca ?? 'pendente_cobranca_transportador',
-    transportador: '',
+    search: '',
+    status_cobranca: initialFilters.status_cobranca ?? 'pendente_cobranca_transportador',
+    transportador: initialFilters.transportador ?? '',
   });
   const searchRef = useRef(null);
   const PAGE_SIZE = 40;
+
+  // Reagir a drill-down vindo do dashboard
+  const initKey = JSON.stringify(initialFilters);
+  useEffect(() => {
+    const { _ts, ...f } = initialFilters;
+    if (Object.keys(f).length) {
+      setFilters({
+        search: '',
+        status_cobranca: f.status_cobranca ?? '',
+        transportador: f.transportador ?? '',
+      });
+      setPage(0);
+      if (f.transportador) setShowFilters(true);
+    }
+  }, [initKey]); // eslint-disable-line
 
   const load = useCallback(async (f, p) => {
     setLoading(true); setError('');

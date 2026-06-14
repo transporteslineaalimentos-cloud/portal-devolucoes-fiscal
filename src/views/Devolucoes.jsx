@@ -27,7 +27,14 @@ const CNPJ_OPTIONS = [
   { v: '05207076000459', l: 'CHOCOLATE' },
 ];
 
+const EMPTY_FILTERS = {
+  search: '', status: '', cnpj_dest: '', cnpj_emitente: '', uf: '',
+  dt_inicio: '', dt_fim: '', mes: '', area: '', motivo: '',
+  devolucao_total: '', com_motivo: '', flag_emissao: '', lancado: '', nf_venda: '',
+};
+
 export default function Devolucoes({ user, initialFilters = {} }) {
+  const { _ts, ...initFilt } = initialFilters; // _ts só força re-render
   const [rows, setRows]         = useState([]);
   const [total, setTotal]       = useState(0);
   const [page, setPage]         = useState(0);
@@ -36,13 +43,19 @@ export default function Devolucoes({ user, initialFilters = {} }) {
   const [selectedId, setSelected]     = useState(null);
   const [showModal, setShowModal]     = useState(false);
   const [showFilters, setShowFilters] = useState(false);
-  const [filters, setFilters] = useState({
-    search: '', status: initialFilters.status || '',
-    cnpj_dest: '', uf: '', dt_inicio: '', dt_fim: '',
-    com_motivo: '', flag_emissao: '', lancado: '',
-  });
+  const [filters, setFilters] = useState({ ...EMPTY_FILTERS, ...initFilt });
   const searchRef = useRef(null);
   const PAGE_SIZE = 40;
+
+  // Reagir a drill-down vindo do dashboard (initialFilters muda)
+  const initKey = JSON.stringify(initialFilters);
+  useEffect(() => {
+    if (Object.keys(initFilt).length) {
+      setFilters({ ...EMPTY_FILTERS, ...initFilt });
+      setPage(0);
+      setShowFilters(true);
+    }
+  }, [initKey]); // eslint-disable-line
 
   const load = useCallback(async (f, p) => {
     setLoading(true); setError('');
@@ -60,12 +73,54 @@ export default function Devolucoes({ user, initialFilters = {} }) {
     clearTimeout(searchRef.current);
     searchRef.current = setTimeout(() => applyFilter({ search: val }), 350);
   };
-  const clearFilters = () => applyFilter({ status: '', cnpj_dest: '', uf: '', dt_inicio: '', dt_fim: '', search: '' });
-  const hasFilters = filters.status || filters.cnpj_dest || filters.uf || filters.dt_inicio || filters.dt_fim || filters.search;
+  const clearFilters = () => { setFilters({ ...EMPTY_FILTERS }); setPage(0); };
+  const hasFilters = Object.entries(filters).some(([k, v]) => v && k !== 'search') || filters.search;
   const totalPages = Math.ceil(total / PAGE_SIZE);
+
+  // Rótulo amigável do filtro de drill-down ativo
+  const MES_NOMES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  const activeChips = [];
+  if (filters.mes)  { const [y,m] = filters.mes.split('-'); activeChips.push({ k: 'mes', label: `Mês: ${MES_NOMES[+m-1]}/${y.slice(2)}` }); }
+  if (filters.area)          activeChips.push({ k: 'area', label: `Área: ${filters.area}` });
+  if (filters.motivo)        activeChips.push({ k: 'motivo', label: `Motivo: ${filters.motivo}` });
+  if (filters.uf)            activeChips.push({ k: 'uf', label: `UF: ${filters.uf}` });
+  if (filters.cnpj_emitente) activeChips.push({ k: 'cnpj_emitente', label: `Cliente filtrado` });
+  if (filters.cnpj_dest)     activeChips.push({ k: 'cnpj_dest', label: `Empresa: ${CNPJ_OPTIONS.find(o=>o.v===filters.cnpj_dest)?.l || 'destino'}` });
+  if (filters.status)        activeChips.push({ k: 'status', label: `Status: ${STATUS_OPTIONS.find(o=>o.v===filters.status)?.l || filters.status}` });
+  if (filters.lancado === 'sim') activeChips.push({ k: 'lancado', label: 'Lançada no Protheus' });
+  if (filters.lancado === 'nao') activeChips.push({ k: 'lancado', label: 'Fora do Protheus' });
+  if (filters.com_motivo === 'sem') activeChips.push({ k: 'com_motivo', label: 'Sem motivo classificado' });
+  if (filters.flag_emissao === 'divergente') activeChips.push({ k: 'flag_emissao', label: 'Emissão divergente' });
+  if (filters.nf_venda === 'nao_localizada') activeChips.push({ k: 'nf_venda', label: 'NF venda não localizada' });
+  if (filters.dt_inicio || filters.dt_fim) {
+    const fmt = s => { if (!s) return ''; const [y,m,dd] = s.split('-'); return `${dd}/${m}/${y.slice(2)}`; };
+    activeChips.push({ k: 'periodo', label: `Período: ${fmt(filters.dt_inicio) || '...'} – ${fmt(filters.dt_fim) || '...'}`, clear: { dt_inicio: '', dt_fim: '' } });
+  }
 
   return (
     <div>
+      {/* Chips de filtro ativo (drill-down do dashboard) */}
+      {activeChips.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)' }}>Filtrado por:</span>
+          {activeChips.map(chip => (
+            <span key={chip.k} style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              fontSize: 11.5, fontWeight: 600, color: 'var(--blue)',
+              background: 'var(--blue-dim)', border: '1px solid var(--blue-mid)',
+              padding: '4px 10px', borderRadius: 20,
+            }}>
+              {chip.label}
+              <button onClick={() => applyFilter(chip.clear || { [chip.k]: '' })}
+                style={{ display: 'flex', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--blue)', padding: 0 }}>
+                <Ic d="M18 6L6 18M6 6l12 12" size={11}/>
+              </button>
+            </span>
+          ))}
+          <button onClick={clearFilters} className="btn btn-ghost btn-sm">Limpar tudo</button>
+        </div>
+      )}
+
       {/* Toolbar */}
       <div className="table-wrap" style={{ marginBottom: 0, borderBottomLeftRadius: 0, borderBottomRightRadius: 0, borderBottom: 'none' }}>
         <div className="table-toolbar">

@@ -40,7 +40,7 @@ function Portal() {
   const changeTab = (id, filters = {}) => {
     setTab(id);
     if (Object.keys(filters).length)
-      setTabFilters(prev => ({ ...prev, [id]: filters }));
+      setTabFilters(prev => ({ ...prev, [id]: { ...filters, _ts: Date.now() } }));
   };
 
   const meta = PAGE_META[tab] || { title: tab, sub: null };
