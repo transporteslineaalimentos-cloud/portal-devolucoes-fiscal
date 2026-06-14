@@ -139,9 +139,15 @@ export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
               )}
             </div>
           </div>
-        ) : rows.map(row => (
-          <div key={row.id} className="table-row"
-            style={{ gridTemplateColumns: COLS }}
+        ) : rows.map(row => {
+          const statusCor = {
+            pendente_cobranca_transportador: 'var(--yellow)',
+            cobrado: 'var(--green)',
+            isento:  'var(--text-3)',
+          }[row.status_cobranca] || 'var(--text-3)';
+          return (
+          <div key={row.id} className="dev-row"
+            style={{ gridTemplateColumns: COLS, '--row-accent': statusCor }}
             onClick={() => setSelectedRow(row)}>
 
             {/* NF Dev */}
@@ -208,7 +214,8 @@ export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
               <BadgeCobranca status={row.status_cobranca} />
             </div>
           </div>
-        ))}
+          );
+        })}
 
         {/* Paginação */}
         {totalPages > 1 && (
