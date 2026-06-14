@@ -10,6 +10,9 @@ const AREA_CORES = {
   'LOGÍSTICA REVERSA': { color: 'var(--green)',   bg: 'var(--green-dim)' },
   'LOGÍSTICA':         { color: 'var(--green)',   bg: 'var(--green-dim)' },
   'CONTROLADORIA':     { color: '#0891B2',        bg: 'rgba(8,145,178,0.10)' },
+  'TI':                { color: '#0EA5E9',        bg: 'rgba(14,165,233,0.10)' },
+  'CUSTOMER SERVICE':  { color: '#DB2777',        bg: 'rgba(219,39,119,0.10)' },
+  'A VALIDAR':         { color: 'var(--text-3)',  bg: 'var(--surface-3)' },
 };
 
 // Autocomplete de motivo com busca por digitação

@@ -24,6 +24,9 @@ const AREA_CORES = {
   'CONTROLADORIA':     '#5B7A99',
   'LOGÍSTICA REVERSA': PAL.green,
   'LOGÍSTICA':         PAL.green,
+  'TI':                '#0EA5E9',
+  'CUSTOMER SERVICE':  '#DB2777',
+  'A VALIDAR':         PAL.gray,
   'SEM CLASSIFICAÇÃO': PAL.gray,
 };
 
