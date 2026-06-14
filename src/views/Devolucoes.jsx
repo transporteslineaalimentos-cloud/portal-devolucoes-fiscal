@@ -11,7 +11,7 @@ const Ic = ({ d, size = 14, color = 'currentColor' }) => (
   </svg>
 );
 
-const COLS = '88px 1fr 90px 60px 110px 100px 90px 60px';
+const COLS = '108px 1fr 132px 96px 132px 150px';
 
 const STATUS_OPTIONS = [
   { v: '',           l: 'Todos os status' },
@@ -160,14 +160,12 @@ export default function Devolucoes({ user, initialFilters = {} }) {
       <div className="table-wrap" style={{ borderTopLeftRadius: 0, borderTopRightRadius: 0 }}>
         {/* Cabeçalho */}
         <div className="table-head" style={{ gridTemplateColumns: COLS }}>
-          <span>NF Dev.</span>
-          <span>Emitente</span>
+          <span>NF Devolução</span>
+          <span>Emitente · Motivo</span>
           <span>NF Venda</span>
-          <span>UF</span>
           <span>Emissão</span>
-          <span style={{ textAlign: 'right' }}>Valor</span>
-          <span style={{ textAlign: 'center' }}>Protheus</span>
-          <span style={{ textAlign: 'center' }}>Status</span>
+          <span style={{ textAlign: 'right' }}>Valor devolvido</span>
+          <span style={{ textAlign: 'right' }}>Situação</span>
         </div>
 
         {error && (
@@ -204,140 +202,144 @@ export default function Devolucoes({ user, initialFilters = {} }) {
           const nfVendaNum = row.chave_nfe_referenciada
             ? String(parseInt(row.chave_nfe_referenciada.slice(25, 34), 10) || '')
             : null;
+          const statusCor = {
+            pendente:   'var(--text-3)',
+            em_analise: 'var(--yellow)',
+            aprovada:   'var(--green)',
+            rejeitada:  'var(--red)',
+            concluida:  'var(--blue)',
+          }[row.status_portal] || 'var(--text-3)';
+          const empresaDest = CNPJ_MAP[row.cnpj_destinatario];
+
           return (
-            <div key={row.id} className="table-row"
-              style={{ gridTemplateColumns: COLS }}
+            <div key={row.id} className="dev-row"
+              style={{ gridTemplateColumns: COLS, '--row-accent': statusCor }}
               onClick={() => setSelected(row.id)}>
 
-              {/* NF Dev */}
+              {/* NF Dev + tipo */}
               <div>
-                <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>
+                <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text)', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }}>
                   {row.nf_numero ?? '—'}
                 </div>
-                {row.nf_serie && (
-                  <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 1 }}>Série {row.nf_serie}</div>
-                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 3 }}>
+                  {row.nf_serie && (
+                    <span style={{ fontSize: 10, color: 'var(--text-3)' }}>Sér. {row.nf_serie}</span>
+                  )}
+                  <span style={{
+                    fontSize: 9, fontWeight: 700, letterSpacing: '.03em',
+                    color: row.lancamento_manual ? 'var(--red)' : 'var(--yellow)',
+                    background: row.lancamento_manual ? 'var(--red-dim)' : 'var(--yellow-dim)',
+                    padding: '1px 5px', borderRadius: 4,
+                  }}>
+                    {row.lancamento_manual ? 'TOTAL' : 'PARCIAL'}
+                  </span>
+                </div>
               </div>
 
-              {/* Emitente */}
-              <div style={{ overflow: 'hidden' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                  <div className="ellipsis" style={{ fontSize: 12.5, color: 'var(--text)', fontWeight: 500 }}>
+              {/* Emitente · Motivo */}
+              <div style={{ overflow: 'hidden', paddingRight: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span className="ellipsis" style={{ fontSize: 12.5, color: 'var(--text)', fontWeight: 600 }}>
                     {row.nome_emitente || '—'}
-                  </div>
+                  </span>
                   {row.lancamento_manual && (
-                    <span style={{ fontSize: 9, fontWeight: 700, background: 'var(--purple-dim)', color: 'var(--purple)', padding: '1px 5px', borderRadius: 10, flexShrink: 0 }}>MANUAL</span>
-                  )}
-                  {row.lancamento_manual === true && (
-                    <span style={{ fontSize: 9, fontWeight: 700, background: 'var(--red-dim)', color: 'var(--red)', padding: '1px 5px', borderRadius: 10, flexShrink: 0 }}>TOTAL</span>
-                  )}
-                  {!row.lancamento_manual && (
-                    <span style={{ fontSize: 9, fontWeight: 700, background: 'var(--yellow-dim)', color: 'var(--yellow)', padding: '1px 5px', borderRadius: 10, flexShrink: 0 }}>PARCIAL</span>
+                    <span style={{ fontSize: 8.5, fontWeight: 700, background: 'var(--purple-dim)', color: 'var(--purple)', padding: '1px 5px', borderRadius: 4, flexShrink: 0, letterSpacing: '.03em' }}>MANUAL</span>
                   )}
                 </div>
-                {/* Motivo — linha separada com destaque */}
-                {row.motivo_devolucao ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 3 }}>
-                    <span style={{ fontSize: 9.5, fontWeight: 700, color: 'var(--red)', background: 'var(--red-dim)', padding: '1px 6px', borderRadius: 10, whiteSpace: 'nowrap' }}>
-                      {row.motivo_devolucao}
-                    </span>
-                  </div>
-                ) : (
-                  <div className="ellipsis" style={{ fontSize: 10.5, color: 'var(--text-3)', marginTop: 1 }}>
-                    {row.municipio_emitente || row.cnpj_emitente || ''}
-                  </div>
-                )}
+                <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {row.motivo_devolucao ? (
+                    <>
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--red)', flexShrink: 0 }}/>
+                      <span className="ellipsis" style={{ fontSize: 11, color: 'var(--text-2)', fontWeight: 500 }}>
+                        {row.motivo_devolucao}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--border-2)', flexShrink: 0 }}/>
+                      <span style={{ fontSize: 10.5, color: 'var(--text-3)', fontStyle: 'italic' }}>
+                        Sem motivo classificado
+                      </span>
+                    </>
+                  )}
+                </div>
               </div>
 
               {/* NF Venda */}
               <div>
                 {row.nf_venda_localizada === true ? (
                   <>
-                    <div style={{ fontSize: 12.5, color: 'var(--blue)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
-                      {row.chave_nfe_referenciada
-                        ? String(parseInt(row.chave_nfe_referenciada.slice(25, 34), 10) || '')
-                        : '—'}
+                    <div style={{ fontSize: 12.5, color: 'var(--blue)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+                      {nfVendaNum || '—'}
                     </div>
-                    <div style={{ fontSize: 9.5, color: 'var(--green)', fontWeight: 700, marginTop: 1, display: 'flex', alignItems: 'center', gap: 3 }}>
+                    <div style={{ fontSize: 9.5, color: 'var(--green)', fontWeight: 600, marginTop: 2, display: 'flex', alignItems: 'center', gap: 3 }}>
                       <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
-                      NF venda localizada
+                      Vinculada
                     </div>
                   </>
                 ) : row.nf_venda_localizada === false ? (
                   <>
-                    <div style={{ fontSize: 11, color: 'var(--text-3)', fontVariantNumeric: 'tabular-nums' }}>
-                      {row.chave_nfe_referenciada
-                        ? String(parseInt(row.chave_nfe_referenciada.slice(25, 34), 10) || '—')
-                        : '—'}
+                    <div style={{ fontSize: 12, color: 'var(--text-2)', fontVariantNumeric: 'tabular-nums' }}>
+                      {nfVendaNum || '—'}
                     </div>
-                    <div style={{ fontSize: 9.5, color: 'var(--yellow)', fontWeight: 700, marginTop: 1, display: 'flex', alignItems: 'center', gap: 3 }}>
-                      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M12 8v4m0 4h.01"/><circle cx="12" cy="12" r="10"/></svg>
+                    <div style={{ fontSize: 9.5, color: 'var(--text-3)', fontWeight: 600, marginTop: 2 }}>
                       Sem vínculo
                     </div>
                   </>
                 ) : (
-                  <div style={{ fontSize: 11, color: 'var(--text-3)' }}>—</div>
+                  <span style={{ fontSize: 12, color: 'var(--text-3)' }}>—</span>
                 )}
-                {row.cnpj_destinatario && (
-                  <div style={{ fontSize: 10, color: 'var(--gold)', marginTop: 1, fontWeight: 600 }}>
-                    {CNPJ_MAP[row.cnpj_destinatario] || ''}
+                {empresaDest && (
+                  <div style={{ fontSize: 9.5, color: 'var(--gold)', marginTop: 2, fontWeight: 700, letterSpacing: '.03em' }}>
+                    {empresaDest}
                   </div>
                 )}
               </div>
 
-              {/* UF */}
+              {/* Emissão + UF */}
               <div>
-                <span style={{
-                  display: 'inline-block', padding: '2px 7px',
-                  background: 'var(--surface-3)', borderRadius: 4,
-                  fontSize: 11, fontWeight: 700, color: 'var(--text-2)',
-                  letterSpacing: '.03em',
-                }}>
-                  {row.uf_emitente || '—'}
-                </span>
-              </div>
-
-              {/* Emissão + flag */}
-              <div>
-                <div style={{ fontSize: 12, color: 'var(--text-2)', fontVariantNumeric: 'tabular-nums' }}>
+                <div style={{ fontSize: 12, color: 'var(--text-2)', fontVariantNumeric: 'tabular-nums', fontWeight: 500 }}>
                   {fmtDate(row.dt_emissao)}
                 </div>
-                {row.flag_emissao_entrega === 'divergente' && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 2 }}>
-                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#D97706" strokeWidth="2.5" strokeLinecap="round"><path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
-                    <span style={{ fontSize: 9, fontWeight: 700, color: '#D97706' }}>DATA DIVERGENTE</span>
-                  </div>
-                )}
-                {row.flag_emissao_entrega === 'aguardando_entrega' && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 2 }}>
-                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-                    <span style={{ fontSize: 9, fontWeight: 600, color: 'var(--text-3)' }}>AG. ENTREGA</span>
-                  </div>
-                )}
-                {row.flag_emissao_entrega === 'no_ato' && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 2 }}>
-                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="var(--green)" strokeWidth="2.5" strokeLinecap="round"><path d="M20 6L9 17l-5-5"/></svg>
-                    <span style={{ fontSize: 9, fontWeight: 600, color: 'var(--green)' }}>NO ATO</span>
-                  </div>
-                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 3 }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', letterSpacing: '.04em' }}>
+                    {row.uf_emitente || '—'}
+                  </span>
+                  {row.flag_emissao_entrega === 'divergente' && (
+                    <span title="Data de emissão divergente da entrega" style={{ display: 'inline-flex' }}>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--yellow)" strokeWidth="2.5" strokeLinecap="round"><path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+                    </span>
+                  )}
+                  {row.flag_emissao_entrega === 'aguardando_entrega' && (
+                    <span title="Aguardando entrega" style={{ display: 'inline-flex' }}>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--text-3)" strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                    </span>
+                  )}
+                  {row.flag_emissao_entrega === 'no_ato' && (
+                    <span title="Emitida no ato da entrega" style={{ display: 'inline-flex' }}>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--green)" strokeWidth="2.5" strokeLinecap="round"><path d="M20 6L9 17l-5-5"/></svg>
+                    </span>
+                  )}
+                </div>
               </div>
 
               {/* Valor */}
-              <div style={{ textAlign: 'right', fontSize: 12.5, fontWeight: 700, color: 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>
-                {fmtBRL(row.valor)}
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text)', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }}>
+                  {fmtBRL(row.valor)}
+                </div>
               </div>
 
-              {/* Protheus */}
-              <div style={{ display: 'flex', justifyContent: 'center' }}>
-                {row.lancado_protheus
-                  ? <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--green)', background: 'var(--green-dim)', padding: '2px 8px', borderRadius: 20, whiteSpace: 'nowrap' }}>✓ Lançada</span>
-                  : <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-3)', background: 'var(--surface-3)', padding: '2px 8px', borderRadius: 20, whiteSpace: 'nowrap' }}>Pendente</span>
-                }
-              </div>
-
-              {/* Status */}
-              <div style={{ display: 'flex', justifyContent: 'center' }}>
+              {/* Situação: status + Protheus */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
                 <Badge status={row.status_portal} />
+                {row.lancado_protheus
+                  ? <span style={{ fontSize: 9.5, fontWeight: 600, color: 'var(--green)', display: 'flex', alignItems: 'center', gap: 3 }}>
+                      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+                      Protheus
+                    </span>
+                  : <span style={{ fontSize: 9.5, fontWeight: 500, color: 'var(--text-3)' }}>Fora do Protheus</span>
+                }
               </div>
             </div>
           );

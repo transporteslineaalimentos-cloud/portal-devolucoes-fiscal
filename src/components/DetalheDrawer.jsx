@@ -114,23 +114,32 @@ function DataItem({ label, value, full, accent, large }) {
   );
 }
 
+function ValorLinha({ label, value }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 0', borderBottom: '1px solid var(--border)' }}>
+      <span style={{ fontSize: 11.5, color: 'var(--text-2)', fontWeight: 500 }}>{label}</span>
+      <span style={{ fontSize: 12.5, color: 'var(--text)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{fmtBRL(value)}</span>
+    </div>
+  );
+}
+
 function SectionCard({ title, icon, color = 'var(--blue)', children, action }) {
   return (
-    <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', marginBottom: 12 }}>
+    <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', marginBottom: 12, boxShadow: 'var(--shadow-xs)' }}>
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '10px 16px', background: 'var(--surface-2)',
+        padding: '12px 16px',
         borderBottom: '1px solid var(--border)',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ width: 24, height: 24, borderRadius: 6, background: color + '18', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <Ic d={icon} size={12} color={color}/>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+          <div style={{ width: 26, height: 26, borderRadius: 7, background: color + '15', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <Ic d={icon} size={13} color={color}/>
           </div>
-          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.01em' }}>{title}</span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.01em' }}>{title}</span>
         </div>
         {action}
       </div>
-      <div style={{ padding: '4px 16px 8px' }}>{children}</div>
+      <div style={{ padding: '6px 16px 10px' }}>{children}</div>
     </div>
   );
 }
@@ -201,32 +210,27 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
 
   return (
     <div className="drawer-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="drawer" style={{ width: 600 }}>
+      <div className="drawer" style={{ width: 648 }}>
 
-        {/* ── Cabeçalho ─────────────────────────── */}
-        <div style={{ padding: '16px 20px 12px', borderBottom: '1px solid var(--border)', flexShrink: 0, background: 'var(--surface)' }}>
+        {/* ── Cabeçalho hero ─────────────────────────── */}
+        <div className="dd-hero">
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               {loading ? (
-                <div style={{ fontSize: 14, color: 'var(--text-3)' }}>Carregando...</div>
+                <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.7)' }}>Carregando...</div>
               ) : (
                 <>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
-                    <span style={{ fontSize: 16, fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.02em' }}>
-                      NF-e {dev?.nf_numero ?? '—'} · Série {dev?.nf_serie ?? '—'}
-                    </span>
-                    <Badge status={dev?.status_portal}/>
-                    {dev?.lancamento_manual && (
-                      <span style={{ fontSize: 9.5, fontWeight: 700, background: 'var(--purple-dim)', color: 'var(--purple)', padding: '2px 7px', borderRadius: 20 }}>MANUAL</span>
-                    )}
-                    {dev?.lancamento_manual === true && (
-                      <span style={{ fontSize: 9.5, fontWeight: 700, background: 'var(--red-dim)', color: 'var(--red)', padding: '2px 7px', borderRadius: 20 }}>TOTAL</span>
-                    )}
-                    {!dev?.lancamento_manual && (
-                      <span style={{ fontSize: 9.5, fontWeight: 700, background: 'var(--yellow-dim)', color: 'var(--yellow)', padding: '2px 7px', borderRadius: 20 }}>PARCIAL</span>
-                    )}
+                  <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--gold-light)', textTransform: 'uppercase', letterSpacing: '.10em', marginBottom: 6 }}>
+                    {dev?.lancamento_manual ? 'Devolução total · lançamento manual' : 'Devolução parcial · NFD do cliente'}
                   </div>
-                  <div style={{ fontSize: 12, color: 'var(--text-2)', fontWeight: 500 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 20, fontWeight: 800, color: '#fff', letterSpacing: '-0.02em' }}>
+                      NF-e {dev?.nf_numero ?? '—'}
+                    </span>
+                    <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', fontWeight: 500 }}>Série {dev?.nf_serie ?? '—'}</span>
+                    <Badge status={dev?.status_portal}/>
+                  </div>
+                  <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.78)', fontWeight: 500, marginTop: 8 }}>
                     {dev?.nome_emitente}
                     {dev?.municipio_emitente && ` · ${dev.municipio_emitente}`}
                     {dev?.uf_emitente && ` / ${dev.uf_emitente}`}
@@ -234,28 +238,58 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
                 </>
               )}
             </div>
-            <button onClick={onClose} className="btn btn-ghost btn-sm" style={{ padding: 6, borderRadius: 6, flexShrink: 0 }}>
+            <button onClick={onClose} className="dd-close">
               <Ic d="M18 6L6 18M6 6l12 12" size={16}/>
             </button>
           </div>
 
+          {/* Faixa de KPIs */}
+          {!loading && dev && (
+            <div className="dd-kpis">
+              <div className="dd-kpi">
+                <span className="dd-kpi-label">Valor devolvido</span>
+                <span className="dd-kpi-value" style={{ color: '#fff' }}>{fmtBRL(dev.valor)}</span>
+              </div>
+              <div className="dd-kpi">
+                <span className="dd-kpi-label">Motivo</span>
+                <span className="dd-kpi-value" style={{ fontSize: 13, color: dev.motivo_devolucao ? '#fff' : 'rgba(255,255,255,0.4)' }}>
+                  {dev.motivo_devolucao || 'A classificar'}
+                </span>
+              </div>
+              <div className="dd-kpi">
+                <span className="dd-kpi-label">Área responsável</span>
+                {dev.area_responsavel
+                  ? <span style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: 'rgba(255,255,255,0.14)', padding: '3px 10px', borderRadius: 20, alignSelf: 'flex-start' }}>{dev.area_responsavel}</span>
+                  : <span className="dd-kpi-value" style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>—</span>
+                }
+              </div>
+              <div className="dd-kpi">
+                <span className="dd-kpi-label">Protheus</span>
+                {dev.lancado_protheus
+                  ? <span style={{ fontSize: 12, fontWeight: 700, color: '#6EE7A8' }}>✓ Lançada</span>
+                  : <span style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.5)' }}>Pendente</span>
+                }
+              </div>
+            </div>
+          )}
+
           {/* Barra de ações */}
           {!loading && dev && (
-            <div style={{ display: 'flex', gap: 7, marginTop: 12, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 7, marginTop: 14, flexWrap: 'wrap' }}>
               <button onClick={() => { setEditMotivo(v => !v); setEdit(false); }}
-                className={`btn btn-sm ${editMotivo ? 'btn-primary' : 'btn-outline'}`}>
+                className={`dd-action ${editMotivo ? 'active' : ''}`}>
                 <Ic d="M7 8h10M7 12h6" size={12}/>
                 {dev.motivo_devolucao ? 'Editar motivo' : 'Classificar motivo'}
               </button>
               <button onClick={() => { setEdit(v => !v); setEditMotivo(false); }}
-                className={`btn btn-sm ${editStatus ? 'btn-primary' : 'btn-outline'}`}>
+                className={`dd-action ${editStatus ? 'active' : ''}`}>
                 <Ic d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" size={12}/>
                 Atualizar status
               </button>
               {dev.xml_baixado && dev.xml_path && (
-                <button onClick={handleXml} className="btn btn-outline btn-sm">
+                <button onClick={handleXml} className="dd-action">
                   <Ic d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" size={12}/>
-                  XML
+                  Baixar XML
                 </button>
               )}
             </div>
@@ -276,7 +310,7 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
             Erro ao carregar os dados.
           </div>
         ) : (
-          <div className="drawer-body" style={{ padding: '16px 20px' }}>
+          <div className="drawer-body" style={{ padding: '18px 22px 28px' }}>
 
             {/* ── Editor motivo ──────────────────── */}
             {editMotivo && (
@@ -380,48 +414,38 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
               </SectionCard>
             </div>
 
-            {/* ── Bloco 2: Motivo + Valores (lado a lado) ── */}
+            {/* ── Bloco 2: Classificação + Valores (lado a lado) ── */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
 
-              {/* Motivo */}
-              <SectionCard title="Classificação" icon="M7 8h10M7 12h6" color="var(--red)"
-                action={
-                  dev.lancado_protheus
-                    ? <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--green)', background: 'var(--green-dim)', padding: '2px 8px', borderRadius: 20 }}>✓ Lançada Protheus</span>
-                    : <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-3)', background: 'var(--surface-3)', padding: '2px 8px', borderRadius: 20 }}>Pendente Protheus</span>
-                }
-              >
-                <DataItem label="Motivo" value={
-                  dev.motivo_devolucao
-                    ? <span style={{ color: 'var(--red)', fontWeight: 700 }}>{dev.motivo_devolucao}</span>
-                    : <span style={{ color: 'var(--text-3)', fontStyle: 'italic', fontSize: 11.5 }}>Não classificado — clique em "Classificar motivo"</span>
-                }/>
-                {dev.area_responsavel && (() => {
-                  const cfg = AREA_CORES[dev.area_responsavel] || { color: 'var(--text-2)', bg: 'var(--surface-3)' };
-                  return (
-                    <DataItem label="Área responsável" value={
-                      <span style={{ fontSize: 12, fontWeight: 700, color: cfg.color, background: cfg.bg, padding: '3px 10px', borderRadius: 20, display: 'inline-block' }}>
-                        {dev.area_responsavel}
-                      </span>
-                    }/>
-                  );
-                })()}
-                <DataItem label="Tipo" value={
+              {/* Classificação */}
+              <SectionCard title="Classificação fiscal" icon="M7 8h10M7 12h6" color="var(--red)">
+                <DataItem label="Tipo de devolução" value={
                   dev.lancamento_manual
-                    ? <span style={{ color: 'var(--red)', fontWeight: 700 }}>● Total <span style={{ fontSize: 10, fontWeight: 500, color: 'var(--text-3)' }}>(lançamento manual)</span></span>
-                    : <span style={{ color: 'var(--yellow)', fontWeight: 700 }}>◐ Parcial <span style={{ fontSize: 10, fontWeight: 500, color: 'var(--text-3)' }}>(NFD emitida pelo cliente)</span></span>
+                    ? <span style={{ color: 'var(--red)', fontWeight: 700 }}>Total <span style={{ fontSize: 10, fontWeight: 500, color: 'var(--text-3)' }}>(lançamento manual)</span></span>
+                    : <span style={{ color: 'var(--yellow)', fontWeight: 700 }}>Parcial <span style={{ fontSize: 10, fontWeight: 500, color: 'var(--text-3)' }}>(NFD do cliente)</span></span>
+                }/>
+                <DataItem label="Situação no Protheus" value={
+                  dev.lancado_protheus
+                    ? <span style={{ color: 'var(--green)', fontWeight: 700 }}>✓ Lançada</span>
+                    : <span style={{ color: 'var(--text-3)', fontWeight: 600 }}>Pendente de lançamento</span>
                 }/>
                 {dev.lancado_protheus && dev.dt_lancamento_protheus && (
-                  <DataItem label="Data lançamento Protheus" value={fmtDate(dev.dt_lancamento_protheus)} accent="var(--green)"/>
+                  <DataItem label="Data do lançamento" value={fmtDate(dev.dt_lancamento_protheus)} accent="var(--green)"/>
                 )}
+                <DataItem label="Natureza da operação" value={dev.nat_operacao}/>
               </SectionCard>
 
               {/* Valores */}
-              <SectionCard title="Valores" icon="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" color="var(--green)">
-                <DataItem label="Total da NF" value={fmtBRL(dev.valor)} accent="var(--text)" large/>
-                <DataItem label="Valor dos produtos" value={fmtBRL(dev.valor_produtos)}/>
-                <DataItem label="ICMS" value={fmtBRL(dev.valor_icms)}/>
-                <DataItem label="ICMS-ST" value={fmtBRL(dev.valor_st)}/>
+              <SectionCard title="Composição de valores" icon="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" color="var(--green)">
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <ValorLinha label="Produtos" value={dev.valor_produtos}/>
+                  <ValorLinha label="ICMS" value={dev.valor_icms}/>
+                  <ValorLinha label="ICMS-ST" value={dev.valor_st}/>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '11px 0 4px', marginTop: 4, borderTop: '2px solid var(--border)' }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '.05em' }}>Total da NF</span>
+                    <span style={{ fontSize: 16, fontWeight: 800, color: 'var(--text)', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }}>{fmtBRL(dev.valor)}</span>
+                  </div>
+                </div>
               </SectionCard>
             </div>
 
