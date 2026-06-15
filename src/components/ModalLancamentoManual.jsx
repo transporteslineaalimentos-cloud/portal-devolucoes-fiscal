@@ -55,24 +55,60 @@ export default function ModalLancamentoManual({ onClose, onSaved, user }) {
     const raw = chave.replace(/\D/g, '');
     if (raw.length !== 44) { setNfVenda(null); setLookupErr(''); return; }
     setBuscando(true); setLookupErr(''); setNfVenda(null);
-    supabase
-      .from('active_webhooks')
-      .select('*')
-      .eq('chave_nfe', raw)
-      .eq('tipo', 'nota_fiscal')
-      .limit(1)
-      .single()
-      .then(({ data, error }) => {
+
+    (async () => {
+      // 1) tenta active_webhooks (fonte primária)
+      const { data: aw } = await supabase
+        .from('active_webhooks')
+        .select('*')
+        .eq('chave_nfe', raw)
+        .eq('tipo', 'nota_fiscal')
+        .limit(1)
+        .maybeSingle();
+
+      if (aw) {
         setBuscando(false);
-        if (error || !data) {
-          setLookupErr('NF não encontrada na base de dados do Active OnSupply.');
-        } else {
-          setNfVenda(data);
-          // Auto-preencher empresa destinatária com base no CNPJ remetente da NF
-          if (data.remetente_cnpj === '05207076000459') setCnpjDest('05207076000459');
-          else setCnpjDest('05207076000297');
-        }
-      });
+        setNfVenda(aw);
+        if (aw.remetente_cnpj === '05207076000459') setCnpjDest('05207076000459');
+        else setCnpjDest('05207076000297');
+        return;
+      }
+
+      // 2) fallback: historico_nfs (cobre NFs não capturadas pelo webhook)
+      const { data: hist } = await supabase
+        .from('historico_nfs')
+        .select('*')
+        .eq('nf_chave', raw)
+        .limit(1)
+        .maybeSingle();
+
+      setBuscando(false);
+
+      if (hist) {
+        // normaliza para o mesmo formato usado pelo restante do componente
+        const normalizado = {
+          chave_nfe:          hist.nf_chave,
+          numero:             hist.nf_numero,
+          serie:              hist.nf_serie,
+          destinatario_cnpj:  hist.destinatario_cnpj,
+          destinatario_nome:  hist.destinatario_nome,
+          remetente_cnpj:     hist.remetente_cnpj,
+          valor_mercadoria:   hist.valor_produtos,
+          transportador_nome: hist.transportador_nome,
+          transportador_cnpj: hist.transportador_cnpj,
+          pedido:             hist.pedido,
+          observacao:         hist.centro_custo,
+          payload_raw: {
+            DESTINATARIO: { CIDADE: hist.cidade_destino, UF: hist.uf_destino },
+          },
+        };
+        setNfVenda(normalizado);
+        if (hist.remetente_cnpj === '05207076000459') setCnpjDest('05207076000459');
+        else setCnpjDest('05207076000297');
+      } else {
+        setLookupErr('NF não encontrada no Active OnSupply nem no histórico de notas.');
+      }
+    })();
   }, [chave]);
 
   const handleSubmit = async () => {

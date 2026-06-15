@@ -503,7 +503,10 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
                         : 'NF de venda não localizada no Active OnSupply. Pode estar em período de inicialização do webhook.';
                     })()}
                   </div>
-                  <div style={{ fontFamily: 'monospace', fontSize: 9.5, color: 'var(--text-3)', background: 'var(--surface-2)', padding: '8px 10px', borderRadius: 6, wordBreak: 'break-all', border: '1px solid var(--border)', letterSpacing: '.04em' }}>
+                  {dev.transportador_cobranca && (
+                    <DataItem label="Transportador (NFD)" value={dev.transportador_cobranca} full/>
+                  )}
+                  <div style={{ fontFamily: 'monospace', fontSize: 9.5, color: 'var(--text-3)', background: 'var(--surface-2)', padding: '8px 10px', borderRadius: 6, wordBreak: 'break-all', border: '1px solid var(--border)', letterSpacing: '.04em', marginTop: dev.transportador_cobranca ? 8 : 0 }}>
                     {dev.chave_nfe_referenciada}
                   </div>
                 </div>

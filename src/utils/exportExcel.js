@@ -56,8 +56,8 @@ export function exportDevolucoesToExcel(rows, { filename = 'devolucoes_fiscais' 
     'Data Cobrança':       r.data_cobranca ? r.data_cobranca.slice(0, 10) : '',
     'Cobrado Por':         r.cobrado_por ?? '',
     'Obs. Cobrança':       r.obs_cobranca ?? '',
-    'Transportador':       r.transportador_cobranca ?? '',
-    'CNPJ Transportador':  r.transportador_cnpj_cobranca ?? '',
+    'Transportador (NFD)':       r.transportador_cobranca ?? '',
+    'CNPJ Transportador (NFD)':   r.transportador_cnpj_cobranca ?? '',
     'Qtd Itens':           Array.isArray(r.itens) ? r.itens.length : 0,
   }));
 
