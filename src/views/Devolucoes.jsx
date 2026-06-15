@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { dbListDevolucoes } from '../config/supabase';
+import { dbListDevolucoes, dbExportDevolucoes } from '../config/supabase';
 import { fmtBRL, fmtDate, CNPJ_MAP, STATUS_CFG, Badge } from '../utils.jsx';
 import DetalheDrawer from '../components/DetalheDrawer.jsx';
 import ModalLancamentoManual from '../components/ModalLancamentoManual.jsx';
+import ModalImportProtheus from '../components/ModalImportProtheus.jsx';
+import { exportDevolucoesToExcel } from '../utils/exportExcel.js';
 
 const Ic = ({ d, size = 14, color = 'currentColor' }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
@@ -42,6 +44,8 @@ export default function Devolucoes({ user, initialFilters = {} }) {
   const [error, setError]       = useState('');
   const [selectedId, setSelected]     = useState(null);
   const [showModal, setShowModal]     = useState(false);
+  const [showImport, setShowImport]   = useState(false);
+  const [exporting, setExporting]     = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({ ...EMPTY_FILTERS, ...initFilt });
   const searchRef = useRef(null);
@@ -76,6 +80,18 @@ export default function Devolucoes({ user, initialFilters = {} }) {
   const clearFilters = () => { setFilters({ ...EMPTY_FILTERS }); setPage(0); };
   const hasFilters = Object.entries(filters).some(([k, v]) => v && k !== 'search') || filters.search;
   const totalPages = Math.ceil(total / PAGE_SIZE);
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const allRows = await dbExportDevolucoes({ filters });
+      exportDevolucoesToExcel(allRows, { filename: hasFilters ? 'devolucoes_fiscais_filtrado' : 'devolucoes_fiscais' });
+    } catch (e) {
+      alert('Erro ao exportar: ' + e.message);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   // Rótulo amigável do filtro de drill-down ativo
   const MES_NOMES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
@@ -139,6 +155,20 @@ export default function Devolucoes({ user, initialFilters = {} }) {
             style={{ background: 'var(--purple)', color: '#fff', flexShrink: 0 }}>
             <Ic d="M12 5v14M5 12h14" size={13}/>
             Lançar manual
+          </button>
+          <button onClick={() => setShowImport(true)} className="btn btn-outline btn-sm" title="Importar lançamentos do Protheus">
+            <Ic d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" size={13}/>
+            Importar Protheus
+          </button>
+          <button onClick={handleExport} disabled={exporting} className="btn btn-outline btn-sm" title="Exportar para Excel">
+            {exporting
+              ? <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 0.9s linear infinite' }}>
+                  <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+                  <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" strokeLinecap="round"/>
+                </svg>
+              : <Ic d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" size={13}/>
+            }
+            {exporting ? 'Exportando...' : 'Exportar Excel'}
           </button>
           <button onClick={() => setShowFilters(v => !v)}
             className={`btn btn-sm ${showFilters ? 'btn-primary' : 'btn-outline'}`}>
@@ -443,6 +473,13 @@ export default function Devolucoes({ user, initialFilters = {} }) {
           user={user}
           onClose={() => setShowModal(false)}
           onSaved={() => { load(filters, page); }}
+        />
+      )}
+
+      {showImport && (
+        <ModalImportProtheus
+          onClose={() => setShowImport(false)}
+          onImported={() => load(filters, page)}
         />
       )}
     </div>

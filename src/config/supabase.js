@@ -70,29 +70,7 @@ export async function dbGetUser(email) {
 
 const PAGE_SIZE = 40;
 
-export async function dbListDevolucoes({ page = 0, filters = {} }) {
-  syncAuthToken();
-  const from = page * PAGE_SIZE;
-  const to   = from + PAGE_SIZE - 1;
-
-  let q = supabase
-    .from('oobj_nfe_recebidas')
-    .select(`
-      id, chave_nfe, nf_numero, nf_serie, nome_emitente,
-      municipio_emitente, uf_emitente, cnpj_emitente, cnpj_destinatario,
-      nat_operacao, dt_emissao, valor, valor_produtos, valor_icms, valor_st,
-      cfops, tipo, status_portal, xml_baixado, xml_path,
-      chave_nfe_referenciada, itens, created_at,
-      inf_complementar, motivo_devolucao, devolucao_total, lancamento_manual,
-      nf_venda_localizada, area_responsavel, flag_emissao_entrega,
-      lancado_protheus, dt_lancamento_protheus
-    `, { count: 'exact' })
-    .eq('tipo', 'devolucao')
-    .gte('dt_emissao', '2026-01-01')
-    .not('status_sefaz', 'eq', 'CANCELADA')   // ocultar canceladas
-    .order('dt_emissao', { ascending: false })
-    .range(from, to);
-
+function applyDevolucoesFilters(q, filters = {}) {
   if (filters.status)         q = q.eq('status_portal', filters.status);
   if (filters.cnpj_dest)      q = q.eq('cnpj_destinatario', filters.cnpj_dest);
   if (filters.cnpj_emitente)  q = q.eq('cnpj_emitente', filters.cnpj_emitente);
@@ -143,10 +121,74 @@ export async function dbListDevolucoes({ page = 0, filters = {} }) {
       q = q.or(`nome_emitente.ilike.%${filters.search.trim()}%,municipio_emitente.ilike.%${filters.search.trim()}%`);
     }
   }
+  return q;
+}
+
+export async function dbListDevolucoes({ page = 0, filters = {} }) {
+  syncAuthToken();
+  const from = page * PAGE_SIZE;
+  const to   = from + PAGE_SIZE - 1;
+
+  let q = supabase
+    .from('oobj_nfe_recebidas')
+    .select(`
+      id, chave_nfe, nf_numero, nf_serie, nome_emitente,
+      municipio_emitente, uf_emitente, cnpj_emitente, cnpj_destinatario,
+      nat_operacao, dt_emissao, valor, valor_produtos, valor_icms, valor_st,
+      cfops, tipo, status_portal, xml_baixado, xml_path,
+      chave_nfe_referenciada, itens, created_at,
+      inf_complementar, motivo_devolucao, devolucao_total, lancamento_manual,
+      nf_venda_localizada, area_responsavel, flag_emissao_entrega,
+      lancado_protheus, dt_lancamento_protheus
+    `, { count: 'exact' })
+    .eq('tipo', 'devolucao')
+    .gte('dt_emissao', '2026-01-01')
+    .not('status_sefaz', 'eq', 'CANCELADA')   // ocultar canceladas
+    .order('dt_emissao', { ascending: false })
+    .range(from, to);
+
+  q = applyDevolucoesFilters(q, filters);
 
   const { data, error, count } = await q;
   if (error) throw new Error(error.message);
   return { rows: data || [], total: count || 0, pageSize: PAGE_SIZE };
+}
+
+// Exporta TODOS os registros que casam com os filtros (sem paginação), em lotes de 1000
+export async function dbExportDevolucoes({ filters = {} } = {}) {
+  syncAuthToken();
+  const BATCH = 1000;
+  let allRows = [];
+  let from = 0;
+  while (true) {
+    let q = supabase
+      .from('oobj_nfe_recebidas')
+      .select(`
+        chave_nfe, nf_numero, nf_serie, nome_emitente, cnpj_emitente,
+        municipio_emitente, uf_emitente, cnpj_destinatario,
+        nat_operacao, dt_emissao, valor, valor_produtos, valor_icms, valor_st,
+        cfops, status_portal, chave_nfe_referenciada, itens,
+        inf_complementar, motivo_devolucao, devolucao_total, lancamento_manual,
+        nf_venda_localizada, area_responsavel, flag_emissao_entrega,
+        lancado_protheus, dt_lancamento_protheus,
+        status_cobranca, nf_debito, data_cobranca, cobrado_por, obs_cobranca,
+        transportador_cobranca, transportador_cnpj_cobranca
+      `)
+      .eq('tipo', 'devolucao')
+      .gte('dt_emissao', '2026-01-01')
+      .not('status_sefaz', 'eq', 'CANCELADA')
+      .order('dt_emissao', { ascending: false })
+      .range(from, from + BATCH - 1);
+
+    q = applyDevolucoesFilters(q, filters);
+
+    const { data, error } = await q;
+    if (error) throw new Error(error.message);
+    allRows = allRows.concat(data || []);
+    if (!data || data.length < BATCH) break;
+    from += BATCH;
+  }
+  return allRows;
 }
 
 export async function dbGetDevolucaoDetail(id) {
@@ -462,4 +504,15 @@ export async function dbGetMotivos() {
     .order('area')
     .order('motivo');
   return data || [];
+}
+
+// ─── Importação de lançamentos do Protheus (planilha) ────────
+// lancamentos: array de { nf_numero, dt_lancamento_protheus, motivo_codigo, motivo_descricao, itens }
+export async function dbImportProtheusLancamentos(lancamentos) {
+  syncAuthToken();
+  const { data, error } = await supabase.rpc('import_protheus_lancamentos', {
+    p_lancamentos: lancamentos,
+  });
+  if (error) throw new Error(error.message);
+  return data; // { applied, staged }
 }
