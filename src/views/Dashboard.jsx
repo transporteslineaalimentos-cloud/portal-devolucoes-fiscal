@@ -597,7 +597,7 @@ export default function Dashboard({ onGoTo }) {
                     alignItems: 'center', columnGap: 12,
                     padding: '8px 0', ...rowBorder(i, arr.length),
                   }}
-                  onClick={() => onGoTo?.('cobrancas', { status_cobranca: 'pendente_cobranca_transportador', transportador: t.transportador })}
+                  onClick={() => onGoTo?.('cobrancas', { status_cobranca: 'pendente_cobranca_transportador', transportador: t.transportador ?? '__sem_transportador__' })}
                   title={`Ver cobranças de ${t.transportador}`}>
                     <span className="ellipsis" style={{ fontSize: 12, fontWeight: 500, color: 'var(--text)' }}>{t.transportador}</span>
                     <Bar valor={t.valor} max={maxVal} color={PAL.amber} height={4}/>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { dbGetDevolucaoDetail, dbUpdateStatus, dbGetXmlUrl, dbUpdateMotivo, dbGetMotivos, dbUpdateTransportador } from '../config/supabase';
 import { fmtBRL, fmtDate, fmtDateTime, fmtCNPJ, CNPJ_MAP, STATUS_CFG, STATUS_OPTIONS, Badge } from '../utils.jsx';
+import AnexosSection from './AnexosSection.jsx';
 
 const AREA_CORES = {
   'COMERCIAL':         { color: 'var(--blue)',   bg: 'var(--blue-dim)' },
@@ -304,11 +305,6 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
                 className={`dd-action ${editMotivo ? 'active' : ''}`}>
                 <Ic d="M7 8h10M7 12h6" size={12}/>
                 {dev.motivo_devolucao ? 'Editar motivo' : 'Classificar motivo'}
-              </button>
-              <button onClick={() => { setEdit(v => !v); setEditMotivo(false); setEditTransp(false); }}
-                className={`dd-action ${editStatus ? 'active' : ''}`}>
-                <Ic d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" size={12}/>
-                Atualizar status
               </button>
               <button onClick={() => { setEditTransp(v => !v); setEdit(false); setEditMotivo(false); }}
                 className={`dd-action ${editTransp ? 'active' : ''}`}>
@@ -700,6 +696,9 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
                 </div>
               </SectionCard>
             )}
+
+            {/* ── Bloco 7: Anexos e evidências ── */}
+            <AnexosSection devolucaoId={id} user={user}/>
 
           </div>
         )}

@@ -433,7 +433,11 @@ export async function dbListCobrancas({ page = 0, filters = {} }) {
     .range(from, to);
 
   if (filters.status_cobranca) q = q.eq('status_cobranca', filters.status_cobranca);
-  if (filters.transportador)   q = q.ilike('transportador_cobranca', `%${filters.transportador}%`);
+  if (filters.transportador === '__sem_transportador__') {
+    q = q.is('transportador_cobranca', null);
+  } else if (filters.transportador) {
+    q = q.ilike('transportador_cobranca', `%${filters.transportador}%`);
+  }
   if (filters.search) {
     const s = filters.search.trim();
     const isNum = /^\d+$/.test(s);
@@ -528,5 +532,57 @@ export async function dbUpdateTransportador(id, { nome, cnpj }) {
       updated_at: new Date().toISOString(),
     })
     .eq('id', id);
+  if (error) throw new Error(error.message);
+}
+
+// ─── Anexos de devoluções ─────────────────────────────────
+export async function dbListAnexos(devolucaoId) {
+  syncAuthToken();
+  const { data, error } = await supabase
+    .from('dev_fiscal_anexos')
+    .select('*')
+    .eq('devolucao_id', devolucaoId)
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+export async function dbUploadAnexo(devolucaoId, file, { descricao = '', userName = '' } = {}) {
+  syncAuthToken();
+  const ext = file.name.split('.').pop();
+  const path = `${devolucaoId}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+
+  const { error: upErr } = await supabase.storage
+    .from('dev-fiscal-anexos')
+    .upload(path, file, { contentType: file.type, upsert: false });
+  if (upErr) throw new Error(upErr.message);
+
+  const { error: dbErr } = await supabase
+    .from('dev_fiscal_anexos')
+    .insert({
+      devolucao_id: devolucaoId,
+      nome_arquivo: file.name,
+      storage_path: path,
+      tipo_mime: file.type,
+      tamanho_bytes: file.size,
+      descricao: descricao || null,
+      uploader: userName || null,
+    });
+  if (dbErr) { await supabase.storage.from('dev-fiscal-anexos').remove([path]); throw new Error(dbErr.message); }
+}
+
+export async function dbGetAnexoUrl(storagePath) {
+  syncAuthToken();
+  const { data, error } = await supabase.storage
+    .from('dev-fiscal-anexos')
+    .createSignedUrl(storagePath, 3600); // 1h
+  if (error) throw new Error(error.message);
+  return data.signedUrl;
+}
+
+export async function dbDeleteAnexo(id, storagePath) {
+  syncAuthToken();
+  await supabase.storage.from('dev-fiscal-anexos').remove([storagePath]);
+  const { error } = await supabase.from('dev_fiscal_anexos').delete().eq('id', id);
   if (error) throw new Error(error.message);
 }
