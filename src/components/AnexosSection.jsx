@@ -95,7 +95,7 @@ export default function AnexosSection({ devolucaoId, user }) {
     <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', marginBottom: 12, boxShadow: 'var(--shadow-xs)' }}>
 
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', padding: '12px 16px', borderBottom: showForm || anexos.length > 0 ? '1px solid var(--border)' : 'none' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
           <div style={{ width: 26, height: 26, borderRadius: 7, background: 'rgba(14,165,233,0.13)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <Ic d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" size={13} color="#0EA5E9"/>
@@ -105,12 +105,9 @@ export default function AnexosSection({ devolucaoId, user }) {
             <span style={{ fontSize: 10, fontWeight: 700, background: 'rgba(14,165,233,0.12)', color: '#0EA5E9', padding: '1px 7px', borderRadius: 20 }}>{anexos.length}</span>
           )}
         </div>
-        <button
-          onClick={() => { setShowForm(v => !v); setPendingFile(null); setDescricao(''); setUploadErr(''); }}
-          className="btn btn-outline btn-sm" style={{ fontSize: 10 }}>
-          <Ic d="M12 5v14M5 12h14" size={12}/>
-          Adicionar
-        </button>
+        {/* Botão oculto — acionado pelo botão do hero via id */}
+        <button id="btn-add-anexo" style={{ display: 'none' }}
+          onClick={() => { setShowForm(v => !v); setPendingFile(null); setDescricao(''); setUploadErr(''); }}/>
       </div>
 
       {/* Form de upload */}
