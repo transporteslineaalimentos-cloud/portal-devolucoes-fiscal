@@ -539,21 +539,14 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
                   <DataItem label="Destinatário" value={nfV.destinatario_nome} full/>
                   <DataItem label="CNPJ" value={fmtCNPJ(nfV.destinatario_cnpj)}/>
                   <DataItem label="Destino" value={nfV.cidade_destino && nfV.uf_destino ? `${nfV.cidade_destino} / ${nfV.uf_destino}` : nfV.uf_destino}/>
-                  {/* Transportador: mostra o salvo no banco (pode ter sido editado manualmente) ou o da NF de venda */}
+                  {/* Transportador vinculado */}
                   <div style={{ gridColumn: '1 / -1', padding: '9px 0', borderBottom: '1px solid var(--border)' }}>
                     <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 4 }}>Transportador</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <div style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--text)', flex: 1 }}>
-                        {dev.transportador_cobranca || nfV.transportador_nome || '—'}
-                        {dev.transportador_cobranca && (
-                          <span style={{ fontSize: 9.5, fontWeight: 600, color: 'var(--green)', background: 'var(--green-dim)', padding: '1px 6px', borderRadius: 10, marginLeft: 6 }}>vinculado</span>
-                        )}
-                      </div>
-                      <button onClick={() => { setEditTransp(true); setEdit(false); setEditMotivo(false); }}
-                        className="btn btn-ghost btn-sm" style={{ fontSize: 10, padding: '3px 8px', flexShrink: 0 }}>
-                        <Ic d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" size={11}/>
-                        {dev.transportador_cobranca ? 'Trocar' : 'Vincular'}
-                      </button>
+                    <div style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--text)' }}>
+                      {dev.transportador_cobranca || nfV.transportador_nome || '—'}
+                      {dev.transportador_cobranca && (
+                        <span style={{ fontSize: 9.5, fontWeight: 600, color: 'var(--green)', background: 'var(--green-dim)', padding: '1px 6px', borderRadius: 10, marginLeft: 6 }}>vinculado</span>
+                      )}
                     </div>
                     {dev.transportador_cnpj_cobranca && (
                       <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 2 }}>{fmtCNPJ(dev.transportador_cnpj_cobranca)}</div>
@@ -576,31 +569,24 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
                         : 'NF de venda não localizada no Active OnSupply. Pode estar em período de inicialização do webhook.';
                     })()}
                   </div>
-                  {/* Transportador: sempre editável mesmo sem NF venda */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: '1px solid var(--border)', marginBottom: 8 }}>
-                    <div style={{ flex: 1 }}>
-                      {dev.transportador_cobranca ? (
-                        <>
-                          <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 3 }}>Transportador</div>
-                          <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                            {dev.transportador_cobranca}
-                            <span style={{ fontSize: 9.5, fontWeight: 600, color: 'var(--green)', background: 'var(--green-dim)', padding: '1px 6px', borderRadius: 10 }}>vinculado</span>
-                          </div>
-                          {dev.transportador_cnpj_cobranca && (
-                            <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 2 }}>{fmtCNPJ(dev.transportador_cnpj_cobranca)}</div>
-                          )}
-                        </>
-                      ) : (
-                        <div style={{ fontSize: 11.5, color: 'var(--yellow)', fontWeight: 600 }}>
-                          ⚠ Transportador não identificado
+                  {/* Transportador: editável via botão no hero */}
+                  <div style={{ padding: '8px 0', borderBottom: '1px solid var(--border)', marginBottom: 8 }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 3 }}>Transportador</div>
+                    {dev.transportador_cobranca ? (
+                      <>
+                        <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                          {dev.transportador_cobranca}
+                          <span style={{ fontSize: 9.5, fontWeight: 600, color: 'var(--green)', background: 'var(--green-dim)', padding: '1px 6px', borderRadius: 10 }}>vinculado</span>
                         </div>
-                      )}
-                    </div>
-                    <button onClick={() => { setEditTransp(true); setEdit(false); setEditMotivo(false); }}
-                      className="btn btn-ghost btn-sm" style={{ fontSize: 10, padding: '3px 8px', flexShrink: 0 }}>
-                      <Ic d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" size={11}/>
-                      {dev.transportador_cobranca ? 'Trocar' : 'Vincular'}
-                    </button>
+                        {dev.transportador_cnpj_cobranca && (
+                          <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 2 }}>{fmtCNPJ(dev.transportador_cnpj_cobranca)}</div>
+                        )}
+                      </>
+                    ) : (
+                      <div style={{ fontSize: 11.5, color: 'var(--yellow)', fontWeight: 600 }}>
+                        ⚠ Não identificado — use "Vincular transportador" acima
+                      </div>
+                    )}
                   </div>
                   <div style={{ fontFamily: 'monospace', fontSize: 9.5, color: 'var(--text-3)', background: 'var(--surface-2)', padding: '8px 10px', borderRadius: 6, wordBreak: 'break-all', border: '1px solid var(--border)', letterSpacing: '.04em' }}>
                     {dev.chave_nfe_referenciada}

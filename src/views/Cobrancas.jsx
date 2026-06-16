@@ -105,10 +105,21 @@ export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
               className="input" style={{ width: 'auto', minWidth: 180 }}>
               {STATUS_OPTIONS.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
             </select>
-            <input type="text" placeholder="Transportador"
-              value={filters.transportador}
-              onChange={e => applyFilter({ transportador: e.target.value })}
-              className="input" style={{ width: 'auto', minWidth: 200 }}/>
+            <select value={filters.transportador === '__sem_transportador__' ? '__sem_transportador__' : ''}
+              onChange={e => {
+                if (e.target.value === '__sem_transportador__') applyFilter({ transportador: '__sem_transportador__' });
+                else applyFilter({ transportador: '' });
+              }}
+              className="input" style={{ width: 'auto', minWidth: 170 }}>
+              <option value="">Todos os transportadores</option>
+              <option value="__sem_transportador__">Não identificado</option>
+            </select>
+            {filters.transportador !== '__sem_transportador__' && (
+              <input type="text" placeholder="Buscar transportador"
+                value={filters.transportador}
+                onChange={e => applyFilter({ transportador: e.target.value })}
+                className="input" style={{ width: 'auto', minWidth: 200 }}/>
+            )}
           </div>
         )}
       </div>
