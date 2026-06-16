@@ -516,3 +516,17 @@ export async function dbImportProtheusLancamentos(lancamentos) {
   if (error) throw new Error(error.message);
   return data; // { applied, staged }
 }
+
+// Atualiza transportador vinculado à NFD (manualmente)
+export async function dbUpdateTransportador(id, { nome, cnpj }) {
+  syncAuthToken();
+  const { error } = await supabase
+    .from('oobj_nfe_recebidas')
+    .update({
+      transportador_cobranca:      nome || null,
+      transportador_cnpj_cobranca: cnpj || null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id);
+  if (error) throw new Error(error.message);
+}

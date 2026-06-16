@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { dbGetDevolucaoDetail, dbUpdateStatus, dbGetXmlUrl, dbUpdateMotivo, dbGetMotivos } from '../config/supabase';
+import { dbGetDevolucaoDetail, dbUpdateStatus, dbGetXmlUrl, dbUpdateMotivo, dbGetMotivos, dbUpdateTransportador } from '../config/supabase';
 import { fmtBRL, fmtDate, fmtDateTime, fmtCNPJ, CNPJ_MAP, STATUS_CFG, STATUS_OPTIONS, Badge } from '../utils.jsx';
 
 const AREA_CORES = {
@@ -161,6 +161,12 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
   const [savingMotivo, setSavingMotivo] = useState(false);
   const [motivosDB, setMotivosDB]   = useState([]);
 
+  const [editTransp, setEditTransp]     = useState(false);
+  const [transpNome, setTranspNome]     = useState('');
+  const [transpCnpj, setTranspCnpj]     = useState('');
+  const [savingTransp, setSavingTransp] = useState(false);
+  const [transpErr, setTranspErr]       = useState('');
+
   // Carregar motivos do banco na primeira vez
   useEffect(() => {
     dbGetMotivos().then(setMotivosDB);
@@ -168,14 +174,29 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
 
   useEffect(() => {
     if (!id) return;
-    setLoading(true); setData(null); setEdit(false); setEditMotivo(false);
+    setLoading(true); setData(null); setEdit(false); setEditMotivo(false); setEditTransp(false);
     dbGetDevolucaoDetail(id).then(d => {
       setData(d);
       setNewStatus(d?.dev?.status_portal || 'pendente');
       setMotivo(d?.dev?.motivo_devolucao || '');
+      setTranspNome(d?.dev?.transportador_cobranca || '');
+      setTranspCnpj(d?.dev?.transportador_cnpj_cobranca || '');
       setLoading(false);
     }).catch(() => setLoading(false));
   }, [id]);
+
+  const handleSaveTransp = async () => {
+    setSavingTransp(true); setTranspErr('');
+    try {
+      await dbUpdateTransportador(id, { nome: transpNome.trim(), cnpj: transpCnpj.replace(/\D/g, '') });
+      setData(prev => ({ ...prev, dev: { ...prev.dev,
+        transportador_cobranca: transpNome.trim(),
+        transportador_cnpj_cobranca: transpCnpj.replace(/\D/g, ''),
+      }}));
+      setEditTransp(false); onSaved?.();
+    } catch (e) { setTranspErr(e.message); }
+    finally { setSavingTransp(false); }
+  };
 
   const handleXml = async () => {
     try { const url = await dbGetXmlUrl(data.dev.xml_path); if (url) window.open(url, '_blank'); }
@@ -284,10 +305,15 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
                 <Ic d="M7 8h10M7 12h6" size={12}/>
                 {dev.motivo_devolucao ? 'Editar motivo' : 'Classificar motivo'}
               </button>
-              <button onClick={() => { setEdit(v => !v); setEditMotivo(false); }}
+              <button onClick={() => { setEdit(v => !v); setEditMotivo(false); setEditTransp(false); }}
                 className={`dd-action ${editStatus ? 'active' : ''}`}>
                 <Ic d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" size={12}/>
                 Atualizar status
+              </button>
+              <button onClick={() => { setEditTransp(v => !v); setEdit(false); setEditMotivo(false); }}
+                className={`dd-action ${editTransp ? 'active' : ''}`}>
+                <Ic d="M3 6h13l3 5v6h-3m-7 0H3V6zm10 11a2 2 0 104 0 2 2 0 00-4 0zM7 17a2 2 0 104 0 2 2 0 00-4 0z" size={12}/>
+                {dev.transportador_cobranca ? 'Trocar transportador' : 'Vincular transportador'}
               </button>
               {dev.xml_baixado && dev.xml_path && (
                 <button onClick={handleXml} className="dd-action">
@@ -465,6 +491,38 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
               </SectionCard>
             )}
 
+            {/* ── Painel edição de transportador ── */}
+            {editTransp && (
+              <div style={{ background: 'var(--blue-dim)', border: '1px solid var(--blue-mid)', borderRadius: 12, padding: '16px', marginBottom: 12 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--blue)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Ic d="M3 6h13l3 5v6h-3m-7 0H3V6zm10 11a2 2 0 104 0 2 2 0 00-4 0zM7 17a2 2 0 104 0 2 2 0 00-4 0z" size={12} color="var(--blue)"/>
+                  {dev.transportador_cobranca ? 'Trocar transportador vinculado' : 'Vincular transportador'}
+                </div>
+                <div style={{ marginBottom: 10 }}>
+                  <label className="input-label">Razão social do transportador *</label>
+                  <input type="text" value={transpNome} onChange={e => setTranspNome(e.target.value)}
+                    className="input" placeholder="Ex: FAST SOLUTION LOGISTICA LTDA"/>
+                </div>
+                <div style={{ marginBottom: 12 }}>
+                  <label className="input-label">CNPJ (só números)</label>
+                  <input type="text" value={transpCnpj} onChange={e => setTranspCnpj(e.target.value)}
+                    className="input" placeholder="Ex: 13407453000189" maxLength={18}/>
+                </div>
+                {transpErr && <div style={{ color: 'var(--red)', fontSize: 11.5, marginBottom: 8 }}>{transpErr}</div>}
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={() => { setEditTransp(false); setTranspNome(dev.transportador_cobranca || ''); setTranspCnpj(dev.transportador_cnpj_cobranca || ''); }} className="btn btn-ghost btn-sm">Cancelar</button>
+                  <button onClick={handleSaveTransp} disabled={savingTransp || !transpNome.trim()} className="btn btn-primary btn-sm">
+                    {savingTransp ? 'Salvando...' : 'Salvar transportador'}
+                  </button>
+                  {dev.transportador_cobranca && (
+                    <button onClick={() => { setTranspNome(''); setTranspCnpj(''); }} className="btn btn-ghost btn-sm" style={{ color: 'var(--red)', marginLeft: 'auto' }}>
+                      Remover vínculo
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* ── Bloco 3: NF original de venda ── */}
             {nfV ? (
               <SectionCard
@@ -485,7 +543,26 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
                   <DataItem label="Destinatário" value={nfV.destinatario_nome} full/>
                   <DataItem label="CNPJ" value={fmtCNPJ(nfV.destinatario_cnpj)}/>
                   <DataItem label="Destino" value={nfV.cidade_destino && nfV.uf_destino ? `${nfV.cidade_destino} / ${nfV.uf_destino}` : nfV.uf_destino}/>
-                  <DataItem label="Transportador" value={nfV.transportador_nome} full/>
+                  {/* Transportador: mostra o salvo no banco (pode ter sido editado manualmente) ou o da NF de venda */}
+                  <div style={{ gridColumn: '1 / -1', padding: '9px 0', borderBottom: '1px solid var(--border)' }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 4 }}>Transportador</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--text)', flex: 1 }}>
+                        {dev.transportador_cobranca || nfV.transportador_nome || '—'}
+                        {dev.transportador_cobranca && (
+                          <span style={{ fontSize: 9.5, fontWeight: 600, color: 'var(--green)', background: 'var(--green-dim)', padding: '1px 6px', borderRadius: 10, marginLeft: 6 }}>vinculado</span>
+                        )}
+                      </div>
+                      <button onClick={() => { setEditTransp(true); setEdit(false); setEditMotivo(false); }}
+                        className="btn btn-ghost btn-sm" style={{ fontSize: 10, padding: '3px 8px', flexShrink: 0 }}>
+                        <Ic d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" size={11}/>
+                        {dev.transportador_cobranca ? 'Trocar' : 'Vincular'}
+                      </button>
+                    </div>
+                    {dev.transportador_cnpj_cobranca && (
+                      <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 2 }}>{fmtCNPJ(dev.transportador_cnpj_cobranca)}</div>
+                    )}
+                  </div>
                   <DataItem label="Pedido" value={nfV.pedido}/>
                   <DataItem label="Centro de custo" value={nfV.centro_custo}/>
                   {nfV.nf_chave && <DataItem label="Chave NF-e" value={<span style={{ fontFamily: 'monospace', fontSize: 9.5, wordBreak: 'break-all' }}>{nfV.nf_chave}</span>} full/>}
@@ -503,10 +580,33 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
                         : 'NF de venda não localizada no Active OnSupply. Pode estar em período de inicialização do webhook.';
                     })()}
                   </div>
-                  {dev.transportador_cobranca && (
-                    <DataItem label="Transportador (NFD)" value={dev.transportador_cobranca} full/>
-                  )}
-                  <div style={{ fontFamily: 'monospace', fontSize: 9.5, color: 'var(--text-3)', background: 'var(--surface-2)', padding: '8px 10px', borderRadius: 6, wordBreak: 'break-all', border: '1px solid var(--border)', letterSpacing: '.04em', marginTop: dev.transportador_cobranca ? 8 : 0 }}>
+                  {/* Transportador: sempre editável mesmo sem NF venda */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: '1px solid var(--border)', marginBottom: 8 }}>
+                    <div style={{ flex: 1 }}>
+                      {dev.transportador_cobranca ? (
+                        <>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 3 }}>Transportador</div>
+                          <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                            {dev.transportador_cobranca}
+                            <span style={{ fontSize: 9.5, fontWeight: 600, color: 'var(--green)', background: 'var(--green-dim)', padding: '1px 6px', borderRadius: 10 }}>vinculado</span>
+                          </div>
+                          {dev.transportador_cnpj_cobranca && (
+                            <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 2 }}>{fmtCNPJ(dev.transportador_cnpj_cobranca)}</div>
+                          )}
+                        </>
+                      ) : (
+                        <div style={{ fontSize: 11.5, color: 'var(--yellow)', fontWeight: 600 }}>
+                          ⚠ Transportador não identificado
+                        </div>
+                      )}
+                    </div>
+                    <button onClick={() => { setEditTransp(true); setEdit(false); setEditMotivo(false); }}
+                      className="btn btn-ghost btn-sm" style={{ fontSize: 10, padding: '3px 8px', flexShrink: 0 }}>
+                      <Ic d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" size={11}/>
+                      {dev.transportador_cobranca ? 'Trocar' : 'Vincular'}
+                    </button>
+                  </div>
+                  <div style={{ fontFamily: 'monospace', fontSize: 9.5, color: 'var(--text-3)', background: 'var(--surface-2)', padding: '8px 10px', borderRadius: 6, wordBreak: 'break-all', border: '1px solid var(--border)', letterSpacing: '.04em' }}>
                     {dev.chave_nfe_referenciada}
                   </div>
                 </div>
