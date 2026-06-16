@@ -591,3 +591,17 @@ export async function dbDeleteAnexo(id, storagePath) {
   const { error } = await supabase.from('dev_fiscal_anexos').delete().eq('id', id);
   if (error) throw new Error(error.message);
 }
+
+// Vincula centro de custo a uma NFD e propaga para todas as NFDs do mesmo cliente
+export async function dbSetCentroCustoCliente({ cnpj_emitente, nome_emitente, centro_custo, usuario, apenas_esta_nfd = null }) {
+  syncAuthToken();
+  const { data, error } = await supabase.rpc('set_centro_custo_cliente', {
+    p_cnpj_emitente: cnpj_emitente,
+    p_nome_emitente: nome_emitente,
+    p_centro_custo:  centro_custo,
+    p_usuario:       usuario || null,
+    p_apenas_esta_nfd: apenas_esta_nfd,
+  });
+  if (error) throw new Error(error.message);
+  return data; // { nfds_atualizadas, regra_salva }
+}

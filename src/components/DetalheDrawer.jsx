@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { dbGetDevolucaoDetail, dbUpdateStatus, dbGetXmlUrl, dbUpdateMotivo, dbGetMotivos, dbUpdateTransportador } from '../config/supabase';
+import { dbGetDevolucaoDetail, dbUpdateStatus, dbGetXmlUrl, dbUpdateMotivo, dbGetMotivos, dbUpdateTransportador, dbSetCentroCustoCliente } from '../config/supabase';
 import { fmtBRL, fmtDate, fmtDateTime, fmtCNPJ, CNPJ_MAP, STATUS_CFG, STATUS_OPTIONS, Badge } from '../utils.jsx';
 import AnexosSection from './AnexosSection.jsx';
 
@@ -168,6 +168,13 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
   const [savingTransp, setSavingTransp] = useState(false);
   const [transpErr, setTranspErr]       = useState('');
 
+  const [editCC, setEditCC]       = useState(false);
+  const [ccValor, setCcValor]     = useState('');
+  const [ccModo, setCcModo]       = useState('todos'); // 'todos' | 'somente_esta'
+  const [savingCC, setSavingCC]   = useState(false);
+  const [ccErr, setCcErr]         = useState('');
+  const [ccResult, setCcResult]   = useState(null);
+
   // Carregar motivos do banco na primeira vez
   useEffect(() => {
     dbGetMotivos().then(setMotivosDB);
@@ -182,6 +189,8 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
       setMotivo(d?.dev?.motivo_devolucao || '');
       setTranspNome(d?.dev?.transportador_cobranca || '');
       setTranspCnpj(d?.dev?.transportador_cnpj_cobranca || '');
+      setCcValor(d?.dev?.centro_custo || '');
+      setCcResult(null);
       setLoading(false);
     }).catch(() => setLoading(false));
   }, [id]);
@@ -197,6 +206,23 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
       setEditTransp(false); onSaved?.();
     } catch (e) { setTranspErr(e.message); }
     finally { setSavingTransp(false); }
+  };
+
+  const handleSaveCC = async (apenasEsta = false) => {
+    setSavingCC(true); setCcErr(''); setCcResult(null);
+    try {
+      const res = await dbSetCentroCustoCliente({
+        cnpj_emitente: dev.cnpj_emitente,
+        nome_emitente: dev.nome_emitente,
+        centro_custo: ccValor,
+        usuario: user?.name || user?.email || '',
+        apenas_esta_nfd: apenasEsta ? id : null,
+      });
+      setData(prev => ({ ...prev, dev: { ...prev.dev, centro_custo: ccValor }}));
+      setCcResult(res);
+      onSaved?.();
+    } catch (e) { setCcErr(e.message); }
+    finally { setSavingCC(false); }
   };
 
   const handleXml = async () => {
@@ -306,10 +332,15 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
                 <Ic d="M7 8h10M7 12h6" size={12}/>
                 {dev.motivo_devolucao ? 'Editar motivo' : 'Classificar motivo'}
               </button>
-              <button onClick={() => { setEditTransp(v => !v); setEdit(false); setEditMotivo(false); }}
+              <button onClick={() => { setEditTransp(v => !v); setEdit(false); setEditMotivo(false); setEditCC(false); }}
                 className={`dd-action ${editTransp ? 'active' : ''}`}>
                 <Ic d="M3 6h13l3 5v6h-3m-7 0H3V6zm10 11a2 2 0 104 0 2 2 0 00-4 0zM7 17a2 2 0 104 0 2 2 0 00-4 0z" size={12}/>
                 {dev.transportador_cobranca ? 'Trocar transportador' : 'Vincular transportador'}
+              </button>
+              <button onClick={() => { setEditCC(v => !v); setEdit(false); setEditMotivo(false); setEditTransp(false); setCcResult(null); }}
+                className={`dd-action ${editCC ? 'active' : ''}`}>
+                <Ic d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" size={12}/>
+                {dev.centro_custo ? 'Mudar centro de custo' : 'Vincular centro de custo'}
               </button>
               <button onClick={() => document.getElementById('btn-add-anexo')?.click()}
                 className="dd-action">
@@ -337,7 +368,7 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
           <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative' }}>
 
             {/* ── Painel de edição flutuante (sticky, não desloca o scroll) ── */}
-            {(editMotivo || editTransp) && (
+            {(editMotivo || editTransp || editCC) && (
               <div style={{
                 position: 'sticky', top: 0, zIndex: 20,
                 background: 'var(--surface)',
@@ -407,6 +438,62 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
                         </button>
                       )}
                     </div>
+                  </div>
+                )}
+
+                {/* Editor centro de custo */}
+                {editCC && (
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--blue)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6, textTransform: 'uppercase', letterSpacing: '.06em' }}>
+                      <Ic d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" size={12} color="var(--blue)"/>
+                      Centro de custo
+                    </div>
+
+                    {ccResult ? (
+                      <div style={{ padding: '12px 14px', background: 'var(--green-dim)', borderRadius: 8, marginBottom: 12 }}>
+                        <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--green)', marginBottom: 4 }}>✓ Centro de custo salvo: <strong>{ccValor}</strong></div>
+                        {ccResult.regra_salva && (
+                          <div style={{ fontSize: 11.5, color: 'var(--text-2)' }}>
+                            Aplicado em <strong>{ccResult.nfds_atualizadas}</strong> {ccResult.nfds_atualizadas === 1 ? 'nota' : 'notas'} de <strong>{dev?.nome_emitente}</strong>.<br/>
+                            Novas devoluções deste cliente serão classificadas automaticamente.
+                          </div>
+                        )}
+                        <button onClick={() => { setEditCC(false); setCcResult(null); }} className="btn btn-ghost btn-sm" style={{ marginTop: 10 }}>Fechar</button>
+                      </div>
+                    ) : (
+                      <>
+                        <div style={{ marginBottom: 12 }}>
+                          <label className="input-label">Centro de custo</label>
+                          <select value={ccValor} onChange={e => setCcValor(e.target.value)} className="input" autoFocus>
+                            <option value="">Selecione...</option>
+                            {['CANAL INDIRETO','CASH & CARRY','FARMA KEY ACCOUNT','KEY ACCOUNT','CANAL DIRETO','NOVOS NEGÓCIOS','ECOMMERCE','CANAL VERDE','EIC'].map(cc => (
+                              <option key={cc} value={cc}>{cc}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 12px', marginBottom: 12 }}>
+                          <div style={{ fontSize: 11.5, color: 'var(--text-2)', lineHeight: 1.5 }}>
+                            <strong style={{ color: 'var(--text)' }}>{dev?.nome_emitente}</strong><br/>
+                            Ao salvar, esse centro de custo será aplicado em todas as devoluções deste cliente (mesmo CNPJ) e nas próximas automaticamente.
+                          </div>
+                        </div>
+
+                        {ccErr && <div style={{ color: 'var(--red)', fontSize: 11.5, marginBottom: 8 }}>{ccErr}</div>}
+
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                          <button onClick={() => setEditCC(false)} className="btn btn-ghost btn-sm">Cancelar</button>
+                          <button onClick={() => handleSaveCC(false)} disabled={savingCC || !ccValor}
+                            className="btn btn-primary btn-sm">
+                            {savingCC ? 'Salvando...' : 'Salvar para todas as notas deste cliente'}
+                          </button>
+                          <button onClick={() => handleSaveCC(true)} disabled={savingCC || !ccValor}
+                            className="btn btn-outline btn-sm" style={{ fontSize: 10.5 }}>
+                            Só esta nota
+                          </button>
+                        </div>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
