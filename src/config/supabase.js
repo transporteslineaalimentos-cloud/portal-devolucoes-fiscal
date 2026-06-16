@@ -144,6 +144,7 @@ export async function dbListDevolucoes({ page = 0, filters = {} }) {
     .eq('tipo', 'devolucao')
     .gte('dt_emissao', '2026-01-01')
     .not('status_sefaz', 'eq', 'CANCELADA')   // ocultar canceladas
+    .not('cfops', 'cs', '{"6201"}')            // excluir dev. de industrialização (fornecedores)
     .order('dt_emissao', { ascending: false })
     .range(from, to);
 
@@ -177,6 +178,7 @@ export async function dbExportDevolucoes({ filters = {} } = {}) {
       .eq('tipo', 'devolucao')
       .gte('dt_emissao', '2026-01-01')
       .not('status_sefaz', 'eq', 'CANCELADA')
+      .not('cfops', 'cs', '{"6201"}')          // excluir dev. de industrialização
       .order('dt_emissao', { ascending: false })
       .range(from, from + BATCH - 1);
 
@@ -428,7 +430,8 @@ export async function dbListCobrancas({ page = 0, filters = {} }) {
       transportador_cobranca, transportador_cnpj_cobranca
     `, { count: 'exact' })
     .not('status_cobranca', 'is', null)
-    .order('status_cobranca', { ascending: true }) // pendentes primeiro
+    .not('cfops', 'cs', '{"6201"}')            // excluir dev. de industrialização
+    .order('status_cobranca', { ascending: true })
     .order('dt_emissao', { ascending: false })
     .range(from, to);
 
