@@ -340,66 +340,85 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
             Erro ao carregar os dados.
           </div>
         ) : (
-          <div className="drawer-body" style={{ padding: '18px 22px 28px' }}>
+          <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative' }}>
 
-            {/* ── Editor motivo ──────────────────── */}
-            {editMotivo && (
-              <div style={{ background: 'var(--blue-dim)', border: '1px solid var(--blue-mid)', borderRadius: 10, padding: '14px 16px', marginBottom: 14 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--blue)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '.06em' }}>Classificar motivo da devolução</div>
-                <div style={{ marginBottom: 10 }}>
-                  <label className="input-label">Motivo</label>
-                  <MotivoAutocomplete
-                    value={motivo}
-                    onChange={setMotivo}
-                    motivos={motivosDB}
-                  />
-                  {motivo && motivosDB.find(m => m.motivo === motivo) && (
-                    <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{ fontSize: 10.5, color: 'var(--text-3)' }}>Área responsável:</span>
-                      {(() => {
-                        const area = motivosDB.find(m => m.motivo === motivo)?.area;
-                        const cfg = AREA_CORES[area] || { color: 'var(--text-2)', bg: 'var(--surface-3)' };
-                        return <span style={{ fontSize: 11, fontWeight: 700, color: cfg.color, background: cfg.bg, padding: '2px 8px', borderRadius: 20 }}>{area}</span>;
-                      })()}
-                    </div>
-                  )}
-                </div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button onClick={() => setEditMotivo(false)} className="btn btn-ghost btn-sm">Cancelar</button>
-                  <button onClick={handleSaveMotivo} disabled={savingMotivo || !motivo} className="btn btn-primary btn-sm">
-                    {savingMotivo ? 'Salvando...' : 'Salvar'}
-                  </button>
-                </div>
-              </div>
-            )}
+            {/* ── Painel de edição flutuante (sticky, não desloca o scroll) ── */}
+            {(editMotivo || editTransp) && (
+              <div style={{
+                position: 'sticky', top: 0, zIndex: 20,
+                background: 'var(--surface)',
+                borderBottom: '2px solid var(--blue)',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.12)',
+                padding: '16px 22px',
+                flexShrink: 0,
+              }}>
 
-            {/* ── Editor status ──────────────────── */}
-            {editStatus && (
-              <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 10, padding: '14px 16px', marginBottom: 14 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-2)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '.06em' }}>Atualizar status</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                {/* Editor motivo */}
+                {editMotivo && (
                   <div>
-                    <label className="input-label">Novo status</label>
-                    <select value={newStatus} onChange={e => setNewStatus(e.target.value)} className="input">
-                      {STATUS_OPTIONS.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
-                    </select>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--blue)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6, textTransform: 'uppercase', letterSpacing: '.06em' }}>
+                      <Ic d="M7 8h10M7 12h6" size={12} color="var(--blue)"/>
+                      Classificar motivo da devolução
+                    </div>
+                    <div style={{ marginBottom: 12 }}>
+                      <MotivoAutocomplete value={motivo} onChange={setMotivo} motivos={motivosDB}/>
+                      {motivo && motivosDB.find(m => m.motivo === motivo) && (
+                        <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ fontSize: 10.5, color: 'var(--text-3)' }}>Área responsável:</span>
+                          {(() => {
+                            const area = motivosDB.find(m => m.motivo === motivo)?.area;
+                            const cfg = AREA_CORES[area] || { color: 'var(--text-2)', bg: 'var(--surface-3)' };
+                            return <span style={{ fontSize: 11, fontWeight: 700, color: cfg.color, background: cfg.bg, padding: '2px 8px', borderRadius: 20 }}>{area}</span>;
+                          })()}
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button onClick={() => setEditMotivo(false)} className="btn btn-ghost btn-sm">Cancelar</button>
+                      <button onClick={handleSaveMotivo} disabled={savingMotivo || !motivo} className="btn btn-primary btn-sm">
+                        {savingMotivo ? 'Salvando...' : 'Salvar motivo'}
+                      </button>
+                    </div>
                   </div>
-                </div>
-                <div style={{ marginBottom: 10 }}>
-                  <label className="input-label">Observação (opcional)</label>
-                  <textarea value={obs} onChange={e => setObs(e.target.value)} className="input" rows={2} style={{ resize: 'vertical' }} placeholder="Motivo ou ação tomada..."/>
-                </div>
-                {saveErr && <div style={{ color: 'var(--red)', fontSize: 11.5, marginBottom: 8 }}>{saveErr}</div>}
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button onClick={() => setEdit(false)} className="btn btn-ghost btn-sm">Cancelar</button>
-                  <button onClick={handleSaveStatus} disabled={saving} className="btn btn-primary btn-sm">
-                    {saving ? 'Salvando...' : 'Confirmar'}
-                  </button>
-                </div>
+                )}
+
+                {/* Editor transportador */}
+                {editTransp && (
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--blue)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6, textTransform: 'uppercase', letterSpacing: '.06em' }}>
+                      <Ic d="M3 6h13l3 5v6h-3m-7 0H3V6zm10 11a2 2 0 104 0 2 2 0 00-4 0zM7 17a2 2 0 104 0 2 2 0 00-4 0z" size={12} color="var(--blue)"/>
+                      {dev?.transportador_cobranca ? 'Trocar transportador' : 'Vincular transportador'}
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+                      <div>
+                        <label className="input-label">Razão social *</label>
+                        <input type="text" value={transpNome} onChange={e => setTranspNome(e.target.value)}
+                          className="input" placeholder="Ex: FAST SOLUTION LOGISTICA LTDA" autoFocus/>
+                      </div>
+                      <div>
+                        <label className="input-label">CNPJ (só números)</label>
+                        <input type="text" value={transpCnpj} onChange={e => setTranspCnpj(e.target.value)}
+                          className="input" placeholder="Ex: 13407453000189" maxLength={18}/>
+                      </div>
+                    </div>
+                    {transpErr && <div style={{ color: 'var(--red)', fontSize: 11.5, marginBottom: 8 }}>{transpErr}</div>}
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <button onClick={() => { setEditTransp(false); setTranspNome(dev?.transportador_cobranca || ''); setTranspCnpj(dev?.transportador_cnpj_cobranca || ''); }} className="btn btn-ghost btn-sm">Cancelar</button>
+                      <button onClick={handleSaveTransp} disabled={savingTransp || !transpNome.trim()} className="btn btn-primary btn-sm">
+                        {savingTransp ? 'Salvando...' : 'Salvar transportador'}
+                      </button>
+                      {dev?.transportador_cobranca && (
+                        <button onClick={() => { setTranspNome(''); setTranspCnpj(''); }} className="btn btn-ghost btn-sm" style={{ color: 'var(--red)', marginLeft: 'auto' }}>
+                          Remover vínculo
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
-            {/* ── Bloco 1: Devolução + Emitente (lado a lado) ── */}
+            <div className="drawer-body" style={{ padding: '18px 22px 28px', overflowY: 'auto', flex: 1 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
 
               {/* Devolução */}
@@ -490,38 +509,6 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
                   {dev.inf_complementar}
                 </div>
               </SectionCard>
-            )}
-
-            {/* ── Painel edição de transportador ── */}
-            {editTransp && (
-              <div style={{ background: 'var(--blue-dim)', border: '1px solid var(--blue-mid)', borderRadius: 12, padding: '16px', marginBottom: 12 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--blue)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <Ic d="M3 6h13l3 5v6h-3m-7 0H3V6zm10 11a2 2 0 104 0 2 2 0 00-4 0zM7 17a2 2 0 104 0 2 2 0 00-4 0z" size={12} color="var(--blue)"/>
-                  {dev.transportador_cobranca ? 'Trocar transportador vinculado' : 'Vincular transportador'}
-                </div>
-                <div style={{ marginBottom: 10 }}>
-                  <label className="input-label">Razão social do transportador *</label>
-                  <input type="text" value={transpNome} onChange={e => setTranspNome(e.target.value)}
-                    className="input" placeholder="Ex: FAST SOLUTION LOGISTICA LTDA"/>
-                </div>
-                <div style={{ marginBottom: 12 }}>
-                  <label className="input-label">CNPJ (só números)</label>
-                  <input type="text" value={transpCnpj} onChange={e => setTranspCnpj(e.target.value)}
-                    className="input" placeholder="Ex: 13407453000189" maxLength={18}/>
-                </div>
-                {transpErr && <div style={{ color: 'var(--red)', fontSize: 11.5, marginBottom: 8 }}>{transpErr}</div>}
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button onClick={() => { setEditTransp(false); setTranspNome(dev.transportador_cobranca || ''); setTranspCnpj(dev.transportador_cnpj_cobranca || ''); }} className="btn btn-ghost btn-sm">Cancelar</button>
-                  <button onClick={handleSaveTransp} disabled={savingTransp || !transpNome.trim()} className="btn btn-primary btn-sm">
-                    {savingTransp ? 'Salvando...' : 'Salvar transportador'}
-                  </button>
-                  {dev.transportador_cobranca && (
-                    <button onClick={() => { setTranspNome(''); setTranspCnpj(''); }} className="btn btn-ghost btn-sm" style={{ color: 'var(--red)', marginLeft: 'auto' }}>
-                      Remover vínculo
-                    </button>
-                  )}
-                </div>
-              </div>
             )}
 
             {/* ── Bloco 3: NF original de venda ── */}
@@ -691,6 +678,7 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
             {/* ── Bloco 7: Anexos e evidências ── */}
             <AnexosSection devolucaoId={id} user={user}/>
 
+          </div>
           </div>
         )}
       </div>
