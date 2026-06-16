@@ -730,6 +730,34 @@ export default function Dashboard({ onGoTo }) {
 
       </div>
 
+      {/* ── Centro de custo ─────────────────────────────── */}
+      {(d.porCentroCusto || []).length > 0 && (
+        <Card title="Centro de custo" subtitle="Valor e participação no período" noPad>
+          <div style={{ padding: '6px 20px 14px' }}>
+            {(() => {
+              const maxVal = Math.max(...(d.porCentroCusto || []).map(c => c.valor), 1);
+              return (d.porCentroCusto || []).map((c, i, arr) => (
+                <div key={c.centro} className="drill-row" style={{
+                  display: 'grid', gridTemplateColumns: '8px minmax(0,1fr) 80px 104px',
+                  alignItems: 'center', columnGap: 12,
+                  padding: '10px 0', ...rowBorder(i, arr.length),
+                }}
+                onClick={() => goDev(c.centro === 'SEM CENTRO' ? { centro_custo: 'sem' } : { centro_custo: c.centro })}
+                title={`Ver devoluções: ${c.centro}`}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: PAL.accent, opacity: c.centro === 'SEM CENTRO' ? 0.3 : 0.85 }}/>
+                  <div style={{ minWidth: 0 }}>
+                    <div className="ellipsis" style={{ fontSize: 12, fontWeight: 500, color: c.centro === 'SEM CENTRO' ? 'var(--text-3)' : 'var(--text)', marginBottom: 5 }}>{c.centro}</div>
+                    <Bar valor={c.valor} max={maxVal} color={PAL.accent} height={3}/>
+                  </div>
+                  <span style={{ ...T.meta, textAlign: 'right' }}>{c.qtd}×</span>
+                  <span style={{ ...T.value, fontSize: 12.5, textAlign: 'right' }}>{fmtBRL(c.valor)}</span>
+                </div>
+              ));
+            })()}
+          </div>
+        </Card>
+      )}
+
     </div>
   );
 }

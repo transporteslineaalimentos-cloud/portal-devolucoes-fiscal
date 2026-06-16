@@ -316,12 +316,6 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
                 <Ic d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" size={12}/>
                 Anexar evidência
               </button>
-              {dev.xml_baixado && dev.xml_path && (
-                <button onClick={handleXml} className="dd-action">
-                  <Ic d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" size={12}/>
-                  Baixar XML
-                </button>
-              )}
             </div>
           )}
         </div>
@@ -545,7 +539,7 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
                     )}
                   </div>
                   <DataItem label="Pedido" value={nfV.pedido}/>
-                  <DataItem label="Centro de custo" value={nfV.centro_custo}/>
+                  <DataItem label="Centro de custo" value={nfV.centro_custo || dev.centro_custo}/>
                   {nfV.nf_chave && <DataItem label="Chave NF-e" value={<span style={{ fontFamily: 'monospace', fontSize: 9.5, wordBreak: 'break-all' }}>{nfV.nf_chave}</span>} full/>}
                 </div>
               </SectionCard>

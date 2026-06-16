@@ -33,6 +33,7 @@ const EMPTY_FILTERS = {
   search: '', status: '', cnpj_dest: '', cnpj_emitente: '', uf: '',
   dt_inicio: '', dt_fim: '', mes: '', area: '', motivo: '',
   devolucao_total: '', com_motivo: '', flag_emissao: '', lancado: '', nf_venda: '',
+  centro_custo: '',
 };
 
 export default function Devolucoes({ user, initialFilters = {} }) {
@@ -108,6 +109,8 @@ export default function Devolucoes({ user, initialFilters = {} }) {
   if (filters.com_motivo === 'sem') activeChips.push({ k: 'com_motivo', label: 'Sem motivo classificado' });
   if (filters.flag_emissao === 'divergente') activeChips.push({ k: 'flag_emissao', label: 'Emissão divergente' });
   if (filters.nf_venda === 'nao_localizada') activeChips.push({ k: 'nf_venda', label: 'NF venda não localizada' });
+  if (filters.centro_custo === 'sem') activeChips.push({ k: 'centro_custo', label: 'Sem centro de custo' });
+  else if (filters.centro_custo) activeChips.push({ k: 'centro_custo', label: `CC: ${filters.centro_custo}` });
   if (filters.dt_inicio || filters.dt_fim) {
     const fmt = s => { if (!s) return ''; const [y,m,dd] = s.split('-'); return `${dd}/${m}/${y.slice(2)}`; };
     activeChips.push({ k: 'periodo', label: `Período: ${fmt(filters.dt_inicio) || '...'} – ${fmt(filters.dt_fim) || '...'}`, clear: { dt_inicio: '', dt_fim: '' } });
@@ -223,6 +226,20 @@ export default function Devolucoes({ user, initialFilters = {} }) {
               <option value="">NF venda: todas</option>
               <option value="localizada">✓ NF venda localizada</option>
               <option value="nao_localizada">✗ NF venda não localizada</option>
+            </select>
+            <select value={filters.centro_custo || ''} onChange={e => applyFilter({ centro_custo: e.target.value })}
+              className="input" style={{ width: 'auto', minWidth: 180 }}>
+              <option value="">Centro de custo: todos</option>
+              <option value="sem">✗ Sem centro de custo</option>
+              <option value="CANAL INDIRETO">Canal Indireto</option>
+              <option value="CASH & CARRY">Cash & Carry</option>
+              <option value="FARMA KEY ACCOUNT">Farma Key Account</option>
+              <option value="KEY ACCOUNT">Key Account</option>
+              <option value="CANAL DIRETO">Canal Direto</option>
+              <option value="NOVOS NEGÓCIOS">Novos Negócios</option>
+              <option value="ECOMMERCE">E-commerce</option>
+              <option value="CANAL VERDE">Canal Verde</option>
+              <option value="EIC">EIC</option>
             </select>
             <input type="text" placeholder="UF" maxLength={2}
               value={filters.uf}

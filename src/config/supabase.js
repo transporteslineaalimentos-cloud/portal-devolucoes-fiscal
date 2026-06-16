@@ -100,6 +100,8 @@ function applyDevolucoesFilters(q, filters = {}) {
   if (filters.nf_venda === 'nao_localizada')  q = q.eq('nf_venda_localizada', false);
   if (filters.com_motivo === 'com')           q = q.not('motivo_devolucao', 'is', null);
   if (filters.com_motivo === 'sem')           q = q.is('motivo_devolucao', null);
+  if (filters.centro_custo === 'sem')         q = q.is('centro_custo', null);
+  else if (filters.centro_custo)              q = q.eq('centro_custo', filters.centro_custo);
   if (filters.flag_emissao === 'divergente')       q = q.eq('flag_emissao_entrega', 'divergente');
   if (filters.flag_emissao === 'no_ato')           q = q.eq('flag_emissao_entrega', 'no_ato');
   if (filters.flag_emissao === 'aguardando')       q = q.eq('flag_emissao_entrega', 'aguardando_entrega');
@@ -173,7 +175,7 @@ export async function dbExportDevolucoes({ filters = {} } = {}) {
         nf_venda_localizada, area_responsavel, flag_emissao_entrega,
         lancado_protheus, dt_lancamento_protheus,
         status_cobranca, nf_debito, data_cobranca, cobrado_por, obs_cobranca,
-        transportador_cobranca, transportador_cnpj_cobranca
+        transportador_cobranca, transportador_cnpj_cobranca, centro_custo
       `)
       .eq('tipo', 'devolucao')
       .gte('dt_emissao', '2026-01-01')
@@ -209,8 +211,7 @@ export async function dbGetDevolucaoDetail(id) {
         .from('active_webhooks')
         .select('numero,serie,chave_nfe,destinatario_nome,destinatario_cnpj,remetente_cnpj,remetente_nome,natureza_operacao,cfop,data_emissao,data_entrega,valor_mercadoria,transportador_nome,transportador_cnpj,pedido,observacao,payload_raw')
         .eq('chave_nfe', dev.chave_nfe_referenciada)
-        .eq('tipo', 'nota_fiscal')
-        .limit(1)
+        .eq('tipo', 'nota_fiscal')        .limit(1)
         .single(),
       null
     );
@@ -335,10 +336,11 @@ export async function dbGetDashboard(periodo) {
     piorMesValor,
     mesAtual,
     mesAnterior,
-    topClientes:   d?.top_clientes || [],
-    topUfs:        d?.top_ufs      || [],
-    porArea:       d?.por_area     || [],
-    topMotivos:    d?.top_motivos  || [],
+    topClientes:   d?.top_clientes  || [],
+    topUfs:        d?.top_ufs       || [],
+    porArea:       d?.por_area      || [],
+    topMotivos:    (d?.top_motivos  || []).sort((a, b) => b.valor - a.valor),
+    porCentroCusto: d?.por_centro_custo || [],
     cobrancas:     d?.cobrancas    || { pendente_count: 0, pendente_valor: 0, cobrado_count: 0, cobrado_valor: 0, top_transportadores: [] },
   };
 }

@@ -58,7 +58,8 @@ export function exportDevolucoesToExcel(rows, { filename = 'devolucoes_fiscais' 
     'Obs. Cobrança':       r.obs_cobranca ?? '',
     'Transportador (NFD)':       r.transportador_cobranca ?? '',
     'CNPJ Transportador (NFD)':   r.transportador_cnpj_cobranca ?? '',
-    'Qtd Itens':           Array.isArray(r.itens) ? r.itens.length : 0,
+    'Centro de custo':            r.centro_custo ?? '',
+    'Qtd Itens':                  Array.isArray(r.itens) ? r.itens.length : 0,
   }));
 
   // ── Aba 2: Itens (uma linha por item) ─────────────────────
