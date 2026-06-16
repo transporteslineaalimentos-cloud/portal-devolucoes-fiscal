@@ -1,18 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../config/supabase';
+import { dbGetMotivos } from '../config/supabase';
 import { fmtBRL, fmtCNPJ } from '../utils.jsx';
-
-const MOTIVOS = [
-  'Avaria no recebimento',
-  'Falta no recebimento',
-  'Mercadoria não solicitada',
-  'Desacordo com o pedido',
-  'Produto fora da validade',
-  'Desvio de qualidade',
-  'Erro de faturamento',
-  'Recusa na entrega',
-  'Outros',
-];
 
 const CNPJ_OPTIONS = [
   { v: '05207076000297', l: 'Linea MIX' },
@@ -42,13 +31,15 @@ export default function ModalLancamentoManual({ onClose, onSaved, user }) {
   const [buscando, setBuscando] = useState(false);
 
   const [motivo, setMotivo]     = useState('');
+  const [motivosDB, setMotivosDB] = useState([]);
   const [dtDev, setDtDev]       = useState(new Date().toISOString().slice(0, 10));
   const [cnpjDest, setCnpjDest] = useState('05207076000297');
   const [obs, setObs]           = useState('');
-  const [motivoCustom, setMotivoCustom] = useState('');
 
   const [saving, setSaving]     = useState(false);
   const [error, setError]       = useState('');
+
+  useEffect(() => { dbGetMotivos().then(setMotivosDB); }, []);
 
   // Lookup automático quando chave atinge 44 dígitos
   useEffect(() => {
@@ -119,7 +110,7 @@ export default function ModalLancamentoManual({ onClose, onSaved, user }) {
     try {
       const payload = nfVenda.payload_raw || {};
       const dest    = payload.DESTINATARIO || {};
-      const motivoFinal = motivo === 'Outros' ? motivoCustom : motivo;
+      const motivoFinal = motivo;
 
       const row = {
         chave_nfe:              `MANUAL-${nfVenda.chave_nfe}-${Date.now()}`,
@@ -261,13 +252,25 @@ export default function ModalLancamentoManual({ onClose, onSaved, user }) {
               <div style={{ gridColumn: '1/-1' }}>
                 <label className="input-label">Motivo da devolução *</label>
                 <select value={motivo} onChange={e => setMotivo(e.target.value)} className="input">
-                  <option value="">— Selecionar —</option>
-                  {MOTIVOS.map(m => <option key={m} value={m}>{m}</option>)}
+                  <option value="">Selecione o motivo...</option>
+                  {(() => {
+                    const areas = [...new Set(motivosDB.map(m => m.area))].sort();
+                    return areas.map(area => (
+                      <optgroup key={area} label={area}>
+                        {motivosDB.filter(m => m.area === area).map(m => (
+                          <option key={m.motivo} value={m.motivo}>{m.motivo}</option>
+                        ))}
+                      </optgroup>
+                    ));
+                  })()}
                 </select>
-                {motivo === 'Outros' && (
-                  <input type="text" placeholder="Descreva o motivo..." value={motivoCustom}
-                    onChange={e => setMotivoCustom(e.target.value)}
-                    className="input" style={{ marginTop: 6 }}/>
+                {motivo && motivosDB.find(m => m.motivo === motivo) && (
+                  <div style={{ marginTop: 5, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 10.5, color: 'var(--text-3)' }}>Área responsável:</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--blue)', background: 'var(--blue-dim)', padding: '1px 8px', borderRadius: 20 }}>
+                      {motivosDB.find(m => m.motivo === motivo)?.area}
+                    </span>
+                  </div>
                 )}
               </div>
               <div style={{ gridColumn: '1/-1' }}>
