@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { dbGetDevolucaoDetail, dbUpdateStatus, dbGetXmlUrl, dbUpdateMotivo, dbGetMotivos, dbUpdateTransportador, dbSetCentroCustoCliente } from '../config/supabase';
+import { dbGetDevolucaoDetail, dbUpdateStatus, dbGetXmlUrl, dbUpdateMotivo, dbGetMotivos, dbUpdateTransportador, dbSetCentroCustoCliente, dbGetTransportadoras, dbSalvarTransportadora } from '../config/supabase';
 import { fmtBRL, fmtDate, fmtDateTime, fmtCNPJ, CNPJ_MAP, STATUS_CFG, STATUS_OPTIONS, Badge } from '../utils.jsx';
 import AnexosSection from './AnexosSection.jsx';
 
@@ -167,6 +167,9 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
   const [transpCnpj, setTranspCnpj]     = useState('');
   const [savingTransp, setSavingTransp] = useState(false);
   const [transpErr, setTranspErr]       = useState('');
+  const [transportadoras, setTransportadoras] = useState([]);
+  const [transpSearch, setTranspSearch] = useState('');
+  const [transpCustom, setTranspCustom] = useState(false); // modo cadastro nova
 
   const [editCC, setEditCC]       = useState(false);
   const [ccValor, setCcValor]     = useState('');
@@ -175,9 +178,10 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
   const [ccErr, setCcErr]         = useState('');
   const [ccResult, setCcResult]   = useState(null);
 
-  // Carregar motivos do banco na primeira vez
+  // Carregar motivos e transportadoras do banco na primeira vez
   useEffect(() => {
     dbGetMotivos().then(setMotivosDB);
+    dbGetTransportadoras().then(setTransportadoras);
   }, []);
 
   useEffect(() => {
@@ -198,12 +202,19 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
   const handleSaveTransp = async () => {
     setSavingTransp(true); setTranspErr('');
     try {
-      await dbUpdateTransportador(id, { nome: transpNome.trim(), cnpj: transpCnpj.replace(/\D/g, '') });
+      const cnpjClean = transpCnpj.replace(/\D/g, '');
+      await dbUpdateTransportador(id, { nome: transpNome.trim(), cnpj: cnpjClean });
+      // Se for uma transportadora nova (não está no cadastro), salva automaticamente
+      if (cnpjClean && !transportadoras.find(t => t.cnpj === cnpjClean)) {
+        await dbSalvarTransportadora({ cnpj: cnpjClean, nome: transpNome.trim() });
+        const lista = await dbGetTransportadoras();
+        setTransportadoras(lista);
+      }
       setData(prev => ({ ...prev, dev: { ...prev.dev,
         transportador_cobranca: transpNome.trim(),
-        transportador_cnpj_cobranca: transpCnpj.replace(/\D/g, ''),
+        transportador_cnpj_cobranca: cnpjClean,
       }}));
-      setEditTransp(false); onSaved?.();
+      setEditTransp(false); setTranspSearch(''); setTranspCustom(false); onSaved?.();
     } catch (e) { setTranspErr(e.message); }
     finally { setSavingTransp(false); }
   };
@@ -414,30 +425,99 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
                       <Ic d="M3 6h13l3 5v6h-3m-7 0H3V6zm10 11a2 2 0 104 0 2 2 0 00-4 0zM7 17a2 2 0 104 0 2 2 0 00-4 0z" size={12} color="var(--blue)"/>
                       {dev?.transportador_cobranca ? 'Trocar transportador' : 'Vincular transportador'}
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
-                      <div>
-                        <label className="input-label">Razão social *</label>
-                        <input type="text" value={transpNome} onChange={e => setTranspNome(e.target.value)}
-                          className="input" placeholder="Ex: FAST SOLUTION LOGISTICA LTDA" autoFocus/>
-                      </div>
-                      <div>
-                        <label className="input-label">CNPJ (só números)</label>
-                        <input type="text" value={transpCnpj} onChange={e => setTranspCnpj(e.target.value)}
-                          className="input" placeholder="Ex: 13407453000189" maxLength={18}/>
-                      </div>
-                    </div>
-                    {transpErr && <div style={{ color: 'var(--red)', fontSize: 11.5, marginBottom: 8 }}>{transpErr}</div>}
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                      <button onClick={() => { setEditTransp(false); setTranspNome(dev?.transportador_cobranca || ''); setTranspCnpj(dev?.transportador_cnpj_cobranca || ''); }} className="btn btn-ghost btn-sm">Cancelar</button>
-                      <button onClick={handleSaveTransp} disabled={savingTransp || !transpNome.trim()} className="btn btn-primary btn-sm">
-                        {savingTransp ? 'Salvando...' : 'Salvar transportador'}
-                      </button>
-                      {dev?.transportador_cobranca && (
-                        <button onClick={() => { setTranspNome(''); setTranspCnpj(''); }} className="btn btn-ghost btn-sm" style={{ color: 'var(--red)', marginLeft: 'auto' }}>
-                          Remover vínculo
-                        </button>
-                      )}
-                    </div>
+
+                    {!transpCustom ? (
+                      <>
+                        {/* Seletor com busca */}
+                        <div style={{ marginBottom: 10 }}>
+                          <label className="input-label">Buscar transportadora</label>
+                          <input
+                            type="text" autoFocus
+                            value={transpSearch}
+                            onChange={e => setTranspSearch(e.target.value)}
+                            className="input"
+                            placeholder="Digite o nome para filtrar..."
+                          />
+                        </div>
+                        <div style={{ maxHeight: 200, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 8, marginBottom: 10 }}>
+                          {transportadoras
+                            .filter(t => !transpSearch || t.nome.toLowerCase().includes(transpSearch.toLowerCase()) || (t.nome_curto || '').toLowerCase().includes(transpSearch.toLowerCase()))
+                            .map(t => (
+                              <div key={t.cnpj}
+                                onClick={() => { setTranspNome(t.nome); setTranspCnpj(t.cnpj); setTranspSearch(''); }}
+                                style={{
+                                  padding: '10px 14px', cursor: 'pointer', borderBottom: '1px solid var(--border)',
+                                  background: transpNome === t.nome ? 'var(--blue-dim)' : 'transparent',
+                                  transition: 'background 80ms',
+                                }}
+                                onMouseEnter={e => { if (transpNome !== t.nome) e.currentTarget.style.background = 'var(--surface-2)'; }}
+                                onMouseLeave={e => { if (transpNome !== t.nome) e.currentTarget.style.background = 'transparent'; }}>
+                                <div style={{ fontSize: 12.5, fontWeight: transpNome === t.nome ? 700 : 500, color: 'var(--text)' }}>
+                                  {t.nome}
+                                  {transpNome === t.nome && <span style={{ marginLeft: 6, color: 'var(--blue)' }}>✓</span>}
+                                </div>
+                                <div style={{ fontSize: 10.5, color: 'var(--text-3)', marginTop: 2 }}>
+                                  CNPJ: {t.cnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5')}
+                                  {t.nome_curto && ` · ${t.nome_curto}`}
+                                </div>
+                              </div>
+                            ))}
+                          {transportadoras.filter(t => !transpSearch || t.nome.toLowerCase().includes(transpSearch.toLowerCase())).length === 0 && (
+                            <div style={{ padding: '12px 14px', fontSize: 12, color: 'var(--text-3)', fontStyle: 'italic' }}>
+                              Nenhuma transportadora encontrada.
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Transportadora selecionada */}
+                        {transpNome && (
+                          <div style={{ padding: '8px 12px', background: 'var(--blue-dim)', borderRadius: 8, marginBottom: 10, fontSize: 12.5, fontWeight: 600, color: 'var(--blue)' }}>
+                            Selecionada: {transpNome}
+                          </div>
+                        )}
+
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                          <button onClick={() => { setEditTransp(false); setTranspSearch(''); setTranspNome(dev?.transportador_cobranca || ''); setTranspCnpj(dev?.transportador_cnpj_cobranca || ''); }} className="btn btn-ghost btn-sm">Cancelar</button>
+                          <button onClick={handleSaveTransp} disabled={savingTransp || !transpNome.trim()} className="btn btn-primary btn-sm">
+                            {savingTransp ? 'Salvando...' : 'Confirmar'}
+                          </button>
+                          <button onClick={() => setTranspCustom(true)} className="btn btn-ghost btn-sm" style={{ marginLeft: 'auto', fontSize: 10.5, color: 'var(--text-3)' }}>
+                            + Cadastrar nova
+                          </button>
+                          {dev?.transportador_cobranca && (
+                            <button onClick={() => { setTranspNome(''); setTranspCnpj(''); handleSaveTransp(); }} className="btn btn-ghost btn-sm" style={{ color: 'var(--red)' }}>
+                              Remover vínculo
+                            </button>
+                          )}
+                        </div>
+                      </>
+                    ) : (
+                      /* Formulário para cadastrar nova transportadora */
+                      <>
+                        <div style={{ fontSize: 11, color: 'var(--text-2)', marginBottom: 10, padding: '8px 12px', background: 'var(--surface-2)', borderRadius: 8 }}>
+                          Não encontrou? Cadastre a nova transportadora abaixo — ela ficará disponível para todas as notas.
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                          <div>
+                            <label className="input-label">Razão social *</label>
+                            <input type="text" value={transpNome} onChange={e => setTranspNome(e.target.value)} autoFocus
+                              className="input" placeholder="Ex: FAST SOLUTION LOGISTICA LTDA"/>
+                          </div>
+                          <div>
+                            <label className="input-label">CNPJ *</label>
+                            <input type="text" value={transpCnpj} onChange={e => setTranspCnpj(e.target.value)}
+                              className="input" placeholder="Só números" maxLength={14}/>
+                          </div>
+                        </div>
+                        {transpErr && <div style={{ color: 'var(--red)', fontSize: 11.5, marginBottom: 8 }}>{transpErr}</div>}
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button onClick={() => setTranspCustom(false)} className="btn btn-ghost btn-sm">← Voltar</button>
+                          <button onClick={handleSaveTransp} disabled={savingTransp || !transpNome.trim() || !transpCnpj.trim()} className="btn btn-primary btn-sm">
+                            {savingTransp ? 'Salvando...' : 'Cadastrar e vincular'}
+                          </button>
+                        </div>
+                      </>
+                    )}
                   </div>
                 )}
 

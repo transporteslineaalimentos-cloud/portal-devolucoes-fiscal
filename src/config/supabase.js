@@ -605,3 +605,24 @@ export async function dbSetCentroCustoCliente({ cnpj_emitente, nome_emitente, ce
   if (error) throw new Error(error.message);
   return data; // { nfds_atualizadas, regra_salva }
 }
+
+// Lista transportadoras cadastradas (para o seletor)
+export async function dbGetTransportadoras() {
+  syncAuthToken();
+  const { data, error } = await supabase
+    .from('transportadoras')
+    .select('cnpj, nome, nome_curto')
+    .eq('ativo', true)
+    .order('nome');
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+// Cria ou atualiza uma transportadora no cadastro
+export async function dbSalvarTransportadora({ cnpj, nome, nome_curto }) {
+  syncAuthToken();
+  const { error } = await supabase
+    .from('transportadoras')
+    .upsert({ cnpj, nome, nome_curto: nome_curto || nome }, { onConflict: 'cnpj' });
+  if (error) throw new Error(error.message);
+}
