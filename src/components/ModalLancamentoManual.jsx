@@ -112,6 +112,8 @@ export default function ModalLancamentoManual({ onClose, onSaved, user }) {
       const dest    = payload.DESTINATARIO || {};
       const motivoFinal = motivo;
 
+      const areaMotivo = motivosDB.find(m => m.motivo === motivoFinal)?.area || null;
+
       const row = {
         chave_nfe:              `MANUAL-${nfVenda.chave_nfe}-${Date.now()}`,
         cnpj_destinatario:      cnpjDest,
@@ -130,6 +132,8 @@ export default function ModalLancamentoManual({ onClose, onSaved, user }) {
         devolucao_total:        true,
         lancamento_manual:      true,
         motivo_devolucao:       motivoFinal,
+        area_responsavel:       areaMotivo,
+        nf_venda_localizada:    true,
         inf_complementar:       obs || null,
         chave_nfe_referenciada: nfVenda.chave_nfe,
         xml_baixado:            false,
@@ -146,7 +150,7 @@ export default function ModalLancamentoManual({ onClose, onSaved, user }) {
       };
 
       const { error: err } = await supabase.from('oobj_nfe_recebidas').insert(row);
-      if (err) throw new Error(err.message);
+      if (err) throw new Error(`Erro ao salvar: ${err.message} (código: ${err.code})`);
       onSaved?.();
       onClose();
     } catch (e) { setError(e.message); setSaving(false); }
@@ -291,11 +295,20 @@ export default function ModalLancamentoManual({ onClose, onSaved, user }) {
 
         <div className="modal-footer">
           <button onClick={onClose} className="btn btn-ghost btn-sm">Cancelar</button>
-          <button onClick={handleSubmit} disabled={saving || !nfVenda || !motivo}
-            className="btn btn-sm"
-            style={{ background: nfVenda && motivo ? 'var(--purple)' : 'var(--border-2)', color: nfVenda && motivo ? '#fff' : 'var(--text-3)', cursor: nfVenda && motivo ? 'pointer' : 'not-allowed' }}>
-            {saving ? 'Registrando...' : 'Registrar devolução'}
-          </button>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+            {!nfVenda && chaveOk && !buscando && (
+              <div style={{ fontSize: 10.5, color: 'var(--red)' }}>NF de venda não localizada</div>
+            )}
+            {nfVenda && !motivo && (
+              <div style={{ fontSize: 10.5, color: 'var(--yellow)' }}>Selecione o motivo da devolução</div>
+            )}
+            <button onClick={handleSubmit} disabled={saving || !nfVenda || !motivo}
+              className="btn btn-sm"
+              title={!nfVenda ? 'Aguarde o carregamento da NF de venda' : !motivo ? 'Selecione o motivo' : ''}
+              style={{ background: nfVenda && motivo ? 'var(--purple)' : 'var(--border-2)', color: nfVenda && motivo ? '#fff' : 'var(--text-3)', cursor: nfVenda && motivo ? 'pointer' : 'not-allowed' }}>
+              {saving ? 'Registrando...' : 'Registrar devolução'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
