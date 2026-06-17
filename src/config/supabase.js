@@ -222,8 +222,8 @@ export async function dbGetDevolucaoDetail(id) {
       const payload = aw.payload_raw || {};
       const dest    = payload.DESTINATARIO || {};
 
-      // data_entrega: pega a PRIMEIRA ocorrência de entrega (mais antiga = entrega real)
-      // Usa COALESCE(data_entrega, data_ocorrencia) pois muitos registros têm data_entrega null
+      // data_entrega: pega a ÚLTIMA ocorrência de entrega bem-sucedida
+      // (se houve reagendamento depois da primeira entrega, a última é a real)
       let dtEntrega = aw.data_entrega;
       if (!dtEntrega && aw.numero) {
         const ocorr = await safeQuery(
@@ -231,13 +231,12 @@ export async function dbGetDevolucaoDetail(id) {
             .from('active_ocorrencias')
             .select('data_entrega, data_ocorrencia, codigo_ocorrencia')
             .eq('nf_numero', aw.numero)
-            .in('codigo_ocorrencia', ['01', '107', '1', '7', '124'])  // 124 = Entregue conforme cliente
-            .order('data_ocorrencia', { ascending: true })   // PRIMEIRO registro de entrega
+            .in('codigo_ocorrencia', ['01', '107', '1', '7', '124'])
+            .order('data_ocorrencia', { ascending: false })  // ÚLTIMO registro = entrega real
             .limit(1)
             .single(),
           null
         );
-        // Usar data_entrega se existir, senão data_ocorrencia
         if (ocorr) dtEntrega = ocorr.data_entrega || ocorr.data_ocorrencia;
       }
 
