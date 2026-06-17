@@ -646,3 +646,11 @@ export async function dbRegistrarHistorico(devolucaoId, { tipo, campo, valor_ant
     .insert({ devolucao_id: devolucaoId, tipo, campo, valor_anterior: valor_anterior || null, valor_novo: valor_novo || null, usuario: usuario || null });
   if (error) console.error('[historico]', error.message);
 }
+
+// Painel de pendências
+export async function dbGetPendencias() {
+  syncAuthToken();
+  const { data, error } = await supabase.rpc('get_pendencias');
+  if (error) throw new Error(error.message);
+  return data || {};
+}
