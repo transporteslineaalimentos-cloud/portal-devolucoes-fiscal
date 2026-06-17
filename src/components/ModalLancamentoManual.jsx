@@ -116,6 +116,8 @@ export default function ModalLancamentoManual({ onClose, onSaved, user }) {
 
       const row = {
         chave_nfe:              `MANUAL-${nfVenda.chave_nfe}-${Date.now()}`,
+        nf_numero:              parseInt(nfVenda.numero, 10) || null,
+        nf_serie:               nfVenda.serie || null,
         cnpj_destinatario:      cnpjDest,
         cnpj_emitente:          nfVenda.destinatario_cnpj,
         nome_emitente:          nfVenda.destinatario_nome,
