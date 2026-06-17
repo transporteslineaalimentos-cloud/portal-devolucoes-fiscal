@@ -119,8 +119,23 @@ export default function ModalLancamentoManual({ onClose, onSaved, user }) {
       const payload = nfVenda.payload_raw || {};
       const dest    = payload.DESTINATARIO || {};
       const motivoFinal = motivo;
-
       const areaMotivo = motivosDB.find(m => m.motivo === motivoFinal)?.area || null;
+
+      // Trava: verifica se já existe devolução total para essa NF de venda
+      const { data: existente } = await supabase
+        .from('oobj_nfe_recebidas')
+        .select('id, nf_numero')
+        .eq('chave_nfe_referenciada', nfVenda.chave_nfe)
+        .eq('devolucao_total', true)
+        .limit(1);
+      if (existente && existente.length > 0) {
+        throw new Error(`Já existe uma devolução TOTAL registrada para a NF de venda ${nfVenda.numero}. Uma NF de venda só pode ter uma devolução total.`);
+      }
+
+      // dt_emissao = data de emissão da NF de venda (já vem do lookup)
+      const dtEmissaoNF = nfVenda.dt_emissao
+        ? nfVenda.dt_emissao.slice(0, 10)
+        : (nfVenda.data_emissao ? nfVenda.data_emissao.slice(0, 10) : null);
 
       const row = {
         chave_nfe:              `MANUAL-${nfVenda.chave_nfe}-${Date.now()}`,
@@ -129,12 +144,12 @@ export default function ModalLancamentoManual({ onClose, onSaved, user }) {
         cnpj_destinatario:      cnpjDest,
         cnpj_emitente:          nfVenda.destinatario_cnpj,
         nome_emitente:          nfVenda.destinatario_nome,
-        municipio_emitente:     dest.CIDADE || null,
-        uf_emitente:            dest.UF || null,
-        dt_emissao:             dtDev,
+        municipio_emitente:     dest.CIDADE || nfVenda.cidade_destino || null,
+        uf_emitente:            dest.UF || nfVenda.uf_destino || null,
+        dt_emissao:             dtEmissaoNF,       // data de emissão da NF de venda
         dt_recebimento_oobj:    new Date().toISOString(),
-        valor:                  parseFloat(nfVenda.valor_mercadoria) || 0,
-        valor_produtos:         parseFloat(nfVenda.valor_mercadoria) || 0,
+        valor:                  parseFloat(nfVenda.valor_mercadoria) || parseFloat(nfVenda.valor_produtos) || 0,
+        valor_produtos:         parseFloat(nfVenda.valor_mercadoria) || parseFloat(nfVenda.valor_produtos) || 0,
         nat_operacao:           'DEVOLUCAO TOTAL - LANCAMENTO MANUAL',
         cfops:                  ['6202'],
         tipo:                   'devolucao',
@@ -150,10 +165,11 @@ export default function ModalLancamentoManual({ onClose, onSaved, user }) {
         raw_json: {
           nf_venda_numero:      nfVenda.numero,
           nf_venda_serie:       nfVenda.serie,
+          dt_devolucao:         dtDev,            // data em que ocorreu a devolução
           transportador:        nfVenda.transportador_nome,
           transportador_cnpj:   nfVenda.transportador_cnpj,
           pedido:               nfVenda.pedido,
-          centro_custo:         nfVenda.observacao,
+          centro_custo:         nfVenda.observacao || nfVenda.centro_custo,
           lancado_por:          user?.name || user?.email,
           lancado_em:           new Date().toISOString(),
         },
@@ -260,12 +276,11 @@ export default function ModalLancamentoManual({ onClose, onSaved, user }) {
                 </select>
               </div>
               <div>
-                <label className="input-label">Data da devolução * <span style={{ fontWeight: 400, color: 'var(--text-3)' }}>(dia em que o cliente devolveu)</span></label>
+                <label className="input-label">Data em que o cliente devolveu *</label>
                 <input type="date" value={dtDev}
                   min="2020-01-01" max={new Date().toISOString().slice(0,10)}
                   onChange={e => {
                     const v = e.target.value;
-                    // valida ano (evita digitação como 32026)
                     if (v && v.split('-')[0].length <= 4) setDtDev(v);
                   }}
                   className="input"/>
@@ -275,6 +290,9 @@ export default function ModalLancamentoManual({ onClose, onSaved, user }) {
                 {dtDev && dtDev.split('-')[0] !== '2026' && dtDev.split('-')[0] !== '2025' && dtDev.split('-')[0] !== '2024' && (
                   <div style={{ fontSize: 11, color: 'var(--red)', marginTop: 4 }}>⚠ Ano inválido: {dtDev.split('-')[0]}</div>
                 )}
+                <div style={{ fontSize: 10.5, color: 'var(--text-3)', marginTop: 4 }}>
+                  A data de emissão da NF de venda é preenchida automaticamente pela chave de acesso
+                </div>
               </div>
               <div style={{ gridColumn: '1/-1' }}>
                 <label className="input-label">Motivo da devolução *</label>
