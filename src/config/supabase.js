@@ -147,7 +147,7 @@ export async function dbListDevolucoes({ page = 0, filters = {} }) {
     `, { count: 'exact' })
     .eq('tipo', 'devolucao')
     .gte('dt_emissao', '2026-01-01')
-    .not('status_sefaz', 'eq', 'CANCELADA')   // ocultar canceladas
+    .or('status_sefaz.neq.CANCELADA,status_sefaz.is.null')   // ocultar canceladas
     .not('cfops', 'cs', '{"6201"}')            // excluir dev. de industrialização (fornecedores)
     .order('dt_emissao', { ascending: false })
     .range(from, to);
@@ -181,7 +181,7 @@ export async function dbExportDevolucoes({ filters = {} } = {}) {
       `)
       .eq('tipo', 'devolucao')
       .gte('dt_emissao', '2026-01-01')
-      .not('status_sefaz', 'eq', 'CANCELADA')
+      .or('status_sefaz.neq.CANCELADA,status_sefaz.is.null')
       .not('cfops', 'cs', '{"6201"}')          // excluir dev. de industrialização
       .order('dt_emissao', { ascending: false })
       .range(from, from + BATCH - 1);
