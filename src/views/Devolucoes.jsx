@@ -71,6 +71,21 @@ export default function Devolucoes({ user, initialFilters = {} }) {
     finally { setLoading(false); }
   }, []);
 
+  // Atalhos de teclado: setas navegam entre notas quando drawer está aberto
+  useEffect(() => {
+    if (!selectedId) return;
+    const handler = (e) => {
+      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+      e.preventDefault();
+      const idx = rows.findIndex(r => r.id === selectedId);
+      if (idx === -1) return;
+      const next = e.key === 'ArrowDown' ? rows[idx + 1] : rows[idx - 1];
+      if (next) setSelected(next.id);
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [selectedId, rows]);
+
   useEffect(() => { load(filters, page); }, [filters, page]); // eslint-disable-line
 
   const applyFilter = patch => { setFilters(f => ({ ...f, ...patch })); setPage(0); };

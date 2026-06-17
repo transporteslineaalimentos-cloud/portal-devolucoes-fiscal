@@ -626,3 +626,23 @@ export async function dbSalvarTransportadora({ cnpj, nome, nome_curto }) {
     .upsert({ cnpj, nome, nome_curto: nome_curto || nome }, { onConflict: 'cnpj' });
   if (error) throw new Error(error.message);
 }
+
+// Histórico de alterações de uma NFD
+export async function dbListHistorico(devolucaoId) {
+  syncAuthToken();
+  const { data, error } = await supabase
+    .from('nfd_historico')
+    .select('*')
+    .eq('devolucao_id', devolucaoId)
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+export async function dbRegistrarHistorico(devolucaoId, { tipo, campo, valor_anterior, valor_novo, usuario }) {
+  syncAuthToken();
+  const { error } = await supabase
+    .from('nfd_historico')
+    .insert({ devolucao_id: devolucaoId, tipo, campo, valor_anterior: valor_anterior || null, valor_novo: valor_novo || null, usuario: usuario || null });
+  if (error) console.error('[historico]', error.message);
+}

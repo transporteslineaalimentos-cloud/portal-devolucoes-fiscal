@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { dbGetDevolucaoDetail, dbUpdateStatus, dbGetXmlUrl, dbUpdateMotivo, dbGetMotivos, dbUpdateTransportador, dbSetCentroCustoCliente, dbGetTransportadoras, dbSalvarTransportadora } from '../config/supabase';
+import { dbGetDevolucaoDetail, dbUpdateStatus, dbGetXmlUrl, dbUpdateMotivo, dbGetMotivos, dbUpdateTransportador, dbSetCentroCustoCliente, dbGetTransportadoras, dbSalvarTransportadora, dbRegistrarHistorico } from '../config/supabase';
 import { fmtBRL, fmtDate, fmtDateTime, fmtCNPJ, CNPJ_MAP, STATUS_CFG, STATUS_OPTIONS, Badge } from '../utils.jsx';
 import AnexosSection from './AnexosSection.jsx';
+import HistoricoSection from './HistoricoSection.jsx';
 
 const AREA_CORES = {
   'COMERCIAL':         { color: 'var(--blue)',   bg: 'var(--blue-dim)' },
@@ -149,7 +150,7 @@ function SectionCard({ title, icon, color = 'var(--blue)', children, action }) {
 }
 
 // ── Componente principal ──────────────────────────────────
-export default function DetalheDrawer({ id, user, onClose, onSaved }) {
+export default function DetalheDrawer({ id, user, onClose, onSaved, onNav }) {
   const [data, setData]             = useState(null);
   const [loading, setLoading]       = useState(true);
   const [editStatus, setEdit]       = useState(false);
@@ -178,7 +179,12 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
   const [ccErr, setCcErr]         = useState('');
   const [ccResult, setCcResult]   = useState(null);
 
-  // Carregar motivos e transportadoras do banco na primeira vez
+  // Atalho Esc para fechar
+  useEffect(() => {
+    const handler = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onClose]);
   useEffect(() => {
     dbGetMotivos().then(setMotivosDB);
     dbGetTransportadoras().then(setTransportadoras);
@@ -204,6 +210,12 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
     try {
       const cnpjClean = transpCnpj.replace(/\D/g, '');
       await dbUpdateTransportador(id, { nome: transpNome.trim(), cnpj: cnpjClean });
+      await dbRegistrarHistorico(id, {
+        tipo: 'transportador', campo: 'transportador_cobranca',
+        valor_anterior: dev?.transportador_cobranca || null,
+        valor_novo: transpNome.trim(),
+        usuario: user?.name || user?.email,
+      });
       // Se for uma transportadora nova (não está no cadastro), salva automaticamente
       if (cnpjClean && !transportadoras.find(t => t.cnpj === cnpjClean)) {
         await dbSalvarTransportadora({ cnpj: cnpjClean, nome: transpNome.trim() });
@@ -229,6 +241,12 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
         usuario: user?.name || user?.email || '',
         apenas_esta_nfd: apenasEsta ? id : null,
       });
+      await dbRegistrarHistorico(id, {
+        tipo: 'centro_custo', campo: 'centro_custo',
+        valor_anterior: dev?.centro_custo || null,
+        valor_novo: ccValor + (res.regra_salva ? ` (aplicado a ${res.nfds_atualizadas} notas)` : ''),
+        usuario: user?.name || user?.email,
+      });
       setData(prev => ({ ...prev, dev: { ...prev.dev, centro_custo: ccValor }}));
       setCcResult(res);
       onSaved?.();
@@ -250,6 +268,12 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
         devolucao_total: dev?.lancamento_manual ? true : false,
         area_responsavel: areaMotivo,
       });
+      await dbRegistrarHistorico(id, {
+        tipo: 'motivo', campo: 'motivo_devolucao',
+        valor_anterior: dev?.motivo_devolucao || null,
+        valor_novo: motivo + (areaMotivo ? ` (${areaMotivo})` : ''),
+        usuario: user?.name || user?.email,
+      });
       setData(prev => ({ ...prev, dev: { ...prev.dev, motivo_devolucao: motivo, area_responsavel: areaMotivo } }));
       setEditMotivo(false); onSaved?.();
     } catch (e) { alert(e.message); }
@@ -260,6 +284,12 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
     setSaveErr(''); setSaving(true);
     try {
       await dbUpdateStatus(id, newStatus, obs, user?.name || user?.email || '');
+      await dbRegistrarHistorico(id, {
+        tipo: 'status', campo: 'status_portal',
+        valor_anterior: dev?.status_portal || null,
+        valor_novo: newStatus,
+        usuario: user?.name || user?.email,
+      });
       setData(prev => ({ ...prev, dev: { ...prev.dev, status_portal: newStatus } }));
       setEdit(false); setObs(''); onSaved?.();
     } catch (e) { setSaveErr(e.message); }
@@ -836,7 +866,10 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
               </SectionCard>
             )}
 
-            {/* ── Bloco 7: Anexos e evidências ── */}
+            {/* ── Bloco 7: Histórico de alterações ── */}
+            <HistoricoSection devolucaoId={id}/>
+
+            {/* ── Bloco 8: Anexos e evidências ── */}
             <AnexosSection devolucaoId={id} user={user}/>
 
           </div>
