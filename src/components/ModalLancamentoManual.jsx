@@ -105,6 +105,14 @@ export default function ModalLancamentoManual({ onClose, onSaved, user }) {
   const handleSubmit = async () => {
     if (!nfVenda) { setError('Aguarde o preenchimento automático com a chave da NF.'); return; }
     if (!motivo)  { setError('Informe o motivo da devolução.'); return; }
+    // Valida data
+    const anoDigitado = dtDev?.split('-')[0];
+    if (!dtDev || anoDigitado?.length !== 4 || parseInt(anoDigitado) < 2020 || parseInt(anoDigitado) > 2030) {
+      setError(`Data inválida: "${dtDev}". Verifique o ano digitado.`); return;
+    }
+    if (new Date(dtDev) > new Date()) {
+      setError('A data da devolução não pode ser uma data futura.'); return;
+    }
     setSaving(true); setError('');
 
     try {
@@ -252,8 +260,21 @@ export default function ModalLancamentoManual({ onClose, onSaved, user }) {
                 </select>
               </div>
               <div>
-                <label className="input-label">Data da devolução *</label>
-                <input type="date" value={dtDev} onChange={e => setDtDev(e.target.value)} className="input"/>
+                <label className="input-label">Data da devolução * <span style={{ fontWeight: 400, color: 'var(--text-3)' }}>(dia em que o cliente devolveu)</span></label>
+                <input type="date" value={dtDev}
+                  min="2020-01-01" max={new Date().toISOString().slice(0,10)}
+                  onChange={e => {
+                    const v = e.target.value;
+                    // valida ano (evita digitação como 32026)
+                    if (v && v.split('-')[0].length <= 4) setDtDev(v);
+                  }}
+                  className="input"/>
+                {dtDev && new Date(dtDev) > new Date() && (
+                  <div style={{ fontSize: 11, color: 'var(--red)', marginTop: 4 }}>⚠ Data futura — verifique</div>
+                )}
+                {dtDev && dtDev.split('-')[0] !== '2026' && dtDev.split('-')[0] !== '2025' && dtDev.split('-')[0] !== '2024' && (
+                  <div style={{ fontSize: 11, color: 'var(--red)', marginTop: 4 }}>⚠ Ano inválido: {dtDev.split('-')[0]}</div>
+                )}
               </div>
               <div style={{ gridColumn: '1/-1' }}>
                 <label className="input-label">Motivo da devolução *</label>
