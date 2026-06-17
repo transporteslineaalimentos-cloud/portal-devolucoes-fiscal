@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { dbListCobrancas } from '../config/supabase';
+import { dbListCobrancas, dbExportCobrancas } from '../config/supabase';
 import { fmtBRL, fmtDate, fmtCNPJ, BadgeCobranca } from '../utils.jsx';
 import ModalCobranca from '../components/ModalCobranca.jsx';
+import { exportCobrancasToExcel } from '../utils/exportExcel.js';
 
 const Ic = ({ d, size = 14, color = 'currentColor' }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
@@ -27,6 +28,16 @@ export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
   const [error, setError]     = useState('');
   const [selectedRow, setSelectedRow] = useState(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [exporting, setExporting] = useState(false);
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const rows = await dbExportCobrancas({ filters });
+      await exportCobrancasToExcel(rows);
+    } catch (e) { alert('Erro ao exportar: ' + e.message); }
+    finally { setExporting(false); }
+  };
   const [filters, setFilters] = useState({
     search: '',
     status_cobranca: initialFilters.status_cobranca ?? 'pendente_cobranca_transportador',
@@ -90,6 +101,13 @@ export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
             className={`btn btn-sm ${showFilters ? 'btn-primary' : 'btn-outline'}`}>
             <Ic d="M4 6h16M7 12h10M10 18h4" size={13}/>
             Filtros
+          </button>
+          <button onClick={handleExport} disabled={exporting} className="btn btn-outline btn-sm" title="Exportar para Excel">
+            {exporting
+              ? <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 0.9s linear infinite' }}><style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" strokeLinecap="round"/></svg>
+              : <Ic d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" size={13}/>
+            }
+            {exporting ? 'Exportando...' : 'Exportar Excel'}
           </button>
           <button onClick={() => load(filters, page)} className="btn btn-outline btn-sm" title="Atualizar">
             <Ic d="M1 4v6h6M23 20v-6h-6M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15" size={13}/>

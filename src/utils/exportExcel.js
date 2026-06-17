@@ -109,3 +109,55 @@ export function exportDevolucoesToExcel(rows, { filename = 'devolucoes_fiscais' 
   const dateStr = new Date().toISOString().slice(0, 10);
   XLSX.writeFile(wb, `${filename}_${dateStr}.xlsx`);
 }
+
+const COBRANCA_STATUS = {
+  pendente_cobranca_transportador: 'Pendente',
+  cobrado: 'Cobrado',
+  isento: 'Isento',
+};
+
+function calcAging(dtLancamento) {
+  if (!dtLancamento) return '';
+  const dias = Math.floor((Date.now() - new Date(dtLancamento).getTime()) / 86400000);
+  return dias;
+}
+
+export function exportCobrancasToExcel(rows, { filename = 'cobrancas_transportadores' } = {}) {
+  const XLSX = window._XLSX || null;
+  // importa dinamicamente
+  return import('xlsx').then(({ utils, writeFile }) => {
+    const data = rows.map(r => ({
+      'NF Devolução':         r.nf_numero ?? '',
+      'Série':                r.nf_serie ?? '',
+      'Emitente':             r.nome_emitente ?? '',
+      'UF':                   r.uf_emitente ?? '',
+      'Município':            r.municipio_emitente ?? '',
+      'Data Emissão':         r.dt_emissao ?? '',
+      'Data Lançamento Protheus': r.dt_lancamento_protheus ?? '',
+      'Valor NFD':            r.valor ?? 0,
+      'Motivo':               r.motivo_devolucao ?? '',
+      'Área':                 r.area_responsavel ?? '',
+      'Centro de Custo':      r.centro_custo ?? '',
+      'Transportador':        r.transportador_cobranca ?? '',
+      'CNPJ Transportador':   r.transportador_cnpj_cobranca ?? '',
+      'Status Cobrança':      COBRANCA_STATUS[r.status_cobranca] || r.status_cobranca || '',
+      'NF Débito':            r.nf_debito ?? '',
+      'Data Cobrança':        r.data_cobranca ? r.data_cobranca.slice(0, 10) : '',
+      'Cobrado Por':          r.cobrado_por ?? '',
+      'Obs. Cobrança':        r.obs_cobranca ?? '',
+      'Dias desde lançamento': calcAging(r.dt_lancamento_protheus),
+    }));
+
+    const wb = utils.book_new();
+    const ws = utils.json_to_sheet(data);
+    ws['!cols'] = [
+      { wch: 12 }, { wch: 6 }, { wch: 36 }, { wch: 4 }, { wch: 20 },
+      { wch: 12 }, { wch: 18 }, { wch: 12 }, { wch: 28 }, { wch: 14 },
+      { wch: 18 }, { wch: 36 }, { wch: 18 }, { wch: 12 }, { wch: 12 },
+      { wch: 14 }, { wch: 20 }, { wch: 30 }, { wch: 18 },
+    ];
+    utils.book_append_sheet(wb, ws, 'Cobranças');
+    const dateStr = new Date().toISOString().slice(0, 10);
+    writeFile(wb, `${filename}_${dateStr}.xlsx`);
+  });
+}

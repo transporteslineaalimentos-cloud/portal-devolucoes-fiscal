@@ -654,3 +654,38 @@ export async function dbGetPendencias() {
   if (error) throw new Error(error.message);
   return data || {};
 }
+
+// Exporta TODAS as cobranças (sem paginação) respeitando filtros
+export async function dbExportCobrancas({ filters = {} } = {}) {
+  syncAuthToken();
+  const BATCH = 1000;
+  let allRows = [], from = 0;
+  while (true) {
+    let q = supabase
+      .from('oobj_nfe_recebidas')
+      .select(`
+        nf_numero, nf_serie, nome_emitente, municipio_emitente, uf_emitente,
+        dt_emissao, dt_lancamento_protheus, valor, cfops,
+        motivo_devolucao, area_responsavel, centro_custo,
+        chave_nfe_referenciada, chave_nfe,
+        status_cobranca, nf_debito, data_cobranca, cobrado_por, obs_cobranca,
+        transportador_cobranca, transportador_cnpj_cobranca
+      `)
+      .not('status_cobranca', 'is', null)
+      .not('cfops', 'cs', '{"6201"}')
+      .order('status_cobranca', { ascending: true })
+      .order('dt_emissao', { ascending: false })
+      .range(from, from + BATCH - 1);
+
+    if (filters.status_cobranca) q = q.eq('status_cobranca', filters.status_cobranca);
+    if (filters.transportador === '__sem_transportador__') q = q.is('transportador_cobranca', null);
+    else if (filters.transportador) q = q.ilike('transportador_cobranca', `%${filters.transportador}%`);
+
+    const { data, error } = await q;
+    if (error) throw new Error(error.message);
+    allRows = allRows.concat(data || []);
+    if (!data || data.length < BATCH) break;
+    from += BATCH;
+  }
+  return allRows;
+}

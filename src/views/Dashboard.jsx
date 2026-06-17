@@ -110,7 +110,7 @@ function Card({ title, subtitle, children, action, noPad = false }) {
 }
 
 /* ─── KPI — borda neutra, identidade só no ícone ──────────── */
-function KpiMini({ label, value, sub, hue, icon, delta, deltaInv, onClick }) {
+function KpiMini({ label, value, sub, hue, icon, delta, deltaInv, onClick, extra }) {
   return (
     <div onClick={onClick} className={onClick ? 'kpi-clickable' : undefined}
       style={{
@@ -138,6 +138,7 @@ function KpiMini({ label, value, sub, hue, icon, delta, deltaInv, onClick }) {
         {sub && <span style={{ fontSize: 11.5, color: 'var(--text-3)', fontWeight: 400, fontVariantNumeric: 'tabular-nums' }}>{sub}</span>}
         {delta != null && <Delta atual={delta.atual} anterior={delta.anterior} invertido={deltaInv}/>}
       </div>
+      {extra && <div style={{ marginTop: 2 }}>{extra}</div>}
     </div>
   );
 }
@@ -368,13 +369,18 @@ export default function Dashboard({ onGoTo }) {
   const [dash, setDash]     = useState(null);
   const [loading, setLoading] = useState(true);
   const [periodo, setPeriodo] = useState({ inicio: '2026-01-01', fim: todayISO() });
+  const [comparar, setComparar] = useState(false);
+  const [periodoComp, setPeriodoComp] = useState({ inicio: '2025-01-01', fim: '2025-12-31' });
+  const [dashComp, setDashComp] = useState(null);
 
   useEffect(() => {
     setLoading(true);
-    Promise.all([dbGetKpis(periodo), dbGetDashboard(periodo)])
-      .then(([k, d]) => { setKpis(k); setDash(d); })
+    const promises = [dbGetKpis(periodo), dbGetDashboard(periodo)];
+    if (comparar) promises.push(dbGetDashboard(periodoComp));
+    Promise.all(promises)
+      .then(([k, d, dc]) => { setKpis(k); setDash(d); if (dc) setDashComp(dc); else setDashComp(null); })
       .finally(() => setLoading(false));
-  }, [periodo]);
+  }, [periodo, comparar, periodoComp]); // eslint-disable-line
 
   const k = kpis || {};
   const d = dash || {};
@@ -396,57 +402,92 @@ export default function Dashboard({ onGoTo }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
       {/* ── Filtro de período ────────────────────────────── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-        <PeriodFilter value={periodo} onChange={setPeriodo}/>
-        <span style={{
-          fontSize: 11.5, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 6,
-          opacity: loading ? 1 : 0, transition: 'opacity 200ms',
-        }}>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-            style={{ animation: 'spin 0.9s linear infinite' }}>
-            <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" strokeLinecap="round"/>
-          </svg>
-          Atualizando
-        </span>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <PeriodFilter value={periodo} onChange={setPeriodo}/>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <button onClick={() => setComparar(v => !v)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '6px 12px', borderRadius: 7, cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                border: comparar ? '1px solid var(--blue)' : '1px solid var(--border)',
+                background: comparar ? 'var(--blue-dim)' : 'var(--surface-2)',
+                color: comparar ? 'var(--blue)' : 'var(--text-3)',
+                transition: 'all 120ms',
+              }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+              {comparar ? 'Comparando períodos' : 'Comparar período'}
+            </button>
+            <span style={{
+              fontSize: 11.5, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 6,
+              opacity: loading ? 1 : 0, transition: 'opacity 200ms',
+            }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                style={{ animation: 'spin 0.9s linear infinite' }}>
+                <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+                <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" strokeLinecap="round"/>
+              </svg>
+              Atualizando
+            </span>
+          </div>
+        </div>
+
+        {/* Período de comparação */}
+        {comparar && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: 'var(--blue-dim)', borderRadius: 8, border: '1px solid var(--blue-mid)' }}>
+            <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--blue)', whiteSpace: 'nowrap' }}>
+              Comparar com:
+            </span>
+            <PeriodFilter value={periodoComp} onChange={setPeriodoComp}/>
+          </div>
+        )}
       </div>
 
       {/* ── KPIs ─────────────────────────────────────────── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
-        <KpiMini
-          label="Devoluções"
-          value={nf(k.total_count)}
-          sub={fmtBRL(k.total_valor)}
-          hue={PAL.accent}
-          icon="M9 14l-4-4 4-4M5 10h11a4 4 0 010 8h-1"
-          delta={mesAtual && mesAnt ? { atual: mesAtual.qtd, anterior: mesAnt.qtd } : null}
-          deltaInv
-          onClick={() => goDev()}
-        />
-        <KpiMini
-          label="Pendentes de análise"
-          value={nf(k.pendente_count)}
-          sub={fmtBRL(k.pendente_valor)}
-          hue={PAL.amber}
-          icon="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-          onClick={() => goDev({ status: 'pendente' })}
-        />
-        <KpiMini
-          label="Ticket médio"
-          value={d.totais?.ticket_medio ? fmtBRL(d.totais.ticket_medio) : '—'}
-          sub={`${nf(d.totais?.clientes)} clientes distintos`}
-          hue={PAL.violet}
-          icon="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-          onClick={() => goDev()}
-        />
-        <KpiMini
-          label="Cobrança transportador"
-          value={nf(cob.pendente_count)}
-          sub={`${fmtBRL(cob.pendente_valor)} pendente`}
-          hue={PAL.red}
-          icon="M3 6h13l3 5v6h-3m-7 0H3V6zm10 11a2 2 0 104 0 2 2 0 00-4 0zM7 17a2 2 0 104 0 2 2 0 00-4 0z"
-          onClick={() => onGoTo?.('cobrancas', { status_cobranca: 'pendente_cobranca_transportador' })}
-        />
+        {(() => {
+          const kc = dashComp?.kpis || {};
+          const tc = dashComp?.totais || {};
+          const cc = dashComp?.cobrancas || {};
+          const CompVal = ({ atual, anterior, inverted }) => {
+            if (!comparar || anterior == null) return null;
+            const pct = anterior > 0 ? ((atual - anterior) / anterior * 100).toFixed(1) : null;
+            const up = atual >= anterior;
+            const good = inverted ? !up : up;
+            return (
+              <div style={{ fontSize: 10, color: good ? 'var(--green)' : 'var(--red)', fontWeight: 600, marginTop: 3, display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span>{up ? '↑' : '↓'} {pct != null ? `${Math.abs(pct)}%` : ''}</span>
+                <span style={{ color: 'var(--text-3)', fontWeight: 400 }}>vs {fmtBRL(anterior)}</span>
+              </div>
+            );
+          };
+          return (
+            <>
+              <KpiMini label="Devoluções" value={nf(k.total_count)} sub={fmtBRL(k.total_valor)}
+                hue={PAL.accent} icon="M9 14l-4-4 4-4M5 10h11a4 4 0 010 8h-1"
+                delta={mesAtual && mesAnt ? { atual: mesAtual.qtd, anterior: mesAnt.qtd } : null} deltaInv
+                onClick={() => goDev()}
+                extra={comparar && <CompVal atual={k.total_valor} anterior={tc.valor} inverted/>}
+              />
+              <KpiMini label="Pendentes de análise" value={nf(k.pendente_count)} sub={fmtBRL(k.pendente_valor)}
+                hue={PAL.amber} icon="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                onClick={() => goDev({ status: 'pendente' })}
+                extra={comparar && <CompVal atual={k.pendente_valor} anterior={kc.pendente_valor} inverted/>}
+              />
+              <KpiMini label="Ticket médio" value={d.totais?.ticket_medio ? fmtBRL(d.totais.ticket_medio) : '—'}
+                sub={`${nf(d.totais?.clientes)} clientes distintos`}
+                hue={PAL.violet} icon="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                onClick={() => goDev()}
+                extra={comparar && tc.ticket_medio && <CompVal atual={d.totais?.ticket_medio} anterior={tc.ticket_medio} inverted={false}/>}
+              />
+              <KpiMini label="Cobrança transportador" value={nf(cob.pendente_count)} sub={`${fmtBRL(cob.pendente_valor)} pendente`}
+                hue={PAL.red} icon="M3 6h13l3 5v6h-3m-7 0H3V6zm10 11a2 2 0 104 0 2 2 0 00-4 0zM7 17a2 2 0 104 0 2 2 0 00-4 0z"
+                onClick={() => onGoTo?.('cobrancas', { status_cobranca: 'pendente_cobranca_transportador' })}
+                extra={comparar && <CompVal atual={cob.pendente_valor} anterior={cc.pendente_valor} inverted/>}
+              />
+            </>
+          );
+        })()}
       </div>
 
       {/* ── Evolução ─────────────────────────────────────── */}
