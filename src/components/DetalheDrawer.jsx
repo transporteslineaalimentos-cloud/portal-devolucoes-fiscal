@@ -635,6 +635,12 @@ export default function DetalheDrawer({ id, user, onClose, onSaved, onNav }) {
                     )}
                   </div>
                 }/>
+                {/* Data de devolução — só para lançamentos manuais */}
+                {dev.lancamento_manual && dev.dt_devolucao && (
+                  <DataItem label="Data da devolução" value={
+                    <span style={{ fontWeight: 600, color: 'var(--blue)' }}>{fmtDate(dev.dt_devolucao)}</span>
+                  }/>
+                )}
                 <DataItem label="CFOPs" value={
                   <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 2 }}>
                     {(dev.cfops || []).map(c => (

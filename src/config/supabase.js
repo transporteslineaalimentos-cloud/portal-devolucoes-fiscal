@@ -138,7 +138,7 @@ export async function dbListDevolucoes({ page = 0, filters = {} }) {
     .select(`
       id, chave_nfe, nf_numero, nf_serie, nome_emitente,
       municipio_emitente, uf_emitente, cnpj_emitente, cnpj_destinatario,
-      nat_operacao, dt_emissao, valor, valor_produtos, valor_icms, valor_st,
+      nat_operacao, dt_emissao, dt_devolucao, valor, valor_produtos, valor_icms, valor_st,
       cfops, tipo, status_portal, xml_baixado, xml_path,
       chave_nfe_referenciada, itens, created_at,
       inf_complementar, motivo_devolucao, devolucao_total, lancamento_manual,

@@ -147,6 +147,7 @@ export default function ModalLancamentoManual({ onClose, onSaved, user }) {
         municipio_emitente:     dest.CIDADE || nfVenda.cidade_destino || null,
         uf_emitente:            dest.UF || nfVenda.uf_destino || null,
         dt_emissao:             dtEmissaoNF,       // data de emissão da NF de venda
+        dt_devolucao:           dtDev,             // data em que ocorreu a devolução
         dt_recebimento_oobj:    new Date().toISOString(),
         valor:                  parseFloat(nfVenda.valor_mercadoria) || parseFloat(nfVenda.valor_produtos) || 0,
         valor_produtos:         parseFloat(nfVenda.valor_mercadoria) || parseFloat(nfVenda.valor_produtos) || 0,
