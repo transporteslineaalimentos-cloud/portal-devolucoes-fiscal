@@ -160,7 +160,7 @@ export default function Devolucoes({ user, initialFilters = {} }) {
         <div className="table-toolbar">
           <Ic d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0" color="var(--text-3)" size={15}/>
           <input type="text" placeholder="Buscar por emitente, número da NF ou município..."
-            defaultValue={filters.search}
+            value={filters.search}
             onChange={e => handleSearch(e.target.value)}
             className="table-search-input"
           />

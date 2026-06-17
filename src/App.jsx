@@ -81,10 +81,9 @@ function Portal() {
   };
 
   const handleGlobalSearch = (value) => {
-    setGlobalSearch(value);
     if (!value.trim()) return;
-    // Vai para devoluções com o termo de busca
     changeTab('devolucoes', { search: value.trim(), _ts: Date.now() });
+    setGlobalSearch(''); // limpa a topbar após navegar
   };
 
   const totalPendencias = pendencias
