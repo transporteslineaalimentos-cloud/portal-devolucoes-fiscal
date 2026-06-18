@@ -363,7 +363,51 @@ function PeriodFilter({ value, onChange }) {
   );
 }
 
-/* ═══ DASHBOARD ════════════════════════════════════════════ */
+// Pill de breakdown Total vs Parcial — reutilizável em todos os cards
+function TotalParcialPill({ valorTotal, valorParcial, qtdTotal, qtdParcial, compact = false }) {
+  const total = (valorTotal || 0) + (valorParcial || 0);
+  if (!total) return null;
+  const pctTotal = Math.round((valorTotal || 0) / total * 100);
+  const pctParcial = 100 - pctTotal;
+  if (compact) {
+    // Versão compacta: só tags
+    return (
+      <div style={{ display: 'flex', gap: 4, marginTop: 4, flexWrap: 'wrap' }}>
+        {(valorTotal || 0) > 0 && (
+          <span style={{ fontSize: 9.5, fontWeight: 700, background: 'rgba(220,38,38,0.10)', color: '#DC2626', padding: '1px 5px', borderRadius: 4 }}>
+            T {qtdTotal}× {fmtBRL(valorTotal)}
+          </span>
+        )}
+        {(valorParcial || 0) > 0 && (
+          <span style={{ fontSize: 9.5, fontWeight: 700, background: 'rgba(37,99,235,0.10)', color: '#2563EB', padding: '1px 5px', borderRadius: 4 }}>
+            P {qtdParcial}× {fmtBRL(valorParcial)}
+          </span>
+        )}
+      </div>
+    );
+  }
+  // Versão com barra segmentada
+  return (
+    <div style={{ marginTop: 5 }}>
+      <div style={{ display: 'flex', height: 3, borderRadius: 3, overflow: 'hidden', gap: 1 }}>
+        {pctTotal > 0 && <div style={{ flex: pctTotal, background: '#DC2626', opacity: 0.7 }}/>}
+        {pctParcial > 0 && <div style={{ flex: pctParcial, background: '#2563EB', opacity: 0.5 }}/>}
+      </div>
+      <div style={{ display: 'flex', gap: 8, marginTop: 3 }}>
+        {(valorTotal || 0) > 0 && (
+          <span style={{ fontSize: 9.5, fontWeight: 700, color: '#DC2626' }}>
+            ▪ Total {pctTotal}% · {qtdTotal}×
+          </span>
+        )}
+        {(valorParcial || 0) > 0 && (
+          <span style={{ fontSize: 9.5, fontWeight: 700, color: '#2563EB' }}>
+            ▪ Parcial {pctParcial}% · {qtdParcial}×
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
 export default function Dashboard({ onGoTo }) {
   const [kpis, setKpis]     = useState(null);
   const [dash, setDash]     = useState(null);
@@ -557,6 +601,7 @@ export default function Dashboard({ onGoTo }) {
                       {c.nome}
                     </div>
                     <Bar valor={c.valor} max={maxVal} color={PAL.accent} height={3}/>
+                    <TotalParcialPill valorTotal={c.valor_total_dev} valorParcial={c.valor_parcial_dev} qtdTotal={c.qtd_total} qtdParcial={c.qtd_parcial}/>
                   </div>
                   <span style={{ ...T.meta, textAlign: 'right' }}>{c.qtd} NFs · {c.uf}</span>
                   <div style={{ textAlign: 'right' }}>
@@ -586,7 +631,10 @@ export default function Dashboard({ onGoTo }) {
                   onClick={() => goDev({ uf: u.uf })}
                   title={`Ver devoluções de ${u.uf}`}>
                     <span style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--text-2)', letterSpacing: '.02em' }}>{u.uf}</span>
-                    <Bar valor={u.valor} max={maxVal} color={PAL.accent} height={4}/>
+                    <div style={{ minWidth: 0 }}>
+                      <Bar valor={u.valor} max={maxVal} color={PAL.accent} height={4}/>
+                      <TotalParcialPill valorTotal={u.valor_total_dev} valorParcial={u.valor_parcial_dev} qtdTotal={u.qtd_total} qtdParcial={u.qtd_parcial} compact/>
+                    </div>
                     <span style={{ ...T.value, fontSize: 12.5, textAlign: 'right' }}>{fmtBRL(u.valor)}</span>
                     <span style={{ ...T.meta, textAlign: 'right' }}>{u.qtd} NFs</span>
                   </div>
@@ -658,12 +706,13 @@ export default function Dashboard({ onGoTo }) {
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
           <thead>
             <tr>
-              {['Mês','NFs','Valor total','Clientes','Ticket médio','Variação'].map((h, i) => (
+              {['Mês','NFs','Valor total','▪ Total','▪ Parcial','Clientes','Ticket médio','Variação'].map((h, i) => (
                 <th key={h} style={{
                   padding: '8px 20px', textAlign: i > 0 ? 'right' : 'left',
                   ...T.overline, fontSize: 10,
                   borderBottom: '1px solid var(--border)',
                   background: 'var(--surface-2)',
+                  color: h === '▪ Total' ? '#DC2626' : h === '▪ Parcial' ? '#2563EB' : undefined,
                 }}>{h}</th>
               ))}
             </tr>
@@ -680,19 +729,21 @@ export default function Dashboard({ onGoTo }) {
                   <td style={{ ...cell, textAlign: 'left', fontWeight: 600, color: 'var(--text)' }}>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                       {fmtMes(m.mes)}
-                      {isMax && (
-                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: PAL.red, display: 'inline-block' }} title="Pior mês em valor"/>
-                      )}
+                      {isMax && <span style={{ width: 6, height: 6, borderRadius: '50%', background: PAL.red, display: 'inline-block' }} title="Pior mês em valor"/>}
                     </span>
                   </td>
                   <td style={{ ...cell, fontWeight: 500, color: 'var(--text-2)' }}>{m.qtd}</td>
                   <td style={{ ...cell, fontWeight: 600, color: 'var(--text)' }}>{fmtBRL(m.valor)}</td>
+                  <td style={{ ...cell, color: '#DC2626', fontWeight: 500 }}>
+                    {m.qtd_total > 0 ? <>{m.qtd_total}× <span style={{ color: 'var(--text-3)' }}>{fmtBRL(m.valor_total_dev)}</span></> : <span style={{ color: 'var(--text-3)' }}>—</span>}
+                  </td>
+                  <td style={{ ...cell, color: '#2563EB', fontWeight: 500 }}>
+                    {m.qtd_parcial > 0 ? <>{m.qtd_parcial}× <span style={{ color: 'var(--text-3)' }}>{fmtBRL(m.valor_parcial_dev)}</span></> : <span style={{ color: 'var(--text-3)' }}>—</span>}
+                  </td>
                   <td style={{ ...cell, color: 'var(--text-2)' }}>{m.clientes}</td>
                   <td style={{ ...cell, color: 'var(--text-2)' }}>{fmtBRL(ticket)}</td>
                   <td style={cell}>
-                    {ant
-                      ? <Delta atual={m.valor} anterior={ant.valor} invertido/>
-                      : <span style={{ color: 'var(--text-3)' }}>—</span>}
+                    {ant ? <Delta atual={m.valor} anterior={ant.valor} invertido/> : <span style={{ color: 'var(--text-3)' }}>—</span>}
                   </td>
                 </tr>
               );
@@ -703,6 +754,8 @@ export default function Dashboard({ onGoTo }) {
               <td style={{ padding: '10px 20px', fontWeight: 600, color: 'var(--text)', fontSize: 12 }}>Total do período</td>
               <td style={{ padding: '10px 20px', textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{d.totais?.qtd}</td>
               <td style={{ padding: '10px 20px', textAlign: 'right', fontWeight: 650, color: 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>{fmtBRL(d.totais?.valor)}</td>
+              <td style={{ padding: '10px 20px', textAlign: 'right', color: '#DC2626', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{d.totais?.qtd_total}× {fmtBRL(d.totais?.valor_total_dev)}</td>
+              <td style={{ padding: '10px 20px', textAlign: 'right', color: '#2563EB', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{d.totais?.qtd_parcial}× {fmtBRL(d.totais?.valor_parcial_dev)}</td>
               <td style={{ padding: '10px 20px', textAlign: 'right', fontWeight: 500, color: 'var(--text-2)', fontVariantNumeric: 'tabular-nums' }}>{d.totais?.clientes}</td>
               <td style={{ padding: '10px 20px', textAlign: 'right', fontWeight: 500, color: 'var(--text-2)', fontVariantNumeric: 'tabular-nums' }}>{fmtBRL(d.totais?.ticket_medio)}</td>
               <td/>
@@ -733,6 +786,7 @@ export default function Dashboard({ onGoTo }) {
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text)', marginBottom: 5 }}>{a.area}</div>
                     <Bar valor={a.valor} max={maxVal} color={cor} height={3}/>
+                    <TotalParcialPill valorTotal={a.valor_total_dev} valorParcial={a.valor_parcial_dev} qtdTotal={a.qtd_total} qtdParcial={a.qtd_parcial} compact/>
                   </div>
                   <span style={{ ...T.meta, textAlign: 'right' }}>{share}% · {a.qtd} NFs</span>
                   <span style={{ ...T.value, fontSize: 12.5, textAlign: 'right' }}>{fmtBRL(a.valor)}</span>
@@ -760,6 +814,7 @@ export default function Dashboard({ onGoTo }) {
                   <div style={{ minWidth: 0 }}>
                     <div className="ellipsis" style={{ fontSize: 12, fontWeight: 500, color: 'var(--text)', marginBottom: 5 }}>{m.motivo}</div>
                     <Bar valor={m.valor} max={maxVal} color={cor} height={3}/>
+                    <TotalParcialPill valorTotal={m.valor_total_dev} valorParcial={m.valor_parcial_dev} qtdTotal={m.qtd_total} qtdParcial={m.qtd_parcial} compact/>
                   </div>
                   <span style={{ ...T.meta, textAlign: 'right' }}>{m.qtd}×</span>
                   <span style={{ ...T.value, fontSize: 12.5, textAlign: 'right' }}>{fmtBRL(m.valor)}</span>
@@ -789,6 +844,7 @@ export default function Dashboard({ onGoTo }) {
                   <div style={{ minWidth: 0 }}>
                     <div className="ellipsis" style={{ fontSize: 12, fontWeight: 500, color: c.centro === 'SEM CENTRO' ? 'var(--text-3)' : 'var(--text)', marginBottom: 5 }}>{c.centro}</div>
                     <Bar valor={c.valor} max={maxVal} color={PAL.accent} height={3}/>
+                    <TotalParcialPill valorTotal={c.valor_total_dev} valorParcial={c.valor_parcial_dev} qtdTotal={c.qtd_total} qtdParcial={c.qtd_parcial} compact/>
                   </div>
                   <span style={{ ...T.meta, textAlign: 'right' }}>{c.qtd}×</span>
                   <span style={{ ...T.value, fontSize: 12.5, textAlign: 'right' }}>{fmtBRL(c.valor)}</span>
