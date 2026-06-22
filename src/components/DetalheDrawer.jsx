@@ -3,6 +3,7 @@ import { dbGetDevolucaoDetail, dbUpdateStatus, dbGetXmlUrl, dbUpdateMotivo, dbGe
 import { fmtBRL, fmtDate, fmtDateTime, fmtCNPJ, CNPJ_MAP, STATUS_CFG, STATUS_OPTIONS, Badge } from '../utils.jsx';
 import AnexosSection from './AnexosSection.jsx';
 import HistoricoSection from './HistoricoSection.jsx';
+import RetornoCDSection from './RetornoCDSection.jsx';
 
 const AREA_CORES = {
   'COMERCIAL':         { color: 'var(--blue)',   bg: 'var(--blue-dim)' },
@@ -915,7 +916,10 @@ export default function DetalheDrawer({ id, user, onClose, onSaved, onNav }) {
               </SectionCard>
             )}
 
-            {/* ── Bloco 7: Histórico de alterações ── */}
+            {/* ── Bloco 7: Retorno ao CD ── */}
+            <RetornoCDSection dev={dev}/>
+
+            {/* ── Bloco 8: Histórico de alterações ── */}
             <HistoricoSection devolucaoId={id}/>
 
             {/* ── Bloco 8: Anexos e evidências ── */}

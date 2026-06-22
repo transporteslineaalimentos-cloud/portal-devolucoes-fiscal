@@ -33,7 +33,7 @@ const EMPTY_FILTERS = {
   search: '', status: '', cnpj_dest: '', cnpj_emitente: '', uf: '',
   dt_inicio: '', dt_fim: '', mes: '', area: '', motivo: '',
   devolucao_total: '', com_motivo: '', flag_emissao: '', lancado: '', nf_venda: '',
-  centro_custo: '', transportador: '',
+  centro_custo: '', transportador: '', retornou_cd: '',
 };
 
 // Componente multi-select de transportadoras com busca e checkbox
@@ -286,7 +286,9 @@ export default function Devolucoes({ user, initialFilters = {} }) {
   if (filters.nf_venda === 'nao_localizada') activeChips.push({ k: 'nf_venda', label: 'NF venda não localizada' });
   if (filters.centro_custo === 'sem') activeChips.push({ k: 'centro_custo', label: 'Sem centro de custo' });
   else if (filters.centro_custo) activeChips.push({ k: 'centro_custo', label: `CC: ${filters.centro_custo}` });
-  if (filters.transportador === '__sem__') activeChips.push({ k: 'transportador', label: 'Sem transportador' });
+  if (filters.retornou_cd === 'sim') activeChips.push({ k: 'retornou_cd', label: 'Retornou ao CD' });
+  if (filters.retornou_cd === 'cobrar') activeChips.push({ k: 'retornou_cd', label: 'CD: tem itens a cobrar' });
+  if (filters.retornou_cd === 'nao') activeChips.push({ k: 'retornou_cd', label: 'Não retornou ao CD' });
   else if (filters.transportador) {
     const nomes = filters.transportador.split('|').filter(Boolean);
     const label = nomes.length === 1 ? `Transp: ${nomes[0].split(' ')[0]}` : `${nomes.length} transportadoras`;
@@ -384,6 +386,13 @@ export default function Devolucoes({ user, initialFilters = {} }) {
               <option value="">Total e Parcial</option>
               <option value="total">Somente Total</option>
               <option value="parcial">Somente Parcial</option>
+            </select>
+            <select value={filters.retornou_cd || ''} onChange={e => applyFilter({ retornou_cd: e.target.value })}
+              className="input" style={{ width: 'auto', minWidth: 190 }}>
+              <option value="">Retorno CD: todos</option>
+              <option value="sim">↩ Retornou ao CD</option>
+              <option value="cobrar">⚠ CD: tem itens a cobrar</option>
+              <option value="nao">→ Não retornou ao CD</option>
             </select>
             {/* Multi-select de transportadoras */}
             <TranspMultiSelect
@@ -535,6 +544,13 @@ export default function Devolucoes({ user, initialFilters = {} }) {
                   </span>
                   {row.lancamento_manual && (
                     <span style={{ fontSize: 8.5, fontWeight: 700, background: 'var(--purple-dim)', color: 'var(--purple)', padding: '1px 5px', borderRadius: 4, flexShrink: 0, letterSpacing: '.03em' }}>MANUAL</span>
+                  )}
+                  {row.retornou_cd && (
+                    <span style={{ fontSize: 8.5, fontWeight: 700, padding: '1px 5px', borderRadius: 4, flexShrink: 0, letterSpacing: '.03em',
+                      background: row.tem_itens_cobrar ? 'rgba(220,38,38,0.10)' : 'rgba(22,163,74,0.10)',
+                      color: row.tem_itens_cobrar ? '#DC2626' : '#16A34A' }}>
+                      {row.tem_itens_cobrar ? '⚠ CD' : '✓ CD'}
+                    </span>
                   )}
                 </div>
                 <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}>

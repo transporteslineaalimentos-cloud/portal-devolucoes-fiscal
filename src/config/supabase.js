@@ -100,7 +100,9 @@ function applyDevolucoesFilters(q, filters = {}) {
   if (filters.nf_venda === 'nao_localizada')  q = q.eq('nf_venda_localizada', false);
   if (filters.com_motivo === 'com')           q = q.not('motivo_devolucao', 'is', null);
   if (filters.com_motivo === 'sem')           q = q.is('motivo_devolucao', null);
-  if (filters.centro_custo === 'sem')         q = q.is('centro_custo', null);
+  if (filters.retornou_cd === 'sim')    q = q.eq('retornou_cd', true);
+  if (filters.retornou_cd === 'nao')    q = q.or('retornou_cd.eq.false,retornou_cd.is.null');
+  if (filters.retornou_cd === 'cobrar') q = q.eq('retornou_cd', true).eq('tem_itens_cobrar', true);
   else if (filters.centro_custo)              q = q.eq('centro_custo', filters.centro_custo);
 
   if (filters.transportador === '__sem__')    q = q.is('transportador_cobranca', null);
@@ -188,7 +190,8 @@ export async function dbExportDevolucoes({ filters = {} } = {}) {
         nf_venda_localizada, area_responsavel, flag_emissao_entrega,
         lancado_protheus, dt_lancamento_protheus,
         status_cobranca, nf_debito, data_cobranca, cobrado_por, obs_cobranca,
-        transportador_cobranca, transportador_cnpj_cobranca, centro_custo
+        transportador_cobranca, transportador_cnpj_cobranca, centro_custo,
+        retornou_cd, tem_itens_cobrar, valor_cobrar_transp
       `)
       .eq('tipo', 'devolucao')
       .gte('dt_emissao', '2026-01-01')
@@ -700,4 +703,17 @@ export async function dbExportCobrancas({ filters = {} } = {}) {
     from += BATCH;
   }
   return allRows;
+}
+
+// Atualiza dados de retorno ao CD manualmente
+export async function dbUpdateRetornoCD(id, { dt_recebimento_cd, filial_cd, itens_cd }) {
+  syncAuthToken();
+  const DESTINOS_COBRAR = new Set(['AVARIA', 'FALTA', 'VALIDADE CURTA', 'IMPROPRIO']);
+  const qtd_total  = itens_cd.reduce((s, i) => s + (i.qtd || 0), 0);
+  const qtd_cobrar = itens_cd.filter(i => DESTINOS_COBRAR.has(i.destino)).reduce((s, i) => s + (i.qtd || 0), 0);
+  const tem_itens_cobrar = qtd_cobrar > 0;
+  const { error } = await supabase.from('oobj_nfe_recebidas').update({
+    retornou_cd: true, dt_recebimento_cd, filial_cd, itens_cd, tem_itens_cobrar,
+  }).eq('id', id);
+  if (error) throw new Error(error.message);
 }
