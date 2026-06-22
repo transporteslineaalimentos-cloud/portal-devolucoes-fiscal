@@ -26,11 +26,8 @@ export const CNPJ_MAP = {
 };
 
 export const STATUS_CFG = {
-  pendente:   { l: 'Pendente',   dot: '#9CA3AF', color: '#4B5563', bg: '#F3F4F6', border: '#E5E7EB' },
-  em_analise: { l: 'Em análise', dot: '#D97706', color: '#92400E', bg: '#FFFBEB', border: '#FDE68A' },
-  aprovada:   { l: 'Aprovada',   dot: '#16A34A', color: '#14532D', bg: '#F0FDF4', border: '#BBF7D0' },
-  rejeitada:  { l: 'Rejeitada',  dot: '#DC2626', color: '#7F1D1D', bg: '#FEF2F2', border: '#FECACA' },
-  concluida:  { l: 'Concluída',  dot: '#1E4DB7', color: '#1E3A8A', bg: '#EFF6FF', border: '#BFDBFE' },
+  evidencia_solicitada: { l: 'Evidência solicitada', dot: '#D97706', color: '#92400E', bg: '#FFFBEB', border: '#FDE68A' },
+  evidencia_anexada:    { l: 'Evidência anexada',    dot: '#16A34A', color: '#14532D', bg: '#F0FDF4', border: '#BBF7D0' },
 };
 
 export const STATUS_OPTIONS = Object.entries(STATUS_CFG).map(([v, c]) => ({ v, l: c.l }));
@@ -56,8 +53,10 @@ export function BadgeCobranca({ status }) {
   );
 }
 
+const STATUS_NEUTRO = { l: '—', dot: '#9CA3AF', color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' };
+
 export function Badge({ status }) {
-  const cfg = STATUS_CFG[status] || STATUS_CFG.pendente;
+  const cfg = STATUS_CFG[status] || STATUS_NEUTRO;
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: 5,

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { dbListDevolucoes, dbExportDevolucoes } from '../config/supabase';
+import { dbListDevolucoes, dbExportDevolucoes, dbGetTransportadoras } from '../config/supabase';
 import { fmtBRL, fmtDate, CNPJ_MAP, STATUS_CFG, Badge } from '../utils.jsx';
 import DetalheDrawer from '../components/DetalheDrawer.jsx';
 import ModalLancamentoManual from '../components/ModalLancamentoManual.jsx';
@@ -33,7 +33,7 @@ const EMPTY_FILTERS = {
   search: '', status: '', cnpj_dest: '', cnpj_emitente: '', uf: '',
   dt_inicio: '', dt_fim: '', mes: '', area: '', motivo: '',
   devolucao_total: '', com_motivo: '', flag_emissao: '', lancado: '', nf_venda: '',
-  centro_custo: '',
+  centro_custo: '', transportador: '',
 };
 
 export default function Devolucoes({ user, initialFilters = {} }) {
@@ -49,8 +49,11 @@ export default function Devolucoes({ user, initialFilters = {} }) {
   const [exporting, setExporting]     = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({ ...EMPTY_FILTERS, ...initFilt });
+  const [transportadoras, setTransportadoras] = useState([]);
   const searchRef = useRef(null);
   const PAGE_SIZE = 40;
+
+  useEffect(() => { dbGetTransportadoras().then(setTransportadoras).catch(() => {}); }, []);
 
   // Reagir a drill-down vindo do dashboard (initialFilters muda)
   const initKey = JSON.stringify(initialFilters);
@@ -126,6 +129,8 @@ export default function Devolucoes({ user, initialFilters = {} }) {
   if (filters.nf_venda === 'nao_localizada') activeChips.push({ k: 'nf_venda', label: 'NF venda não localizada' });
   if (filters.centro_custo === 'sem') activeChips.push({ k: 'centro_custo', label: 'Sem centro de custo' });
   else if (filters.centro_custo) activeChips.push({ k: 'centro_custo', label: `CC: ${filters.centro_custo}` });
+  if (filters.transportador === '__sem__') activeChips.push({ k: 'transportador', label: 'Sem transportador' });
+  else if (filters.transportador) activeChips.push({ k: 'transportador', label: `Transp: ${filters.transportador}` });
   if (filters.dt_inicio || filters.dt_fim) {
     const fmt = s => { if (!s) return ''; const [y,m,dd] = s.split('-'); return `${dd}/${m}/${y.slice(2)}`; };
     activeChips.push({ k: 'periodo', label: `Período: ${fmt(filters.dt_inicio) || '...'} – ${fmt(filters.dt_fim) || '...'}`, clear: { dt_inicio: '', dt_fim: '' } });
@@ -204,8 +209,10 @@ export default function Devolucoes({ user, initialFilters = {} }) {
         {showFilters && (
           <div className="table-filters-row">
             <select value={filters.status} onChange={e => applyFilter({ status: e.target.value })}
-              className="input" style={{ width: 'auto', minWidth: 160 }}>
-              {STATUS_OPTIONS.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
+              className="input" style={{ width: 'auto', minWidth: 200 }}>
+              <option value="">Todos os status</option>
+              <option value="evidencia_solicitada">🟡 Evidência solicitada</option>
+              <option value="evidencia_anexada">🟢 Evidência anexada</option>
             </select>
             <select value={filters.cnpj_dest} onChange={e => applyFilter({ cnpj_dest: e.target.value })}
               className="input" style={{ width: 'auto', minWidth: 150 }}>
@@ -216,6 +223,14 @@ export default function Devolucoes({ user, initialFilters = {} }) {
               <option value="">Total e Parcial</option>
               <option value="total">Somente Total</option>
               <option value="parcial">Somente Parcial</option>
+            </select>
+            <select value={filters.transportador || ''} onChange={e => applyFilter({ transportador: e.target.value })}
+              className="input" style={{ width: 'auto', minWidth: 200 }}>
+              <option value="">Transportador: todos</option>
+              <option value="__sem__">✗ Sem transportador</option>
+              {transportadoras.map(t => (
+                <option key={t.cnpj} value={t.nome}>{t.nome_curto || t.nome}</option>
+              ))}
             </select>
             <select value={filters.com_motivo || ''} onChange={e => applyFilter({ com_motivo: e.target.value })}
               className="input" style={{ width: 'auto', minWidth: 170 }}>

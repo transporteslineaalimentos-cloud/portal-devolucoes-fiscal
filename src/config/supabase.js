@@ -102,6 +102,9 @@ function applyDevolucoesFilters(q, filters = {}) {
   if (filters.com_motivo === 'sem')           q = q.is('motivo_devolucao', null);
   if (filters.centro_custo === 'sem')         q = q.is('centro_custo', null);
   else if (filters.centro_custo)              q = q.eq('centro_custo', filters.centro_custo);
+
+  if (filters.transportador === '__sem__')    q = q.is('transportador_cobranca', null);
+  else if (filters.transportador)             q = q.ilike('transportador_cobranca', `%${filters.transportador}%`);
   if (filters.flag_emissao === 'divergente')       q = q.eq('flag_emissao_entrega', 'divergente');
   if (filters.flag_emissao === 'no_ato')           q = q.eq('flag_emissao_entrega', 'no_ato');
   if (filters.flag_emissao === 'aguardando')       q = q.eq('flag_emissao_entrega', 'aguardando_entrega');

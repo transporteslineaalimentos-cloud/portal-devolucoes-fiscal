@@ -283,14 +283,14 @@ export default function DetalheDrawer({ id, user, onClose, onSaved, onNav }) {
   const handleSaveStatus = async () => {
     setSaveErr(''); setSaving(true);
     try {
-      await dbUpdateStatus(id, newStatus, obs, user?.name || user?.email || '');
+      await dbUpdateStatus(id, newStatus || null, obs, user?.name || user?.email || '');
       await dbRegistrarHistorico(id, {
         tipo: 'status', campo: 'status_portal',
         valor_anterior: dev?.status_portal || null,
-        valor_novo: newStatus,
+        valor_novo: newStatus || null,
         usuario: user?.name || user?.email,
       });
-      setData(prev => ({ ...prev, dev: { ...prev.dev, status_portal: newStatus } }));
+      setData(prev => ({ ...prev, dev: { ...prev.dev, status_portal: newStatus || null } }));
       setEdit(false); setObs(''); onSaved?.();
     } catch (e) { setSaveErr(e.message); }
     finally { setSaving(false); }
@@ -383,6 +383,11 @@ export default function DetalheDrawer({ id, user, onClose, onSaved, onNav }) {
                 <Ic d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" size={12}/>
                 {dev.centro_custo ? 'Mudar centro de custo' : 'Vincular centro de custo'}
               </button>
+              <button onClick={() => { setEdit(v => !v); setEditMotivo(false); setEditTransp(false); setEditCC(false); }}
+                className={`dd-action ${editStatus ? 'active' : ''}`}>
+                <Ic d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" size={12}/>
+                {dev.status_portal ? (dev.status_portal === 'evidencia_solicitada' ? 'Evidência solicitada' : 'Evidência anexada') : 'Marcar status'}
+              </button>
               <button onClick={() => document.getElementById('btn-add-anexo')?.click()}
                 className="dd-action">
                 <Ic d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" size={12}/>
@@ -409,7 +414,7 @@ export default function DetalheDrawer({ id, user, onClose, onSaved, onNav }) {
           <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative' }}>
 
             {/* ── Painel de edição flutuante (sticky, não desloca o scroll) ── */}
-            {(editMotivo || editTransp || editCC) && (
+            {(editStatus || editMotivo || editTransp || editCC) && (
               <div style={{
                 position: 'sticky', top: 0, zIndex: 20,
                 background: 'var(--surface)',
@@ -419,7 +424,45 @@ export default function DetalheDrawer({ id, user, onClose, onSaved, onNav }) {
                 flexShrink: 0,
               }}>
 
-                {/* Editor motivo */}
+                {/* Editor status */}
+                {editStatus && (
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--blue)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6, textTransform: 'uppercase', letterSpacing: '.06em' }}>
+                      <Ic d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" size={12} color="var(--blue)"/>
+                      Marcar status da evidência
+                    </div>
+                    <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
+                      {[
+                        { v: 'evidencia_solicitada', l: 'Evidência solicitada', dot: '#D97706', bg: '#FFFBEB', border: '#FDE68A', color: '#92400E' },
+                        { v: 'evidencia_anexada',    l: 'Evidência anexada',    dot: '#16A34A', bg: '#F0FDF4', border: '#BBF7D0', color: '#14532D' },
+                      ].map(opt => (
+                        <button key={opt.v} onClick={() => setNewStatus(opt.v)}
+                          style={{
+                            flex: 1, padding: '12px 10px', borderRadius: 10, cursor: 'pointer',
+                            border: `2px solid ${newStatus === opt.v ? opt.dot : 'var(--border)'}`,
+                            background: newStatus === opt.v ? opt.bg : 'var(--surface-2)',
+                            transition: 'all 120ms',
+                            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+                          }}>
+                          <span style={{ width: 10, height: 10, borderRadius: '50%', background: opt.dot }}/>
+                          <span style={{ fontSize: 11.5, fontWeight: 700, color: newStatus === opt.v ? opt.color : 'var(--text-2)' }}>{opt.l}</span>
+                        </button>
+                      ))}
+                    </div>
+                    {saveErr && <div style={{ color: 'var(--red)', fontSize: 11.5, marginBottom: 8 }}>{saveErr}</div>}
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button onClick={() => setEdit(false)} className="btn btn-ghost btn-sm">Cancelar</button>
+                      <button onClick={handleSaveStatus} disabled={saving || !newStatus} className="btn btn-primary btn-sm">
+                        {saving ? 'Salvando...' : 'Confirmar'}
+                      </button>
+                      {dev?.status_portal && (
+                        <button onClick={async () => { setNewStatus(''); await handleSaveStatus(); }} className="btn btn-ghost btn-sm" style={{ color: 'var(--text-3)', marginLeft: 'auto', fontSize: 10.5 }}>
+                          Limpar status
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
                 {editMotivo && (
                   <div>
                     <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--blue)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6, textTransform: 'uppercase', letterSpacing: '.06em' }}>
