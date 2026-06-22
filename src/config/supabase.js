@@ -444,7 +444,8 @@ export async function dbListCobrancas({ page = 0, filters = {} }) {
       dt_emissao, valor, motivo_devolucao, area_responsavel,
       chave_nfe_referenciada, dt_lancamento_protheus,
       status_cobranca, nf_debito, data_cobranca, cobrado_por, obs_cobranca,
-      transportador_cobranca, transportador_cnpj_cobranca
+      transportador_cobranca, transportador_cnpj_cobranca,
+      retornou_cd, tem_itens_cobrar, dt_recebimento_cd
     `, { count: 'exact' })
     .not('status_cobranca', 'is', null)
     .not('cfops', 'cs', '{"6201"}')            // excluir dev. de industrialização
@@ -716,4 +717,35 @@ export async function dbUpdateRetornoCD(id, { dt_recebimento_cd, filial_cd, iten
     retornou_cd: true, dt_recebimento_cd, filial_cd, itens_cd, tem_itens_cobrar,
   }).eq('id', id);
   if (error) throw new Error(error.message);
+}
+
+// Importa planilha de retorno ao CD (mesmo formato da NFD_retornaram_CD.xlsx)
+export async function dbImportRetornoCD(registros) {
+  // registros: array de { nf_numero, dt_recebimento_cd, filial_cd, itens_cd, tem_itens_cobrar, valor_cobrar_transp }
+  syncAuthToken();
+  let atualizadas = 0, nao_encontradas = [];
+  for (const reg of registros) {
+    const { data, error } = await supabase
+      .from('oobj_nfe_recebidas')
+      .select('id')
+      .eq('nf_numero', reg.nf_numero)
+      .eq('tipo', 'devolucao')
+      .limit(1)
+      .maybeSingle();
+    if (error || !data) { nao_encontradas.push(reg.nf_numero); continue; }
+    const { error: upErr } = await supabase
+      .from('oobj_nfe_recebidas')
+      .update({
+        retornou_cd: true,
+        dt_recebimento_cd: reg.dt_recebimento_cd,
+        filial_cd: reg.filial_cd,
+        itens_cd: reg.itens_cd,
+        tem_itens_cobrar: reg.tem_itens_cobrar,
+        valor_cobrar_transp: reg.valor_cobrar_transp,
+      })
+      .eq('id', data.id);
+    if (!upErr) atualizadas++;
+    else nao_encontradas.push(reg.nf_numero);
+  }
+  return { atualizadas, nao_encontradas };
 }

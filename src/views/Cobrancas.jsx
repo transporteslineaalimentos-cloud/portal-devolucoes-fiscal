@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { dbListCobrancas, dbExportCobrancas } from '../config/supabase';
 import { fmtBRL, fmtDate, fmtCNPJ, BadgeCobranca } from '../utils.jsx';
 import ModalCobranca from '../components/ModalCobranca.jsx';
+import ModalImportRetornoCD from '../components/ModalImportRetornoCD.jsx';
 import { exportCobrancasToExcel } from '../utils/exportExcel.js';
 
 const Ic = ({ d, size = 14, color = 'currentColor' }) => (
@@ -29,6 +30,7 @@ export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
   const [selectedRow, setSelectedRow] = useState(null);
   const [showFilters, setShowFilters] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [showImportCD, setShowImportCD] = useState(false);
 
   const handleExport = async () => {
     setExporting(true);
@@ -108,6 +110,10 @@ export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
               : <Ic d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" size={13}/>
             }
             {exporting ? 'Exportando...' : 'Exportar Excel'}
+          </button>
+          <button onClick={() => setShowImportCD(true)} className="btn btn-outline btn-sm" title="Importar planilha de retorno ao CD">
+            <Ic d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" size={13}/>
+            Importar CD
           </button>
           <button onClick={() => load(filters, page)} className="btn btn-outline btn-sm" title="Atualizar">
             <Ic d="M1 4v6h6M23 20v-6h-6M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15" size={13}/>
@@ -203,6 +209,20 @@ export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
               {row.nf_serie && (
                 <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 1 }}>Série {row.nf_serie}</div>
               )}
+              {/* Badge retorno CD */}
+              {row.retornou_cd ? (
+                <span style={{
+                  fontSize: 8.5, fontWeight: 700, padding: '1px 5px', borderRadius: 4, marginTop: 3, display: 'inline-block',
+                  background: row.tem_itens_cobrar ? 'rgba(220,38,38,0.10)' : 'rgba(22,163,74,0.10)',
+                  color: row.tem_itens_cobrar ? '#DC2626' : '#16A34A',
+                }}>
+                  {row.tem_itens_cobrar ? '⚠ CD' : '✓ CD'}
+                </span>
+              ) : (
+                <span style={{ fontSize: 8.5, color: 'var(--text-3)', marginTop: 3, display: 'inline-block' }}>
+                  — sem CD
+                </span>
+              )}
             </div>
 
             {/* Emitente / Motivo */}
@@ -297,6 +317,13 @@ export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
         <ModalCobranca row={selectedRow} user={user}
           onClose={() => setSelectedRow(null)}
           onSaved={() => { load(filters, page); onChanged?.(); }}
+        />
+      )}
+
+      {showImportCD && (
+        <ModalImportRetornoCD
+          onClose={() => setShowImportCD(false)}
+          onDone={() => { load(filters, page); }}
         />
       )}
     </div>
