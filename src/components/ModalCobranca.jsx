@@ -4,6 +4,7 @@ import {
   dbGetDevolucaoDetail, dbGetXmlUrl,
 } from '../config/supabase';
 import { fmtBRL, fmtDate, fmtCNPJ, fmtDateTime, BadgeCobranca } from '../utils.jsx';
+import RetornoCDSection from './RetornoCDSection.jsx';
 
 const Ic = ({ d, size = 14, color = 'currentColor' }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
@@ -243,6 +244,9 @@ export default function ModalCobranca({ row, user, onClose, onSaved }) {
               </div>
             </SectionCard>
           )}
+
+          {/* ── Retorno ao CD ── */}
+          <RetornoCDSection dev={dev}/>
 
           {/* ── Estado: já cobrado / isento ── */}
           {!isPendente && (
