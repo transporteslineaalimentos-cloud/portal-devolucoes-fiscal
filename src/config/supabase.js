@@ -104,7 +104,15 @@ function applyDevolucoesFilters(q, filters = {}) {
   else if (filters.centro_custo)              q = q.eq('centro_custo', filters.centro_custo);
 
   if (filters.transportador === '__sem__')    q = q.is('transportador_cobranca', null);
-  else if (filters.transportador)             q = q.ilike('transportador_cobranca', `%${filters.transportador}%`);
+  else if (filters.transportador) {
+    const nomes = filters.transportador.split('|').filter(Boolean);
+    if (nomes.length === 1) {
+      q = q.ilike('transportador_cobranca', `%${nomes[0]}%`);
+    } else {
+      // múltiplas: OR entre cada transportadora
+      q = q.or(nomes.map(n => `transportador_cobranca.ilike.%${n}%`).join(','));
+    }
+  }
   if (filters.flag_emissao === 'divergente')       q = q.eq('flag_emissao_entrega', 'divergente');
   if (filters.flag_emissao === 'no_ato')           q = q.eq('flag_emissao_entrega', 'no_ato');
   if (filters.flag_emissao === 'aguardando')       q = q.eq('flag_emissao_entrega', 'aguardando_entrega');

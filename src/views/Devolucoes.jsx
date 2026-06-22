@@ -36,6 +36,163 @@ const EMPTY_FILTERS = {
   centro_custo: '', transportador: '',
 };
 
+// Componente multi-select de transportadoras com busca e checkbox
+function TranspMultiSelect({ transportadoras, value, onChange }) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const ref = useRef(null);
+
+  // value é string separada por | ou '__sem__'
+  const selected = value === '__sem__' ? ['__sem__'] : value ? value.split('|').filter(Boolean) : [];
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  const toggle = (nome) => {
+    if (nome === '__sem__') {
+      onChange(selected.includes('__sem__') ? '' : '__sem__');
+      return;
+    }
+    const next = selected.includes(nome)
+      ? selected.filter(s => s !== nome && s !== '__sem__')
+      : [...selected.filter(s => s !== '__sem__'), nome];
+    onChange(next.join('|'));
+  };
+
+  const clear = () => { onChange(''); setSearch(''); };
+
+  const filtered = transportadoras.filter(t =>
+    !search || t.nome.toLowerCase().includes(search.toLowerCase()) || (t.nome_curto || '').toLowerCase().includes(search.toLowerCase())
+  );
+
+  const label = selected.length === 0
+    ? 'Transportador: todos'
+    : selected[0] === '__sem__'
+    ? 'Sem transportador'
+    : selected.length === 1
+    ? (transportadoras.find(t => t.nome === selected[0])?.nome_curto || selected[0])
+    : `${selected.length} transportadoras`;
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        className="input"
+        style={{
+          width: 'auto', minWidth: 200, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          gap: 8, cursor: 'pointer', background: selected.length ? 'var(--blue-dim)' : undefined,
+          border: selected.length ? '1px solid var(--blue-mid)' : undefined,
+          color: selected.length ? 'var(--blue)' : undefined,
+          fontWeight: selected.length ? 600 : undefined,
+        }}>
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 12.5 }}>{label}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+          {selected.length > 0 && (
+            <span onClick={e => { e.stopPropagation(); clear(); }}
+              style={{ fontSize: 14, color: 'var(--blue)', lineHeight: 1, padding: '0 2px' }}>×</span>
+          )}
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <path d={open ? 'M2 7l3-3 3 3' : 'M2 3l3 3 3-3'}/>
+          </svg>
+        </div>
+      </button>
+
+      {open && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 300,
+          background: 'var(--surface)', border: '1px solid var(--border)',
+          borderRadius: 10, boxShadow: '0 8px 24px rgba(15,25,35,0.14)',
+          minWidth: 280, maxWidth: 340,
+        }}>
+          {/* Busca */}
+          <div style={{ padding: '10px 12px 6px', borderBottom: '1px solid var(--border)' }}>
+            <input
+              autoFocus
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Buscar transportadora..."
+              className="input"
+              style={{ width: '100%', fontSize: 12 }}
+            />
+          </div>
+
+          {/* Opção sem transportador */}
+          <div onClick={() => toggle('__sem__')}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px',
+              cursor: 'pointer', borderBottom: '1px solid var(--border)',
+              background: selected.includes('__sem__') ? 'var(--blue-dim)' : 'transparent',
+              transition: 'background 80ms',
+            }}
+            onMouseEnter={e => { if (!selected.includes('__sem__')) e.currentTarget.style.background = 'var(--surface-2)'; }}
+            onMouseLeave={e => { if (!selected.includes('__sem__')) e.currentTarget.style.background = 'transparent'; }}>
+            <div style={{
+              width: 16, height: 16, borderRadius: 4, border: `2px solid ${selected.includes('__sem__') ? 'var(--blue)' : 'var(--border-2)'}`,
+              background: selected.includes('__sem__') ? 'var(--blue)' : 'transparent',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 100ms',
+            }}>
+              {selected.includes('__sem__') && <svg width="9" height="9" viewBox="0 0 9 9" fill="none"><path d="M1.5 4.5L3.5 6.5L7.5 2.5" stroke="white" strokeWidth="1.5" strokeLinecap="round"/></svg>}
+            </div>
+            <span style={{ fontSize: 12, color: 'var(--text-3)', fontStyle: 'italic' }}>✗ Sem transportador</span>
+          </div>
+
+          {/* Lista */}
+          <div style={{ maxHeight: 220, overflowY: 'auto' }}>
+            {filtered.length === 0 && (
+              <div style={{ padding: '12px 14px', fontSize: 12, color: 'var(--text-3)', fontStyle: 'italic' }}>Nenhuma encontrada</div>
+            )}
+            {filtered.map(t => {
+              const isSelected = selected.includes(t.nome);
+              return (
+                <div key={t.cnpj} onClick={() => toggle(t.nome)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px',
+                    cursor: 'pointer', borderBottom: '1px solid var(--border)',
+                    background: isSelected ? 'var(--blue-dim)' : 'transparent',
+                    transition: 'background 80ms',
+                  }}
+                  onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = 'var(--surface-2)'; }}
+                  onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = isSelected ? 'var(--blue-dim)' : 'transparent'; }}>
+                  <div style={{
+                    width: 16, height: 16, borderRadius: 4, flexShrink: 0,
+                    border: `2px solid ${isSelected ? 'var(--blue)' : 'var(--border-2)'}`,
+                    background: isSelected ? 'var(--blue)' : 'transparent',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 100ms',
+                  }}>
+                    {isSelected && <svg width="9" height="9" viewBox="0 0 9 9" fill="none"><path d="M1.5 4.5L3.5 6.5L7.5 2.5" stroke="white" strokeWidth="1.5" strokeLinecap="round"/></svg>}
+                  </div>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 12, fontWeight: isSelected ? 600 : 400, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {t.nome_curto || t.nome}
+                    </div>
+                    {t.nome_curto && (
+                      <div style={{ fontSize: 10, color: 'var(--text-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.nome}</div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Rodapé */}
+          {selected.length > 0 && (
+            <div style={{ padding: '8px 14px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{selected.length} selecionada{selected.length > 1 ? 's' : ''}</span>
+              <button onClick={clear} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: 'var(--blue)', fontWeight: 600 }}>Limpar</button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Devolucoes({ user, initialFilters = {} }) {
   const { _ts, ...initFilt } = initialFilters; // _ts só força re-render
   const [rows, setRows]         = useState([]);
@@ -130,7 +287,11 @@ export default function Devolucoes({ user, initialFilters = {} }) {
   if (filters.centro_custo === 'sem') activeChips.push({ k: 'centro_custo', label: 'Sem centro de custo' });
   else if (filters.centro_custo) activeChips.push({ k: 'centro_custo', label: `CC: ${filters.centro_custo}` });
   if (filters.transportador === '__sem__') activeChips.push({ k: 'transportador', label: 'Sem transportador' });
-  else if (filters.transportador) activeChips.push({ k: 'transportador', label: `Transp: ${filters.transportador}` });
+  else if (filters.transportador) {
+    const nomes = filters.transportador.split('|').filter(Boolean);
+    const label = nomes.length === 1 ? `Transp: ${nomes[0].split(' ')[0]}` : `${nomes.length} transportadoras`;
+    activeChips.push({ k: 'transportador', label });
+  }
   if (filters.dt_inicio || filters.dt_fim) {
     const fmt = s => { if (!s) return ''; const [y,m,dd] = s.split('-'); return `${dd}/${m}/${y.slice(2)}`; };
     activeChips.push({ k: 'periodo', label: `Período: ${fmt(filters.dt_inicio) || '...'} – ${fmt(filters.dt_fim) || '...'}`, clear: { dt_inicio: '', dt_fim: '' } });
@@ -224,14 +385,12 @@ export default function Devolucoes({ user, initialFilters = {} }) {
               <option value="total">Somente Total</option>
               <option value="parcial">Somente Parcial</option>
             </select>
-            <select value={filters.transportador || ''} onChange={e => applyFilter({ transportador: e.target.value })}
-              className="input" style={{ width: 'auto', minWidth: 200 }}>
-              <option value="">Transportador: todos</option>
-              <option value="__sem__">✗ Sem transportador</option>
-              {transportadoras.map(t => (
-                <option key={t.cnpj} value={t.nome}>{t.nome_curto || t.nome}</option>
-              ))}
-            </select>
+            {/* Multi-select de transportadoras */}
+            <TranspMultiSelect
+              transportadoras={transportadoras}
+              value={filters.transportador || ''}
+              onChange={v => applyFilter({ transportador: v })}
+            />
             <select value={filters.com_motivo || ''} onChange={e => applyFilter({ com_motivo: e.target.value })}
               className="input" style={{ width: 'auto', minWidth: 170 }}>
               <option value="">Motivo: todos</option>
