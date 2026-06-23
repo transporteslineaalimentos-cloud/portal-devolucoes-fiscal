@@ -356,6 +356,7 @@ export async function dbGetDashboard(periodo) {
     porArea:       d?.por_area      || [],
     topMotivos:    (d?.top_motivos  || []).sort((a, b) => b.valor - a.valor),
     porCentroCusto: d?.por_centro_custo || [],
+    evolucaoProtheus: (d?.evolucao_protheus || []),
     cobrancas: {
       pendente_count:  d?.cobrancas?.pendente_count  || 0,
       pendente_valor:  d?.cobrancas?.pendente_valor  || 0,
