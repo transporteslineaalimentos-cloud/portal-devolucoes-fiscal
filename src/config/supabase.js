@@ -75,15 +75,27 @@ function applyDevolucoesFilters(q, filters = {}) {
   if (filters.cnpj_dest)      q = q.eq('cnpj_destinatario', filters.cnpj_dest);
   if (filters.cnpj_emitente)  q = q.eq('cnpj_emitente', filters.cnpj_emitente);
   if (filters.uf)             q = q.eq('uf_emitente', filters.uf);
-  if (filters.dt_inicio)      q = q.gte('dt_emissao', filters.dt_inicio);
-  if (filters.dt_fim)         q = q.lte('dt_emissao', filters.dt_fim);
+  // Filtro de período: parciais usam dt_emissao, totais (lancamento_manual=true) usam dt_devolucao
+  if (filters.dt_inicio || filters.dt_fim) {
+    const ini = filters.dt_inicio || '2000-01-01';
+    const fim = filters.dt_fim    || '2099-12-31';
+    q = q.or(
+      `and(lancamento_manual.is.null,dt_emissao.gte.${ini},dt_emissao.lte.${fim}),` +
+      `and(lancamento_manual.eq.false,dt_emissao.gte.${ini},dt_emissao.lte.${fim}),` +
+      `and(lancamento_manual.eq.true,dt_devolucao.gte.${ini},dt_devolucao.lte.${fim})`
+    );
+  }
   if (filters.mes) {
     // mes no formato 'YYYY-MM' → intervalo do mês
     const [y, m] = filters.mes.split('-').map(Number);
     const ini = `${filters.mes}-01`;
     const fimDate = new Date(y, m, 0); // último dia do mês
     const fim = `${y}-${String(m).padStart(2,'0')}-${String(fimDate.getDate()).padStart(2,'0')}`;
-    q = q.gte('dt_emissao', ini).lte('dt_emissao', fim);
+    q = q.or(
+      `and(lancamento_manual.is.null,dt_emissao.gte.${ini},dt_emissao.lte.${fim}),` +
+      `and(lancamento_manual.eq.false,dt_emissao.gte.${ini},dt_emissao.lte.${fim}),` +
+      `and(lancamento_manual.eq.true,dt_devolucao.gte.${ini},dt_devolucao.lte.${fim})`
+    );
   }
   if (filters.area) {
     if (filters.area === 'SEM CLASSIFICAÇÃO') q = q.is('area_responsavel', null);
