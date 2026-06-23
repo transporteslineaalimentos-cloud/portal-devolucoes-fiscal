@@ -643,59 +643,107 @@ export default function Dashboard({ onGoTo }) {
             </div>
           </Card>
 
-          {/* Cobranças a transportadores */}
+          {/* ── Cobranças a transportadores ─────────────────── */}
           <Card title="Cobranças a transportadores" subtitle="Responsabilidade do transporte · lançadas no Protheus" noPad
             action={
               <button onClick={() => onGoTo?.('cobrancas')}
-                style={{
-                  padding: '5px 11px', borderRadius: 7, cursor: 'pointer',
-                  border: '1px solid var(--border)', background: 'var(--surface)',
-                  fontSize: 11.5, fontWeight: 500, color: 'var(--text-2)', fontFamily: 'inherit',
-                }}>
+                style={{ padding: '5px 11px', borderRadius: 7, cursor: 'pointer', border: '1px solid var(--border)', background: 'var(--surface)', fontSize: 11.5, fontWeight: 500, color: 'var(--text-2)', fontFamily: 'inherit' }}>
                 Ver tudo →
               </button>
             }>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderBottom: '1px solid var(--surface-3)' }}>
-              <div className="drill-row" style={{ padding: '12px 20px', borderRight: '1px solid var(--surface-3)' }}
-                onClick={() => onGoTo?.('cobrancas', { status_cobranca: 'pendente_cobranca_transportador' })}>
-                <div style={{ ...T.overline, marginBottom: 5 }}>Pendentes</div>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 7 }}>
-                  <span style={{ fontSize: 17, fontWeight: 650, color: 'var(--text)', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }}>{fmtBRL(cob.pendente_valor)}</span>
-                  <span style={T.meta}>{nf(cob.pendente_count)} NFs</span>
+
+            {/* KPIs de cobrança: Pendente / Cobrado / Isento */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', borderBottom: '1px solid var(--surface-3)' }}>
+              {[
+                { label: 'Pendentes',  valor: cob.pendente_valor, qtd: cob.pendente_count, cor: PAL.amber, status: 'pendente_cobranca_transportador' },
+                { label: 'Já cobradas', valor: cob.cobrado_valor,  qtd: cob.cobrado_count,  cor: PAL.green, status: 'cobrado' },
+                { label: 'Isentas',    valor: cob.isento_valor,   qtd: cob.isento_count,   cor: 'var(--text-3)', status: 'isento' },
+              ].map((item, i) => (
+                <div key={item.label} className="drill-row"
+                  style={{ padding: '12px 16px', borderRight: i < 2 ? '1px solid var(--surface-3)' : 'none' }}
+                  onClick={() => onGoTo?.('cobrancas', { status_cobranca: item.status })}>
+                  <div style={{ ...T.overline, marginBottom: 5 }}>{item.label}</div>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: item.cor, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }}>{fmtBRL(item.valor)}</div>
+                  <div style={{ ...T.meta, marginTop: 2 }}>{nf(item.qtd)} NFs</div>
                 </div>
-              </div>
-              <div className="drill-row" style={{ padding: '12px 20px' }}
-                onClick={() => onGoTo?.('cobrancas', { status_cobranca: 'cobrado' })}>
-                <div style={{ ...T.overline, marginBottom: 5 }}>Já cobradas</div>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 7 }}>
-                  <span style={{ fontSize: 17, fontWeight: 650, color: PAL.green, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }}>{fmtBRL(cob.cobrado_valor)}</span>
-                  <span style={T.meta}>{nf(cob.cobrado_count)} NFs</span>
+              ))}
+            </div>
+
+            {/* Pendentes por transportador */}
+            {(cob.pendentes_por_transportador || []).length > 0 && (
+              <div style={{ padding: '10px 20px 0' }}>
+                <div style={{ ...T.overline, marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>Pendente por transportador</span>
+                  <span style={{ color: 'var(--yellow)', fontWeight: 700 }}>{fmtBRL(cob.pendente_valor)}</span>
                 </div>
+                {(cob.pendentes_por_transportador || []).map((t, i, arr) => {
+                  const maxVal = arr[0]?.valor_pendente || 1;
+                  return (
+                    <div key={t.transportador} className="drill-row"
+                      style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 100px 44px', alignItems: 'center', columnGap: 10, padding: '7px 0', ...rowBorder(i, arr.length) }}
+                      onClick={() => onGoTo?.('cobrancas', { status_cobranca: 'pendente_cobranca_transportador', transportador: t.transportador === 'Não identificado' ? '__sem_transportador__' : t.transportador })}>
+                      <div style={{ minWidth: 0 }}>
+                        <div className="ellipsis" style={{ fontSize: 11.5, fontWeight: 500, color: 'var(--text)', marginBottom: 3 }}>{t.transportador}</div>
+                        <Bar valor={t.valor_pendente} max={maxVal} color={PAL.amber} height={3}/>
+                      </div>
+                      <span style={{ ...T.value, fontSize: 12, textAlign: 'right', color: '#D97706' }}>{fmtBRL(t.valor_pendente)}</span>
+                      <span style={{ ...T.meta, textAlign: 'right' }}>{t.qtd}×</span>
+                    </div>
+                  );
+                })}
               </div>
-            </div>
-            <div style={{ padding: '6px 20px 14px' }}>
-              {(cob.top_transportadores || []).length === 0 && (
-                <div style={{ padding: '10px 0', fontSize: 12, color: 'var(--text-3)' }}>Nenhuma cobrança pendente no período.</div>
-              )}
-              {(cob.top_transportadores || []).map((t, i, arr) => {
-                const maxVal = arr[0]?.valor || 1;
-                return (
-                  <div key={t.transportador} className="drill-row" style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'minmax(0,42%) minmax(0,1fr) 96px 40px',
-                    alignItems: 'center', columnGap: 12,
-                    padding: '8px 0', ...rowBorder(i, arr.length),
-                  }}
-                  onClick={() => onGoTo?.('cobrancas', { status_cobranca: 'pendente_cobranca_transportador', transportador: t.transportador ?? '__sem_transportador__' })}
-                  title={`Ver cobranças de ${t.transportador}`}>
-                    <span className="ellipsis" style={{ fontSize: 12, fontWeight: 500, color: 'var(--text)' }}>{t.transportador}</span>
-                    <Bar valor={t.valor} max={maxVal} color={PAL.amber} height={4}/>
-                    <span style={{ ...T.value, fontSize: 12.5, textAlign: 'right' }}>{fmtBRL(t.valor)}</span>
-                    <span style={{ ...T.meta, textAlign: 'right' }}>{t.qtd}×</span>
-                  </div>
-                );
-              })}
-            </div>
+            )}
+
+            {/* Cobrados por transportador */}
+            {(cob.cobrados_por_transportador || []).length > 0 && (
+              <div style={{ padding: '10px 20px 0', borderTop: '1px solid var(--surface-3)', marginTop: 10 }}>
+                <div style={{ ...T.overline, marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>Já cobrado por transportador</span>
+                  <span style={{ color: PAL.green, fontWeight: 700 }}>{fmtBRL(cob.cobrado_valor)}</span>
+                </div>
+                {(cob.cobrados_por_transportador || []).map((t, i, arr) => {
+                  const maxVal = arr[0]?.valor_cobrado || 1;
+                  return (
+                    <div key={t.transportador} className="drill-row"
+                      style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 100px 44px', alignItems: 'center', columnGap: 10, padding: '7px 0', ...rowBorder(i, arr.length) }}
+                      onClick={() => onGoTo?.('cobrancas', { status_cobranca: 'cobrado', transportador: t.transportador })}>
+                      <div style={{ minWidth: 0 }}>
+                        <div className="ellipsis" style={{ fontSize: 11.5, fontWeight: 500, color: 'var(--text)', marginBottom: 3 }}>{t.transportador}</div>
+                        <Bar valor={t.valor_cobrado} max={maxVal} color={PAL.green} height={3}/>
+                      </div>
+                      <span style={{ ...T.value, fontSize: 12, textAlign: 'right', color: PAL.green }}>{fmtBRL(t.valor_cobrado)}</span>
+                      <span style={{ ...T.meta, textAlign: 'right' }}>{t.qtd}×</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Pendentes por motivo */}
+            {(cob.pendentes_por_motivo || []).length > 0 && (
+              <div style={{ padding: '10px 20px 14px', borderTop: '1px solid var(--surface-3)', marginTop: 10 }}>
+                <div style={{ ...T.overline, marginBottom: 8 }}>Pendente por motivo</div>
+                {(cob.pendentes_por_motivo || []).map((m, i, arr) => {
+                  const maxVal = arr[0]?.valor_pendente || 1;
+                  return (
+                    <div key={m.motivo} className="drill-row"
+                      style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 100px 44px', alignItems: 'center', columnGap: 10, padding: '7px 0', ...rowBorder(i, arr.length) }}
+                      onClick={() => onGoTo?.('cobrancas', { status_cobranca: 'pendente_cobranca_transportador' })}>
+                      <div style={{ minWidth: 0 }}>
+                        <div className="ellipsis" style={{ fontSize: 11.5, fontWeight: 500, color: 'var(--text)', marginBottom: 3 }}>{m.motivo}</div>
+                        <Bar valor={m.valor_pendente} max={maxVal} color={PAL.red} height={3}/>
+                      </div>
+                      <span style={{ ...T.value, fontSize: 12, textAlign: 'right', color: PAL.red }}>{fmtBRL(m.valor_pendente)}</span>
+                      <span style={{ ...T.meta, textAlign: 'right' }}>{m.qtd}×</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {(cob.pendente_count || 0) === 0 && (cob.cobrado_count || 0) === 0 && (
+              <div style={{ padding: '16px 20px', fontSize: 12, color: 'var(--text-3)' }}>Nenhuma cobrança registrada.</div>
+            )}
           </Card>
 
         </div>

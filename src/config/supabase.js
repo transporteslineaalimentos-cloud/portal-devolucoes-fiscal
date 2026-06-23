@@ -356,7 +356,17 @@ export async function dbGetDashboard(periodo) {
     porArea:       d?.por_area      || [],
     topMotivos:    (d?.top_motivos  || []).sort((a, b) => b.valor - a.valor),
     porCentroCusto: d?.por_centro_custo || [],
-    cobrancas:     d?.cobrancas    || { pendente_count: 0, pendente_valor: 0, cobrado_count: 0, cobrado_valor: 0, top_transportadores: [] },
+    cobrancas: {
+      pendente_count:  d?.cobrancas?.pendente_count  || 0,
+      pendente_valor:  d?.cobrancas?.pendente_valor  || 0,
+      cobrado_count:   d?.cobrancas?.cobrado_count   || 0,
+      cobrado_valor:   d?.cobrancas?.cobrado_valor   || 0,
+      isento_count:    d?.cobrancas?.isento_count    || 0,
+      isento_valor:    d?.cobrancas?.isento_valor    || 0,
+      pendentes_por_transportador: d?.cobrancas?.pendentes_por_transportador || [],
+      cobrados_por_transportador:  d?.cobrancas?.cobrados_por_transportador  || [],
+      pendentes_por_motivo:        d?.cobrancas?.pendentes_por_motivo        || [],
+    },
   };
 }
 
