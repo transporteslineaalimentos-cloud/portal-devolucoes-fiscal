@@ -44,6 +44,7 @@ export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
     search: '',
     status_cobranca: initialFilters.status_cobranca ?? 'pendente_cobranca_transportador',
     transportador: initialFilters.transportador ?? '',
+    retornou_cd: '',
   });
   const searchRef = useRef(null);
   const PAGE_SIZE = 40;
@@ -57,6 +58,7 @@ export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
         search: '',
         status_cobranca: f.status_cobranca ?? '',
         transportador: f.transportador ?? '',
+        retornou_cd: '',
       });
       setPage(0);
       if (f.transportador) setShowFilters(true);
@@ -128,6 +130,13 @@ export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
             <select value={filters.status_cobranca} onChange={e => applyFilter({ status_cobranca: e.target.value })}
               className="input" style={{ width: 'auto', minWidth: 180 }}>
               {STATUS_OPTIONS.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
+            </select>
+            <select value={filters.retornou_cd || ''} onChange={e => applyFilter({ retornou_cd: e.target.value })}
+              className="input" style={{ width: 'auto', minWidth: 200 }}>
+              <option value="">Retorno CD: todos</option>
+              <option value="bom">✓ Retornou — só itens bons</option>
+              <option value="cobrar">⚠ Retornou — tem itens a cobrar</option>
+              <option value="nao">→ Não retornou ao CD</option>
             </select>
             <select value={filters.transportador === '__sem_transportador__' ? '__sem_transportador__' : ''}
               onChange={e => {

@@ -9,7 +9,7 @@ const Ic = ({ d, size = 14, color = 'currentColor' }) => (
   </svg>
 );
 
-const DESTINOS_COBRAR = new Set(['AVARIA', 'FALTA', 'VALIDADE CURTA', 'IMPROPRIO']);
+const DESTINOS_COBRAR = new Set(['AVARIA', 'FALTA', 'IMPROPRIO']);
 
 function toIsoDate(v) {
   if (v == null || v === '') return null;

@@ -459,6 +459,9 @@ export async function dbListCobrancas({ page = 0, filters = {} }) {
   } else if (filters.transportador) {
     q = q.ilike('transportador_cobranca', `%${filters.transportador}%`);
   }
+  if (filters.retornou_cd === 'bom')    q = q.eq('retornou_cd', true).eq('tem_itens_cobrar', false);
+  if (filters.retornou_cd === 'cobrar') q = q.eq('retornou_cd', true).eq('tem_itens_cobrar', true);
+  if (filters.retornou_cd === 'nao')    q = q.or('retornou_cd.eq.false,retornou_cd.is.null');
   if (filters.search) {
     const s = filters.search.trim();
     const isNum = /^\d+$/.test(s);
@@ -709,7 +712,7 @@ export async function dbExportCobrancas({ filters = {} } = {}) {
 // Atualiza dados de retorno ao CD manualmente
 export async function dbUpdateRetornoCD(id, { dt_recebimento_cd, filial_cd, itens_cd }) {
   syncAuthToken();
-  const DESTINOS_COBRAR = new Set(['AVARIA', 'FALTA', 'VALIDADE CURTA', 'IMPROPRIO']);
+  const DESTINOS_COBRAR = new Set(['AVARIA', 'FALTA', 'IMPROPRIO']);
   const qtd_total  = itens_cd.reduce((s, i) => s + (i.qtd || 0), 0);
   const qtd_cobrar = itens_cd.filter(i => DESTINOS_COBRAR.has(i.destino)).reduce((s, i) => s + (i.qtd || 0), 0);
   const tem_itens_cobrar = qtd_cobrar > 0;

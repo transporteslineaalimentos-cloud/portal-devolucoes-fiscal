@@ -16,7 +16,7 @@ export default function RetornoCDSection({ dev }) {
   if (!dev?.retornou_cd) return null;
 
   const itens = dev.itens_cd || [];
-  const COBRAR = new Set(['AVARIA', 'FALTA', 'VALIDADE CURTA', 'IMPROPRIO']);
+  const COBRAR = new Set(['AVARIA', 'FALTA', 'IMPROPRIO']);
 
   // Agrupa por destino
   const porDestino = {};
