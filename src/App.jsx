@@ -7,11 +7,13 @@ import { dbGetCobrancasCount, dbGetPendencias } from './config/supabase';
 
 const Devolucoes = lazy(() => import('./views/Devolucoes'));
 const Cobrancas  = lazy(() => import('./views/Cobrancas'));
+const Protheus   = lazy(() => import('./views/Protheus'));
 
 const PAGE_META = {
   dashboard:  { title: 'Dashboard',          sub: null },
   devolucoes: { title: 'Devoluções Fiscais',  sub: 'NF-e recebidas classificadas por CFOP · sincronizado a cada hora' },
   cobrancas:  { title: 'Cobranças',          sub: 'Devoluções com responsabilidade do transportador já lançadas no Protheus' },
+  protheus:   { title: 'Controle Protheus',  sub: 'Todos os lançamentos de devolução escriturados no Protheus via GoBi' },
 };
 
 function Fallback() {
@@ -241,7 +243,12 @@ function Portal() {
             </Suspense>
           )}
           {tab === 'cobrancas' && (
-            <Suspense fallback={<Fallback />}>
+            <Suspense fallb
+          {tab === 'protheus' && (
+            <Suspense fallback={<div className="loading-state">Carregando…</div>}>
+              <Protheus user={user} />
+            </Suspense>
+          )}ack={<Fallback />}>
               <Cobrancas user={user} initialFilters={tabFilters.cobrancas || {}}
                 onChanged={refreshCounts} />
             </Suspense>
