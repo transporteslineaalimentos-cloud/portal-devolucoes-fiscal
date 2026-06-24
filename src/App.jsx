@@ -243,14 +243,14 @@ function Portal() {
             </Suspense>
           )}
           {tab === 'cobrancas' && (
-            <Suspense fallb
-          {tab === 'protheus' && (
-            <Suspense fallback={<div className="loading-state">Carregando…</div>}>
-              <Protheus user={user} />
-            </Suspense>
-          )}ack={<Fallback />}>
+            <Suspense fallback={<Fallback />}>
               <Cobrancas user={user} initialFilters={tabFilters.cobrancas || {}}
                 onChanged={refreshCounts} />
+            </Suspense>
+          )}
+          {tab === 'protheus' && (
+            <Suspense fallback={<Fallback />}>
+              <Protheus user={user} />
             </Suspense>
           )}
         </main>
