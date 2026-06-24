@@ -133,18 +133,19 @@ function applyDevolucoesFilters(q, filters = {}) {
   if (filters.lancado === 'sim')   q = q.eq('lancado_protheus', true);
   if (filters.lancado === 'nao')   q = q.or('lancado_protheus.is.null,lancado_protheus.eq.false');
 
-  // Busca — usa filtro separado encapsulado para não conflitar com outros filtros
+  // Busca
   if (filters.search) {
     const s = filters.search.trim().replace(/\./g,'').replace(/\//g,'').replace(/-/g,'');
     const isNum = /^\d+$/.test(s);
-    if (isNum && s.length <= 9) {
-      // número curto = número da NF de devolução OU número da NF de venda (em chave referenciada)
+    if (isNum && s.length >= 14) {
+      // 14 dígitos = CNPJ
+      q = q.ilike('cnpj_emitente', `%${s}%`);
+    } else if (isNum) {
+      // qualquer número = nf_numero OU chave_nfe_referenciada
+      // sem restrição de data — número identifica a nota univocamente
       const nfInt = parseInt(s, 10);
       const nfStr = nfInt.toString().padStart(9, '0');
       q = q.or(`nf_numero.eq.${nfInt},chave_nfe_referenciada.like.%${nfStr}%`);
-    } else if (isNum && s.length >= 10) {
-      // número longo = CNPJ
-      q = q.ilike('cnpj_emitente', `%${s}%`);
     } else {
       // texto = nome do emitente ou município
       q = q.or(`nome_emitente.ilike.%${filters.search.trim()}%,municipio_emitente.ilike.%${filters.search.trim()}%`);
@@ -157,6 +158,11 @@ export async function dbListDevolucoes({ page = 0, filters = {} }) {
   syncAuthToken();
   const from = page * PAGE_SIZE;
   const to   = from + PAGE_SIZE - 1;
+
+  // Detecta se é busca numérica (número de NF) — nesse caso remove o filtro de data
+  // para poder encontrar qualquer nota independente do período
+  const searchTerm = (filters.search || '').trim().replace(/[./-]/g, '');
+  const isNumericSearch = /^\d+$/.test(searchTerm) && searchTerm.length < 14;
 
   let q = supabase
     .from('oobj_nfe_recebidas')
@@ -171,11 +177,15 @@ export async function dbListDevolucoes({ page = 0, filters = {} }) {
       lancado_protheus, dt_lancamento_protheus
     `, { count: 'exact' })
     .eq('tipo', 'devolucao')
-    .gte('dt_emissao', '2026-01-01')
     .or('status_sefaz.neq.CANCELADA,status_sefaz.is.null')   // ocultar canceladas
     .not('cfops', 'cs', '{"6201"}')            // excluir dev. de industrialização (fornecedores)
     .order('dt_emissao', { ascending: false })
     .range(from, to);
+
+  // Só aplica filtro de data mínima quando NÃO é busca numérica direta
+  if (!isNumericSearch) {
+    q = q.gte('dt_emissao', '2026-01-01');
+  }
 
   q = applyDevolucoesFilters(q, filters);
 

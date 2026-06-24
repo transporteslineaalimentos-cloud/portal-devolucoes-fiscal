@@ -206,8 +206,9 @@ export default function Devolucoes({ user, initialFilters = {} }) {
   const [exporting, setExporting]     = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({ ...EMPTY_FILTERS, ...initFilt });
+  const [searchInput, setSearchInput] = useState(initFilt.search || '');
   const [transportadoras, setTransportadoras] = useState([]);
-  const searchRef = useRef(null);
+  const searchRef = useRef(null); // armazena o timer do debounce
   const PAGE_SIZE = 40;
 
   useEffect(() => { dbGetTransportadoras().then(setTransportadoras).catch(() => {}); }, []);
@@ -217,6 +218,7 @@ export default function Devolucoes({ user, initialFilters = {} }) {
   useEffect(() => {
     if (Object.keys(initFilt).length) {
       setFilters({ ...EMPTY_FILTERS, ...initFilt });
+      setSearchInput(initFilt.search || '');
       setPage(0);
       setShowFilters(true);
     }
@@ -250,10 +252,11 @@ export default function Devolucoes({ user, initialFilters = {} }) {
 
   const applyFilter = patch => { setFilters(f => ({ ...f, ...patch })); setPage(0); };
   const handleSearch = val => {
+    setSearchInput(val);                        // visual imediato — sem lag
     clearTimeout(searchRef.current);
-    searchRef.current = setTimeout(() => applyFilter({ search: val }), 350);
+    searchRef.current = setTimeout(() => applyFilter({ search: val }), 400);
   };
-  const clearFilters = () => { setFilters({ ...EMPTY_FILTERS }); setPage(0); };
+  const clearFilters = () => { setFilters({ ...EMPTY_FILTERS }); setSearchInput(''); setPage(0); };
   const hasFilters = Object.entries(filters).some(([k, v]) => v && k !== 'search') || filters.search;
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
@@ -328,7 +331,7 @@ export default function Devolucoes({ user, initialFilters = {} }) {
         <div className="table-toolbar">
           <Ic d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0" color="var(--text-3)" size={15}/>
           <input type="text" placeholder="Buscar por emitente, número da NF ou município..."
-            value={filters.search}
+            value={searchInput}
             onChange={e => handleSearch(e.target.value)}
             className="table-search-input"
           />
