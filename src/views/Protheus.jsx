@@ -1,60 +1,211 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { supabase, syncAuthToken } from '../config/supabase';
-import { fmtBRL, fmtDate } from '../utils.jsx';
+import { fmtBRL } from '../utils.jsx';
 
-const Ic = ({ d, size = 14, color = 'currentColor' }) => (
+// ── Ícones inline ──────────────────────────────────────────────────────────
+const Ic = ({ d, size = 14 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
-    stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
     <path d={d} />
   </svg>
 );
+const IC_SYNC   = 'M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15';
+const IC_UP     = 'M5 10l7-7m0 0l7 7m-7-7v18';
+const IC_DOWN   = 'M19 14l-7 7m0 0l-7-7m7 7V3';
+const IC_FLAT   = 'M5 12h14';
+const IC_FILTER = 'M3 4h18M7 8h10M11 12h2';
 
-const ICON_CHART  = 'M3 3v18h18M9 17V9m4 8v-5m4 5V5';
-const ICON_LIST   = 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2';
-const ICON_LINK   = 'M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1';
-const ICON_FILTER = 'M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z';
-const ICON_SYNC   = 'M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15';
-
-const MESES = {
-  '2026-01':'Jan/26','2026-02':'Fev/26','2026-03':'Mar/26',
-  '2026-04':'Abr/26','2026-05':'Mai/26','2026-06':'Jun/26',
-  '2026-07':'Jul/26','2026-08':'Ago/26','2026-09':'Set/26',
-  '2026-10':'Out/26','2026-11':'Nov/26','2026-12':'Dez/26',
+const fmtMes = m => {
+  if (!m) return '';
+  const [y, mo] = m.split('-');
+  const nomes = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  return `${nomes[parseInt(mo)-1]}/${y.slice(2)}`;
 };
 
-const fmtMes = m => MESES[m] || m;
+const pct = (a, b) => b > 0 ? ((a / b) * 100).toFixed(1) + '%' : '—';
 
-function KpiCard({ label, value, sub, color = 'var(--accent)' }) {
+const variacao = (atual, anterior) => {
+  if (!anterior || anterior === 0) return null;
+  return ((atual - anterior) / anterior) * 100;
+};
+
+// ── KPI Card ───────────────────────────────────────────────────────────────
+function KpiCard({ label, value, sub, color = 'var(--accent)', delta, deltaLabel }) {
+  const deltaOk = delta !== null && delta !== undefined;
+  const up = deltaOk && delta > 0;
+  const down = deltaOk && delta < 0;
   return (
     <div style={{
       background: 'var(--surface)', border: '1px solid var(--border)',
-      borderRadius: 10, padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 4,
+      borderRadius: 12, padding: '18px 22px', display: 'flex', flexDirection: 'column', gap: 6,
+      borderTop: `3px solid ${color}`,
     }}>
-      <span style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</span>
-      <span style={{ fontSize: 22, fontWeight: 800, color, fontVariantNumeric: 'tabular-nums' }}>{value}</span>
-      {sub && <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{sub}</span>}
+      <span style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600 }}>{label}</span>
+      <span style={{ fontSize: 24, fontWeight: 800, color, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{value}</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        {sub && <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{sub}</span>}
+        {deltaOk && (
+          <span style={{
+            fontSize: 11, fontWeight: 700, display: 'flex', gap: 3, alignItems: 'center',
+            color: up ? '#22c55e' : down ? '#ef4444' : 'var(--text-3)',
+          }}>
+            <Ic d={up ? IC_UP : down ? IC_DOWN : IC_FLAT} size={10} />
+            {Math.abs(delta).toFixed(1)}% {deltaLabel || 'vs mês ant.'}
+          </span>
+        )}
+      </div>
     </div>
   );
 }
 
-function BarChart({ data, valueKey = 'valor', labelKey = 'mes', colorA = 'var(--accent)', colorB = '#e74c3c' }) {
+// ── Gráfico de linha SVG ───────────────────────────────────────────────────
+function LineChart({ data, valueKey = 'valor', labelKey = 'mes', color = 'var(--accent)', height = 140 }) {
   if (!data?.length) return null;
-  const max = Math.max(...data.map(d => d[valueKey] || 0), 1);
+  const W = 600, H = height;
+  const PAD = { t: 10, r: 20, b: 28, l: 56 };
+  const vals = data.map(d => d[valueKey] || 0);
+  const maxV = Math.max(...vals, 1);
+  const minV = Math.min(...vals, 0);
+  const range = maxV - minV || 1;
+
+  const x = i => PAD.l + (i / (data.length - 1)) * (W - PAD.l - PAD.r);
+  const y = v => PAD.t + (1 - (v - minV) / range) * (H - PAD.t - PAD.b);
+
+  const pts = data.map((d, i) => `${x(i)},${y(d[valueKey] || 0)}`).join(' ');
+  const area = `M${x(0)},${y(0)} ` + data.map((d, i) => `L${x(i)},${y(d[valueKey] || 0)}`).join(' ') +
+    ` L${x(data.length-1)},${H - PAD.b} L${x(0)},${H - PAD.b} Z`;
+
+  // grades horizontais
+  const ticks = 4;
+  const grades = Array.from({ length: ticks + 1 }, (_, i) => minV + (range * i / ticks));
+
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 120, padding: '0 4px' }}>
-      {data.map((d, i) => {
-        const h = Math.max(4, Math.round(((d[valueKey] || 0) / max) * 100));
-        const hPortal = Math.round(((d.valor_no_portal || 0) / max) * 100);
-        const hFora   = Math.round(((d.valor_fora_portal || 0) / max) * 100);
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height }} preserveAspectRatio="none">
+      <defs>
+        <linearGradient id="lg" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.18" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+
+      {/* grades */}
+      {grades.map((v, i) => (
+        <g key={i}>
+          <line x1={PAD.l} x2={W - PAD.r} y1={y(v)} y2={y(v)}
+            stroke="var(--border)" strokeWidth="0.5" strokeDasharray="3,3" />
+          <text x={PAD.l - 6} y={y(v) + 3.5} textAnchor="end"
+            style={{ fontSize: 9, fill: 'var(--text-3)', fontVariantNumeric: 'tabular-nums' }}>
+            {v >= 1000 ? `${(v/1000).toFixed(0)}k` : v.toFixed(0)}
+          </text>
+        </g>
+      ))}
+
+      {/* área */}
+      <path d={area} fill="url(#lg)" />
+
+      {/* linha */}
+      <polyline points={pts} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round" />
+
+      {/* pontos e labels */}
+      {data.map((d, i) => (
+        <g key={i}>
+          <circle cx={x(i)} cy={y(d[valueKey] || 0)} r={3.5} fill={color} />
+          <text x={x(i)} y={H - PAD.b + 14} textAnchor="middle"
+            style={{ fontSize: 9, fill: 'var(--text-3)' }}>
+            {fmtMes(d[labelKey])}
+          </text>
+        </g>
+      ))}
+    </svg>
+  );
+}
+
+// ── Gráfico barras duplas SVG ──────────────────────────────────────────────
+function BarDualChart({ data, height = 130 }) {
+  if (!data?.length) return null;
+  const W = 600, H = height;
+  const PAD = { t: 10, r: 16, b: 28, l: 56 };
+  const maxV = Math.max(...data.map(d => (d.valor_no_portal || 0) + (d.valor_fora_portal || 0)), 1);
+  const bw = ((W - PAD.l - PAD.r) / data.length) * 0.72;
+  const gap = ((W - PAD.l - PAD.r) / data.length) * 0.28;
+  const bh = H - PAD.t - PAD.b;
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height }} preserveAspectRatio="none">
+      {/* grade */}
+      {[0, 0.25, 0.5, 0.75, 1].map((f, i) => {
+        const yy = PAD.t + (1 - f) * bh;
         return (
-          <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-            <div style={{ width: '100%', display: 'flex', alignItems: 'flex-end', gap: 1, height: 90 }}>
-              <div title={`No portal: ${fmtBRL(d.valor_no_portal || 0)}`}
-                style={{ flex:1, height: hPortal+'%', background: colorA, borderRadius: '3px 3px 0 0', minHeight: d.valor_no_portal > 0 ? 3 : 0 }} />
-              <div title={`Fora do portal: ${fmtBRL(d.valor_fora_portal || 0)}`}
-                style={{ flex:1, height: hFora+'%', background: colorB, borderRadius: '3px 3px 0 0', minHeight: d.valor_fora_portal > 0 ? 3 : 0 }} />
+          <g key={i}>
+            <line x1={PAD.l} x2={W - PAD.r} y1={yy} y2={yy}
+              stroke="var(--border)" strokeWidth="0.5" strokeDasharray="3,3" />
+            <text x={PAD.l - 6} y={yy + 3.5} textAnchor="end"
+              style={{ fontSize: 9, fill: 'var(--text-3)', fontVariantNumeric: 'tabular-nums' }}>
+              {`${((maxV * f) / 1000).toFixed(0)}k`}
+            </text>
+          </g>
+        );
+      })}
+
+      {data.map((d, i) => {
+        const slotW = (W - PAD.l - PAD.r) / data.length;
+        const cx = PAD.l + i * slotW + slotW / 2;
+        const hP = ((d.valor_no_portal || 0) / maxV) * bh;
+        const hF = ((d.valor_fora_portal || 0) / maxV) * bh;
+        const yBase = PAD.t + bh;
+        const half = bw / 2 - 1;
+
+        return (
+          <g key={i}>
+            {/* barra portal */}
+            <rect x={cx - half - 1} y={yBase - hP} width={half} height={Math.max(hP, 1)}
+              fill="var(--accent)" rx={2} opacity={0.85} />
+            {/* barra fora portal */}
+            <rect x={cx + 1} y={yBase - hF} width={half} height={Math.max(hF, 1)}
+              fill="#e74c3c" rx={2} opacity={0.75} />
+            <text x={cx} y={H - PAD.b + 14} textAnchor="middle"
+              style={{ fontSize: 9, fill: 'var(--text-3)' }}>
+              {fmtMes(d.mes)}
+            </text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+// ── Ranking horizontal ─────────────────────────────────────────────────────
+function HBar({ items, valueKey = 'valor', labelKey = 'cliente', color = 'var(--accent)', limit = 8 }) {
+  if (!items?.length) return <div style={{ color: 'var(--text-3)', fontSize: 12, padding: '12px 0' }}>Sem dados</div>;
+  const top = items.slice(0, limit);
+  const maxV = top[0]?.[valueKey] || 1;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {top.map((item, i) => {
+        const w = Math.round((item[valueKey] / maxV) * 100);
+        const label = (item[labelKey] || '—').trim().slice(0, 32);
+        return (
+          <div key={i}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 3 }}>
+              <span style={{ color: 'var(--text-1)', fontWeight: 500 }}>{label}</span>
+              <span style={{ color: 'var(--text-2)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+                {fmtBRL(item[valueKey])}
+              </span>
             </div>
-            <span style={{ fontSize: 10, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>{fmtMes(d[labelKey])}</span>
+            <div style={{ height: 6, background: 'var(--border)', borderRadius: 4, overflow: 'hidden' }}>
+              <div style={{ width: w + '%', height: '100%', background: color, borderRadius: 4,
+                transition: 'width 0.4s ease' }} />
+            </div>
+            {item.qtd !== undefined && (
+              <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 2 }}>
+                {item.qtd} NF{item.qtd !== 1 ? 'Ds' : 'D'}
+                {item.qtd_no_portal !== undefined && (
+                  <span style={{ marginLeft: 8, color: 'var(--accent)' }}>
+                    {item.qtd_no_portal} no portal
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         );
       })}
@@ -62,40 +213,94 @@ function BarChart({ data, valueKey = 'valor', labelKey = 'mes', colorA = 'var(--
   );
 }
 
-export default function Protheus({ user }) {
+// ── Tabela evolução compacta ───────────────────────────────────────────────
+function EvolucaoTable({ data }) {
+  if (!data?.length) return null;
+  return (
+    <div style={{ overflowX: 'auto' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+        <thead>
+          <tr style={{ borderBottom: '1px solid var(--border)' }}>
+            {['Mês', 'NFDs', 'Valor total', 'No portal', 'Só Protheus', 'Variação'].map(h => (
+              <th key={h} style={{ padding: '6px 10px', textAlign: h === 'Mês' ? 'left' : 'right',
+                color: 'var(--text-3)', fontSize: 10, fontWeight: 700,
+                textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {data.map((r, i) => {
+            const prev = data[i - 1];
+            const v = variacao(r.valor, prev?.valor);
+            return (
+              <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
+                <td style={{ padding: '7px 10px', fontWeight: 700 }}>{fmtMes(r.mes)}</td>
+                <td style={{ padding: '7px 10px', textAlign: 'right', color: 'var(--text-2)' }}>{r.qtd}</td>
+                <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 700 }}>{fmtBRL(r.valor)}</td>
+                <td style={{ padding: '7px 10px', textAlign: 'right', color: 'var(--accent)' }}>{fmtBRL(r.valor_no_portal)}</td>
+                <td style={{ padding: '7px 10px', textAlign: 'right', color: '#e74c3c' }}>{fmtBRL(r.valor_fora_portal)}</td>
+                <td style={{ padding: '7px 10px', textAlign: 'right' }}>
+                  {v === null ? <span style={{ color: 'var(--text-3)' }}>—</span> : (
+                    <span style={{ color: v > 0 ? '#ef4444' : '#22c55e', fontWeight: 700, fontSize: 11 }}>
+                      {v > 0 ? '▲' : '▼'} {Math.abs(v).toFixed(1)}%
+                    </span>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ── Card container ─────────────────────────────────────────────────────────
+function Card({ title, sub, children, span = 1 }) {
+  return (
+    <div style={{
+      background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12,
+      padding: '18px 20px', gridColumn: `span ${span}`,
+      display: 'flex', flexDirection: 'column', gap: 14,
+    }}>
+      <div>
+        <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-1)' }}>{title}</div>
+        {sub && <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>{sub}</div>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// ── View principal ─────────────────────────────────────────────────────────
+export default function Protheus() {
   const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
-  const [view, setView]       = useState('lista'); // 'lista' | 'grafico'
-
   const [filters, setFilters] = useState({
     dt_inicio: '2026-01-01',
-    dt_fim: new Date().toISOString().slice(0,10),
-    motivo: '',
-    cliente: '',
+    dt_fim: new Date().toISOString().slice(0, 10),
     status: '',
   });
-  const [clienteInput, setClienteInput] = useState('');
-  const debounceRef = useRef(null);
-
-  const [detalhe, setDetalhe] = useState(null);
+  const debRef = useRef(null);
 
   const load = async (f) => {
-    const ff = f || filters;
     setLoading(true);
     try {
       syncAuthToken();
       const { data: res, error } = await supabase.rpc('get_protheus_data', {
-        p_inicio:  ff.dt_inicio || null,
-        p_fim:     ff.dt_fim    || null,
-        p_motivo:  ff.motivo    || null,
-        p_cliente: ff.cliente   || null,
-        p_status:  ff.status    || null,
+        p_inicio: f.dt_inicio || null,
+        p_fim:    f.dt_fim    || null,
+        p_status: f.status    || null,
+        p_motivo: null,
+        p_cliente: null,
       });
       if (error) throw error;
       setData(res);
-    } catch(e) {
-      console.error('get_protheus_data error:', e);
+    } catch (e) {
+      console.error('get_protheus_data:', e);
     } finally {
       setLoading(false);
     }
@@ -106,393 +311,206 @@ export default function Protheus({ user }) {
   const applyFilter = patch => {
     const next = { ...filters, ...patch };
     setFilters(next);
-    load(next);
-  };
-
-  const handleClienteInput = val => {
-    setClienteInput(val);
-    clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => applyFilter({ cliente: val }), 400);
+    clearTimeout(debRef.current);
+    debRef.current = setTimeout(() => load(next), 300);
   };
 
   const handleSync = async () => {
     setSyncing(true);
     try {
+      const hoje = new Date();
+      const d4 = new Date(hoje); d4.setDate(d4.getDate() - 4);
       const resp = await fetch('https://opcrtjdnpgqcjlksofjw.supabase.co/functions/v1/sync-protheus', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          start_date: new Date(Date.now() - 4*86400000).toISOString().slice(0,10),
-          end_date:   new Date().toISOString().slice(0,10),
+          start_date: d4.toISOString().slice(0, 10),
+          end_date:   hoje.toISOString().slice(0, 10),
         }),
       });
       const res = await resp.json();
-      alert(`Sync concluído!\n${res.atualizados} novas | ${res.ja_lancados} atualizadas | ${res.nao_encontrados_count} fora do portal`);
-      load();
-    } catch(e) {
-      alert('Erro no sync: ' + e.message);
+      alert(`Sync concluído!\n${res.atualizados} novas · ${res.ja_lancados} atualizadas · ${res.nao_encontrados_count} fora do portal`);
+      load(filters);
+    } catch (e) {
+      alert('Erro: ' + e.message);
     } finally {
       setSyncing(false);
     }
   };
 
-  const kpis    = data?.kpis || {};
-  const lista   = data?.lista || [];
-  const evolucao= data?.evolucao || [];
+  const kpis    = data?.kpis     || {};
+  const evolucao= data?.evolucao  || [];
   const clientes= data?.top_clientes || [];
-  const motivos = data?.por_motivo || [];
-  const motivosDisp = data?.motivos_disponiveis || [];
+  const motivos = data?.por_motivo   || [];
 
-  const pct = (a,b) => b > 0 ? ((a/b)*100).toFixed(1)+'%' : '—';
+  // Calcula variação do último mês vs penúltimo
+  const ultMes  = evolucao[evolucao.length - 1];
+  const pentMes = evolucao[evolucao.length - 2];
+  const deltaUlt = variacao(ultMes?.valor, pentMes?.valor);
+
+  // Cobertura portal
+  const coberturaPortal = kpis.total_lancamentos > 0
+    ? (kpis.total_no_portal / kpis.total_lancamentos) * 100 : 0;
+
+  // Ticket médio
+  const ticketMedio = kpis.total_lancamentos > 0
+    ? kpis.total_valor / kpis.total_lancamentos : 0;
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', gap: 20, padding: '0 0 40px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100%' }}>
 
-      {/* ── Header + filtros ────────────────────────────────────── */}
+      {/* ── Topbar filtros ── */}
       <div style={{
-        background:'var(--surface)', borderBottom:'1px solid var(--border)',
-        padding:'16px 24px', display:'flex', flexWrap:'wrap', gap:12, alignItems:'center',
+        background: 'var(--surface)', borderBottom: '1px solid var(--border)',
+        padding: '12px 24px', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap',
       }}>
-        {/* Período */}
-        <div style={{ display:'flex', gap:6, alignItems:'center' }}>
-          <input type="date" value={filters.dt_inicio}
-            onChange={e => applyFilter({ dt_inicio: e.target.value })}
-            style={{ background:'var(--bg)', border:'1px solid var(--border)', borderRadius:6,
-              padding:'5px 8px', fontSize:12, color:'var(--text-1)' }} />
-          <span style={{ color:'var(--text-3)', fontSize:12 }}>até</span>
-          <input type="date" value={filters.dt_fim}
-            onChange={e => applyFilter({ dt_fim: e.target.value })}
-            style={{ background:'var(--bg)', border:'1px solid var(--border)', borderRadius:6,
-              padding:'5px 8px', fontSize:12, color:'var(--text-1)' }} />
-        </div>
+        <Ic d={IC_FILTER} size={13} />
+        <input type="date" value={filters.dt_inicio}
+          onChange={e => applyFilter({ dt_inicio: e.target.value })}
+          style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 6,
+            padding: '5px 8px', fontSize: 12, color: 'var(--text-1)' }} />
+        <span style={{ color: 'var(--text-3)', fontSize: 12 }}>até</span>
+        <input type="date" value={filters.dt_fim}
+          onChange={e => applyFilter({ dt_fim: e.target.value })}
+          style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 6,
+            padding: '5px 8px', fontSize: 12, color: 'var(--text-1)' }} />
 
-        {/* Busca cliente */}
-        <input type="text" placeholder="Buscar cliente…" value={clienteInput}
-          onChange={e => handleClienteInput(e.target.value)}
-          style={{ background:'var(--bg)', border:'1px solid var(--border)', borderRadius:6,
-            padding:'5px 10px', fontSize:12, color:'var(--text-1)', width: 200 }} />
-
-        {/* Motivo */}
-        <select value={filters.motivo} onChange={e => applyFilter({ motivo: e.target.value })}
-          style={{ background:'var(--bg)', border:'1px solid var(--border)', borderRadius:6,
-            padding:'5px 8px', fontSize:12, color:'var(--text-1)' }}>
-          <option value="">Todos os motivos</option>
-          {motivosDisp.map(m => (
-            <option key={m.codigo} value={m.codigo}>{m.descricao?.trim() || m.codigo}</option>
-          ))}
-        </select>
-
-        {/* Status portal */}
         <select value={filters.status} onChange={e => applyFilter({ status: e.target.value })}
-          style={{ background:'var(--bg)', border:'1px solid var(--border)', borderRadius:6,
-            padding:'5px 8px', fontSize:12, color:'var(--text-1)' }}>
+          style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 6,
+            padding: '5px 8px', fontSize: 12, color: 'var(--text-1)' }}>
           <option value="">Todos</option>
           <option value="no_portal">Vinculado ao portal</option>
           <option value="fora_portal">Somente Protheus</option>
         </select>
 
-        {/* Toggle view */}
-        <div style={{ marginLeft:'auto', display:'flex', gap:4 }}>
-          <button onClick={() => setView('lista')}
-            style={{ background: view==='lista' ? 'var(--accent)' : 'var(--bg)',
-              color: view==='lista' ? '#fff' : 'var(--text-2)',
-              border:'1px solid var(--border)', borderRadius:6, padding:'5px 10px',
-              fontSize:12, cursor:'pointer', display:'flex', gap:5, alignItems:'center' }}>
-            <Ic d={ICON_LIST} size={13}/> Lista
-          </button>
-          <button onClick={() => setView('grafico')}
-            style={{ background: view==='grafico' ? 'var(--accent)' : 'var(--bg)',
-              color: view==='grafico' ? '#fff' : 'var(--text-2)',
-              border:'1px solid var(--border)', borderRadius:6, padding:'5px 10px',
-              fontSize:12, cursor:'pointer', display:'flex', gap:5, alignItems:'center' }}>
-            <Ic d={ICON_CHART} size={13}/> Gráficos
-          </button>
-          <button onClick={handleSync} disabled={syncing}
-            style={{ background:'var(--bg)', color:'var(--text-2)', border:'1px solid var(--border)',
-              borderRadius:6, padding:'5px 10px', fontSize:12, cursor:'pointer',
-              display:'flex', gap:5, alignItems:'center', opacity: syncing?0.6:1 }}>
-            <Ic d={ICON_SYNC} size={13}/> {syncing ? 'Sincronizando…' : 'Sync agora'}
-          </button>
-        </div>
+        <button onClick={handleSync} disabled={syncing}
+          style={{ marginLeft: 'auto', background: 'var(--bg)', border: '1px solid var(--border)',
+            color: 'var(--text-2)', borderRadius: 6, padding: '5px 12px', fontSize: 12,
+            cursor: 'pointer', display: 'flex', gap: 6, alignItems: 'center', opacity: syncing ? 0.6 : 1 }}>
+          <Ic d={IC_SYNC} size={12} /> {syncing ? 'Sincronizando…' : 'Sync agora'}
+        </button>
       </div>
 
-      <div style={{ padding:'0 24px', display:'flex', flexDirection:'column', gap:20 }}>
+      {/* ── Conteúdo ── */}
+      <div style={{ padding: '20px 24px 40px', display: 'flex', flexDirection: 'column', gap: 18 }}>
 
-        {/* ── KPIs ───────────────────────────────────────────────── */}
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))', gap:12 }}>
-          <KpiCard label="Total lançado Protheus" value={fmtBRL(kpis.total_valor||0)} sub={`${kpis.total_lancamentos||0} NFDs`} />
-          <KpiCard label="Vinculado ao portal" value={fmtBRL(kpis.valor_no_portal||0)}
-            sub={`${kpis.total_no_portal||0} NFDs · ${pct(kpis.total_no_portal,kpis.total_lancamentos)}`}
-            color="var(--accent)" />
-          <KpiCard label="Somente Protheus" value={fmtBRL(kpis.valor_fora_portal||0)}
-            sub={`${kpis.total_fora_portal||0} NFDs · ${pct(kpis.total_fora_portal,kpis.total_lancamentos)}`}
-            color="#e74c3c" />
-          <KpiCard label="Clientes distintos" value={kpis.clientes_distintos||0} color="var(--text-2)" />
-        </div>
-
-        {loading && (
-          <div style={{ textAlign:'center', padding:40, color:'var(--text-3)', fontSize:13 }}>
-            Carregando…
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: 60, color: 'var(--text-3)', fontSize: 13 }}>
+            Carregando dados…
           </div>
-        )}
-
-        {!loading && view === 'grafico' && (
+        ) : (
           <>
-            {/* Gráfico evolução */}
-            <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:10, padding:20 }}>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
-                <div>
-                  <div style={{ fontWeight:700, fontSize:14 }}>Evolução mensal — lançamentos no Protheus</div>
-                  <div style={{ fontSize:11, color:'var(--text-3)', marginTop:2 }}>Por data de digitação</div>
+            {/* ── KPIs ── */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+              <KpiCard
+                label="Total lançado Protheus"
+                value={fmtBRL(kpis.total_valor || 0)}
+                sub={`${kpis.total_lancamentos || 0} NFDs`}
+                color="var(--accent)"
+                delta={deltaUlt}
+                deltaLabel="vs mês ant."
+              />
+              <KpiCard
+                label="Ticket médio / NFD"
+                value={fmtBRL(ticketMedio)}
+                sub={`${kpis.clientes_distintos || 0} clientes`}
+                color="#8b5cf6"
+              />
+              <KpiCard
+                label="Cobertura no portal"
+                value={`${coberturaPortal.toFixed(1)}%`}
+                sub={`${kpis.total_no_portal || 0} de ${kpis.total_lancamentos || 0} NFDs`}
+                color="var(--accent)"
+              />
+              <KpiCard
+                label="Fora do portal"
+                value={fmtBRL(kpis.valor_fora_portal || 0)}
+                sub={`${kpis.total_fora_portal || 0} NFDs sem correspondência OOBJ`}
+                color="#e74c3c"
+              />
+            </div>
+
+            {/* ── Evolução mensal — gráfico de linha ── */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12 }}>
+              <Card title="Evolução mensal de lançamentos no Protheus"
+                sub="Valor total escriturado por mês de digitação — linha cheia = total">
+                <LineChart data={evolucao} valueKey="valor" labelKey="mes" height={150} />
+                <div style={{ display: 'flex', gap: 20, justifyContent: 'center', fontSize: 11, color: 'var(--text-3)' }}>
+                  <span style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                    <span style={{ width: 12, height: 3, background: 'var(--accent)', display: 'inline-block', borderRadius: 2 }}/>
+                    Total escriturado
+                  </span>
                 </div>
-                <div style={{ display:'flex', gap:12, fontSize:11 }}>
-                  <span style={{ display:'flex', gap:5, alignItems:'center' }}>
-                    <span style={{ width:10, height:10, borderRadius:2, background:'var(--accent)', display:'inline-block' }}/>
+              </Card>
+            </div>
+
+            {/* ── Barras empilhadas + tabela ── */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 12 }}>
+              <Card title="Portal vs. Somente Protheus por mês"
+                sub="Azul = vinculado ao portal · Vermelho = só no Protheus (sem NFD no OOBJ)">
+                <BarDualChart data={evolucao} height={120} />
+                <div style={{ display: 'flex', gap: 16, fontSize: 11, color: 'var(--text-3)' }}>
+                  <span style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                    <span style={{ width: 10, height: 10, background: 'var(--accent)', display: 'inline-block', borderRadius: 2 }}/>
                     Vinculado ao portal
                   </span>
-                  <span style={{ display:'flex', gap:5, alignItems:'center' }}>
-                    <span style={{ width:10, height:10, borderRadius:2, background:'#e74c3c', display:'inline-block' }}/>
+                  <span style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                    <span style={{ width: 10, height: 10, background: '#e74c3c', display: 'inline-block', borderRadius: 2 }}/>
                     Somente Protheus
                   </span>
                 </div>
-              </div>
-              <BarChart data={evolucao} valueKey="valor" labelKey="mes" />
-              {/* Tabela resumo */}
-              <div style={{ marginTop:16, overflowX:'auto' }}>
-                <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
-                  <thead>
-                    <tr style={{ borderBottom:'1px solid var(--border)' }}>
-                      {['Mês','NFDs','Valor total','No portal','Valor portal','Fora portal','Valor fora'].map(h => (
-                        <th key={h} style={{ padding:'6px 10px', textAlign:'right', color:'var(--text-3)',
-                          fontWeight:600, fontSize:11, textTransform:'uppercase', letterSpacing:'0.04em',
-                          ':first-child': { textAlign:'left' } }}>
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {evolucao.map((r,i) => (
-                      <tr key={i} style={{ borderBottom:'1px solid var(--border)' }}>
-                        <td style={{ padding:'7px 10px', fontWeight:600, color:'var(--text-1)', textAlign:'left' }}>{fmtMes(r.mes)}</td>
-                        <td style={{ padding:'7px 10px', textAlign:'right', color:'var(--text-2)' }}>{r.qtd}</td>
-                        <td style={{ padding:'7px 10px', textAlign:'right', fontWeight:700 }}>{fmtBRL(r.valor)}</td>
-                        <td style={{ padding:'7px 10px', textAlign:'right', color:'var(--accent)' }}>{r.qtd_no_portal}</td>
-                        <td style={{ padding:'7px 10px', textAlign:'right', color:'var(--accent)' }}>{fmtBRL(r.valor_no_portal)}</td>
-                        <td style={{ padding:'7px 10px', textAlign:'right', color:'#e74c3c' }}>{r.qtd_fora_portal}</td>
-                        <td style={{ padding:'7px 10px', textAlign:'right', color:'#e74c3c' }}>{fmtBRL(r.valor_fora_portal)}</td>
-                      </tr>
-                    ))}
-                    <tr style={{ borderTop:'2px solid var(--border)', background:'var(--bg)' }}>
-                      <td style={{ padding:'8px 10px', fontWeight:800, textAlign:'left' }}>Total</td>
-                      <td style={{ padding:'8px 10px', textAlign:'right', fontWeight:700 }}>{kpis.total_lancamentos}</td>
-                      <td style={{ padding:'8px 10px', textAlign:'right', fontWeight:800, color:'var(--accent)' }}>{fmtBRL(kpis.total_valor||0)}</td>
-                      <td style={{ padding:'8px 10px', textAlign:'right', fontWeight:700, color:'var(--accent)' }}>{kpis.total_no_portal}</td>
-                      <td style={{ padding:'8px 10px', textAlign:'right', fontWeight:700, color:'var(--accent)' }}>{fmtBRL(kpis.valor_no_portal||0)}</td>
-                      <td style={{ padding:'8px 10px', textAlign:'right', fontWeight:700, color:'#e74c3c' }}>{kpis.total_fora_portal}</td>
-                      <td style={{ padding:'8px 10px', textAlign:'right', fontWeight:700, color:'#e74c3c' }}>{fmtBRL(kpis.valor_fora_portal||0)}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+              </Card>
+
+              <Card title="Detalhe mensal" sub="Variação ▲ ruim (mais devoluções) · ▼ bom">
+                <EvolucaoTable data={evolucao} />
+              </Card>
             </div>
 
-            {/* Top clientes + por motivo lado a lado */}
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
+            {/* ── Rankings ── */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <Card title="Maiores clientes por valor escriturado"
+                sub="Top 8 — baseado no valor lançado no Protheus no período">
+                <HBar items={clientes} valueKey="valor" labelKey="cliente" color="var(--accent)" />
+              </Card>
 
-              {/* Top clientes */}
-              <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:10, padding:20 }}>
-                <div style={{ fontWeight:700, fontSize:14, marginBottom:14 }}>Top clientes</div>
-                <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                  {clientes.slice(0,10).map((c,i) => {
-                    const maxV = clientes[0]?.valor || 1;
-                    const pctBar = Math.round((c.valor/maxV)*100);
-                    return (
-                      <div key={i} style={{ display:'flex', flexDirection:'column', gap:3 }}>
-                        <div style={{ display:'flex', justifyContent:'space-between', fontSize:12 }}>
-                          <span style={{ color:'var(--text-1)', fontWeight:500 }}>{c.cliente?.trim()?.slice(0,30)}</span>
-                          <span style={{ fontWeight:700 }}>{fmtBRL(c.valor)}</span>
-                        </div>
-                        <div style={{ display:'flex', gap:3, alignItems:'center' }}>
-                          <div style={{ flex:1, height:5, background:'var(--border)', borderRadius:3, overflow:'hidden' }}>
-                            <div style={{ width:pctBar+'%', height:'100%', background:'var(--accent)', borderRadius:3 }}/>
-                          </div>
-                          <span style={{ fontSize:10, color:'var(--text-3)', minWidth:60, textAlign:'right' }}>
-                            {c.qtd_no_portal > 0
-                              ? <span style={{ color:'var(--accent)' }}>{c.qtd_no_portal} portal</span>
-                              : <span style={{ color:'#e74c3c' }}>fora</span>
-                            }
-                            {' '}/ {c.qtd} total
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Por motivo */}
-              <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:10, padding:20 }}>
-                <div style={{ fontWeight:700, fontSize:14, marginBottom:14 }}>Por motivo</div>
-                <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                  {motivos.slice(0,10).map((m,i) => {
-                    const maxV = motivos[0]?.valor || 1;
-                    const pctBar = Math.round((m.valor/maxV)*100);
-                    return (
-                      <div key={i} style={{ display:'flex', flexDirection:'column', gap:3 }}>
-                        <div style={{ display:'flex', justifyContent:'space-between', fontSize:12 }}>
-                          <span style={{ color:'var(--text-1)', fontWeight:500 }}>{m.motivo?.trim()?.slice(0,35)}</span>
-                          <span style={{ fontWeight:700 }}>{fmtBRL(m.valor)}</span>
-                        </div>
-                        <div style={{ height:5, background:'var(--border)', borderRadius:3, overflow:'hidden' }}>
-                          <div style={{ width:pctBar+'%', height:'100%', background:'#8b5cf6', borderRadius:3 }}/>
-                        </div>
-                        <span style={{ fontSize:10, color:'var(--text-3)' }}>{m.qtd} NFDs</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
+              <Card title="Por motivo de devolução"
+                sub="Distribuição do valor escriturado por motivo">
+                <HBar items={motivos} valueKey="valor" labelKey="motivo" color="#8b5cf6" limit={8} />
+              </Card>
             </div>
+
+            {/* ── Insight automático ── */}
+            {evolucao.length >= 2 && (
+              <div style={{
+                background: deltaUlt > 15 ? '#ef444418' : deltaUlt < -15 ? '#22c55e18' : 'var(--surface)',
+                border: `1px solid ${deltaUlt > 15 ? '#ef4444' : deltaUlt < -15 ? '#22c55e' : 'var(--border)'}`,
+                borderRadius: 10, padding: '14px 18px', fontSize: 12,
+                display: 'flex', gap: 10, alignItems: 'flex-start',
+              }}>
+                <span style={{ fontSize: 18 }}>
+                  {deltaUlt > 15 ? '⚠️' : deltaUlt < -15 ? '✅' : 'ℹ️'}
+                </span>
+                <div>
+                  <div style={{ fontWeight: 700, marginBottom: 4, fontSize: 13 }}>
+                    {deltaUlt > 15
+                      ? `Alta de ${deltaUlt.toFixed(1)}% no último mês`
+                      : deltaUlt < -15
+                      ? `Queda de ${Math.abs(deltaUlt).toFixed(1)}% no último mês`
+                      : 'Estável no último mês'}
+                  </div>
+                  <div style={{ color: 'var(--text-2)', lineHeight: 1.5 }}>
+                    {fmtMes(ultMes?.mes)}: <strong>{fmtBRL(ultMes?.valor)}</strong> em{' '}
+                    <strong>{ultMes?.qtd} NFDs</strong> escrituradas.
+                    {pentMes && ` Em ${fmtMes(pentMes.mes)} foram ${fmtBRL(pentMes.valor)} (${pentMes.qtd} NFDs).`}
+                    {' '}O maior cliente do período é{' '}
+                    <strong>{clientes[0]?.cliente?.trim()?.split(' ').slice(0, 3).join(' ')}</strong>{' '}
+                    com {fmtBRL(clientes[0]?.valor)}.
+                  </div>
+                </div>
+              </div>
+            )}
           </>
         )}
-
-        {!loading && view === 'lista' && (
-          <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:10, overflow:'hidden' }}>
-            <div style={{ padding:'12px 20px', borderBottom:'1px solid var(--border)',
-              display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-              <span style={{ fontSize:13, fontWeight:600 }}>
-                {lista.length} lançamentos
-                {lista.length === 200 && <span style={{ color:'var(--text-3)', fontWeight:400 }}> (máx. 200 — refine os filtros)</span>}
-              </span>
-              <div style={{ display:'flex', gap:12, fontSize:11 }}>
-                <span style={{ display:'flex', gap:4, alignItems:'center' }}>
-                  <span style={{ width:8, height:8, borderRadius:'50%', background:'var(--accent)', display:'inline-block' }}/>
-                  Vinculado ao portal
-                </span>
-                <span style={{ display:'flex', gap:4, alignItems:'center' }}>
-                  <span style={{ width:8, height:8, borderRadius:'50%', background:'#e74c3c', display:'inline-block' }}/>
-                  Somente Protheus
-                </span>
-              </div>
-            </div>
-
-            <div style={{ overflowX:'auto' }}>
-              <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
-                <thead>
-                  <tr style={{ background:'var(--bg)', borderBottom:'1px solid var(--border)' }}>
-                    {['Status','NFD Origem','Data Digitação','Cliente','Motivo','Itens','Valor Total'].map(h => (
-                      <th key={h} style={{ padding:'8px 12px', textAlign:'left', color:'var(--text-3)',
-                        fontWeight:600, fontSize:11, textTransform:'uppercase', letterSpacing:'0.04em',
-                        whiteSpace:'nowrap' }}>
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {lista.map((row, i) => (
-                    <tr key={i}
-                      onClick={() => setDetalhe(detalhe?.nf_origem === row.nf_origem ? null : row)}
-                      style={{
-                        borderBottom:'1px solid var(--border)', cursor:'pointer',
-                        background: detalhe?.nf_origem === row.nf_origem ? 'var(--accent-alpha)' : 'transparent',
-                      }}
-                      onMouseEnter={e => e.currentTarget.style.background = detalhe?.nf_origem === row.nf_origem ? 'var(--accent-alpha)' : 'var(--bg)'}
-                      onMouseLeave={e => e.currentTarget.style.background = detalhe?.nf_origem === row.nf_origem ? 'var(--accent-alpha)' : 'transparent'}
-                    >
-                      <td style={{ padding:'8px 12px' }}>
-                        <span style={{
-                          display:'inline-flex', alignItems:'center', gap:4,
-                          background: row.no_portal ? '#1a7f5322' : '#e74c3c22',
-                          color: row.no_portal ? 'var(--accent)' : '#e74c3c',
-                          borderRadius:5, padding:'2px 7px', fontSize:11, fontWeight:600, whiteSpace:'nowrap',
-                        }}>
-                          {row.no_portal ? '● Portal' : '● Protheus'}
-                        </span>
-                      </td>
-                      <td style={{ padding:'8px 12px', fontWeight:700, fontVariantNumeric:'tabular-nums' }}>{row.nf_origem}</td>
-                      <td style={{ padding:'8px 12px', color:'var(--text-2)', whiteSpace:'nowrap' }}>{fmtDate(row.dt_digitacao)}</td>
-                      <td style={{ padding:'8px 12px', color:'var(--text-1)' }}>{row.razao_social?.trim()?.slice(0,32)}</td>
-                      <td style={{ padding:'8px 12px', color:'var(--text-2)' }}>{row.motivo_descricao?.trim()?.slice(0,30) || '—'}</td>
-                      <td style={{ padding:'8px 12px', textAlign:'center', color:'var(--text-3)' }}>{row.qtd_itens}</td>
-                      <td style={{ padding:'8px 12px', textAlign:'right', fontWeight:700, fontVariantNumeric:'tabular-nums' }}>{fmtBRL(row.valor_total)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* ── Detalhe da linha selecionada ───────────────────────── */}
-        {detalhe && (
-          <div style={{ background:'var(--surface)', border:'1px solid var(--accent)', borderRadius:10, padding:20 }}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:16 }}>
-              <div>
-                <div style={{ fontWeight:800, fontSize:15 }}>NFD {detalhe.nf_origem}</div>
-                <div style={{ fontSize:12, color:'var(--text-3)', marginTop:2 }}>
-                  {detalhe.razao_social?.trim()} · Digitado em {fmtDate(detalhe.dt_digitacao)}
-                </div>
-                {detalhe.motivo_descricao && (
-                  <div style={{ fontSize:12, color:'var(--text-2)', marginTop:4 }}>
-                    Motivo: {detalhe.motivo_descricao.trim()}
-                  </div>
-                )}
-              </div>
-              <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-                {detalhe.no_portal
-                  ? <span style={{ fontSize:11, color:'var(--accent)', background:'#1a7f5322',
-                      borderRadius:5, padding:'3px 8px', display:'flex', gap:4, alignItems:'center' }}>
-                      <Ic d={ICON_LINK} size={11}/> Vinculado ao portal
-                    </span>
-                  : <span style={{ fontSize:11, color:'#e74c3c', background:'#e74c3c22',
-                      borderRadius:5, padding:'3px 8px' }}>
-                      Apenas no Protheus
-                    </span>
-                }
-                <button onClick={() => setDetalhe(null)}
-                  style={{ background:'none', border:'none', cursor:'pointer', color:'var(--text-3)', fontSize:18, lineHeight:1 }}>
-                  ×
-                </button>
-              </div>
-            </div>
-
-            {/* Itens */}
-            <div style={{ overflowX:'auto' }}>
-              <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
-                <thead>
-                  <tr style={{ background:'var(--bg)', borderBottom:'1px solid var(--border)' }}>
-                    {['#','Código','Descrição','Unid','CFOP','Qtd','Vl. Unit.','Vl. Total'].map(h => (
-                      <th key={h} style={{ padding:'6px 10px', textAlign: ['Qtd','Vl. Unit.','Vl. Total'].includes(h) ? 'right' : 'left',
-                        color:'var(--text-3)', fontWeight:600, fontSize:11 }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {(detalhe.itens || []).map((it, i) => (
-                    <tr key={i} style={{ borderBottom:'1px solid var(--border)' }}>
-                      <td style={{ padding:'6px 10px', color:'var(--text-3)' }}>{it.item}</td>
-                      <td style={{ padding:'6px 10px', fontFamily:'monospace', color:'var(--text-2)' }}>{it.codigo_produto}</td>
-                      <td style={{ padding:'6px 10px', color:'var(--text-1)' }}>{it.descricao}</td>
-                      <td style={{ padding:'6px 10px', color:'var(--text-3)' }}>{it.unidade}</td>
-                      <td style={{ padding:'6px 10px', color:'var(--text-3)' }}>{it.cfop}</td>
-                      <td style={{ padding:'6px 10px', textAlign:'right', fontVariantNumeric:'tabular-nums' }}>{it.quantidade}</td>
-                      <td style={{ padding:'6px 10px', textAlign:'right', fontVariantNumeric:'tabular-nums' }}>{fmtBRL(it.valor_unitario)}</td>
-                      <td style={{ padding:'6px 10px', textAlign:'right', fontWeight:700, fontVariantNumeric:'tabular-nums' }}>{fmtBRL(it.valor_total)}</td>
-                    </tr>
-                  ))}
-                  <tr style={{ borderTop:'2px solid var(--border)', background:'var(--bg)' }}>
-                    <td colSpan={7} style={{ padding:'8px 10px', textAlign:'right', fontWeight:700 }}>Total</td>
-                    <td style={{ padding:'8px 10px', textAlign:'right', fontWeight:800, color:'var(--accent)' }}>{fmtBRL(detalhe.valor_total)}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
       </div>
     </div>
   );
