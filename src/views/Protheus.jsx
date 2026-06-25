@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { supabase } from '../config/supabase';
+import { supabase, syncAuthToken } from '../config/supabase';
 import { fmtBRL, fmtDate } from '../utils.jsx';
 
 const Ic = ({ d, size = 14, color = 'currentColor' }) => (
@@ -80,15 +80,17 @@ export default function Protheus({ user }) {
 
   const [detalhe, setDetalhe] = useState(null);
 
-  const load = useCallback(async (f = filters) => {
+  const load = async (f) => {
+    const ff = f || filters;
     setLoading(true);
     try {
+      syncAuthToken();
       const { data: res, error } = await supabase.rpc('get_protheus_data', {
-        p_inicio:  f.dt_inicio || null,
-        p_fim:     f.dt_fim    || null,
-        p_motivo:  f.motivo    || null,
-        p_cliente: f.cliente   || null,
-        p_status:  f.status    || null,
+        p_inicio:  ff.dt_inicio || null,
+        p_fim:     ff.dt_fim    || null,
+        p_motivo:  ff.motivo    || null,
+        p_cliente: ff.cliente   || null,
+        p_status:  ff.status    || null,
       });
       if (error) throw error;
       setData(res);
@@ -97,9 +99,9 @@ export default function Protheus({ user }) {
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  };
 
-  useEffect(() => { load(); }, []); // eslint-disable-line
+  useEffect(() => { load(filters); }, []); // eslint-disable-line
 
   const applyFilter = patch => {
     const next = { ...filters, ...patch };
