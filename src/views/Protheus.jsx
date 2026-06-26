@@ -243,7 +243,7 @@ function DrillModal({ title, items, loading, onClose }) {
           display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>{title}</div>
-            <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>{items.length} NFDs · {fmtBRL(items.reduce((s, i) => s + (i.valor_total || 0), 0))}</div>
+            {items && <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>{items.length} NFDs · {fmtBRL(items.reduce((s, i) => s + (i.valor_total || 0), 0))}</div>}
           </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer',
             fontSize: 20, color: 'var(--text-3)', lineHeight: 1, padding: '4px 8px' }}>×</button>
