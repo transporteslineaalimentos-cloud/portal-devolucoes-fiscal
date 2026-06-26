@@ -99,7 +99,7 @@ function KpiCard({ label, value, sub, hue, icon, delta, deltaInv, onClick }) {
 }
 
 /* ── Gráfico de linha (mesmo padrão do Dashboard) ────────────────────────── */
-function TrendChart({ data, valueKey, labelKey, color = PAL.accent, height = 150, onPointClick }) {
+function TrendChart({ data, valueKey, labelKey, color = PAL.accent, height = 150, onPointClick, formatValue }) {
   const [hovered, setHovered] = useState(null);
   if (!data?.length) return <div style={{ height, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)', fontSize: 12 }}>Sem dados</div>;
 
@@ -154,13 +154,16 @@ function TrendChart({ data, valueKey, labelKey, color = PAL.accent, height = 150
           }} />
           {hovered === i && (
             <div style={{
-              position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)',
+              position: 'absolute', bottom: '100%',
+              left: i === 0 ? '0%' : i === data.length - 1 ? 'auto' : '50%',
+              right: i === data.length - 1 ? '0%' : 'auto',
+              transform: i === 0 || i === data.length - 1 ? 'none' : 'translateX(-50%)',
               marginBottom: 7, padding: '5px 9px', borderRadius: 6,
               background: 'var(--text)', color: '#fff',
               fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', pointerEvents: 'none',
               fontVariantNumeric: 'tabular-nums', boxShadow: 'var(--shadow-md)', zIndex: 3,
             }}>
-              {fmtBRL(p.d[valueKey])}
+              {formatValue ? formatValue(p.d[valueKey]) : p.d[valueKey]}
               <span style={{ opacity: 0.6, fontWeight: 400, marginLeft: 6 }}>{p.d[labelKey]}</span>
             </div>
           )}
@@ -300,7 +303,6 @@ export default function Protheus() {
   const [filters, setFilters] = useState({
     dt_inicio: '2026-01-01',
     dt_fim:    new Date().toISOString().slice(0, 10),
-    status:    '',
   });
   const debRef = useRef(null);
 
@@ -311,7 +313,7 @@ export default function Protheus() {
       const { data: res, error } = await supabase.rpc('get_protheus_data', {
         p_inicio:  f.dt_inicio || null,
         p_fim:     f.dt_fim    || null,
-        p_status:  f.status    || null,
+        p_status:  null,
         p_motivo:  null,
         p_cliente: null,
       });
@@ -381,13 +383,7 @@ export default function Protheus() {
         <input type="date" value={filters.dt_fim} onChange={e => applyFilter({ dt_fim: e.target.value })}
           style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 6,
             padding: '5px 8px', fontSize: 12, color: 'var(--text)' }} />
-        <select value={filters.status} onChange={e => applyFilter({ status: e.target.value })}
-          style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 6,
-            padding: '5px 8px', fontSize: 12, color: 'var(--text)' }}>
-          <option value="">Todos os lançamentos</option>
-          <option value="no_portal">Vinculado ao portal</option>
-          <option value="fora_portal">Somente Protheus</option>
-        </select>
+
         <button onClick={handleSync} disabled={syncing}
           style={{ marginLeft: 'auto', background: 'var(--bg)', border: '1px solid var(--border)',
             color: 'var(--text-2)', borderRadius: 6, padding: '5px 12px', fontSize: 12,
@@ -449,6 +445,7 @@ export default function Protheus() {
               subtitle="Quantidade de notas — clique em uma barra para ver as NFDs">
               <TrendChart data={evolucao} valueKey="qtd" labelKey="label"
                 color={PAL.violet} height={130}
+                formatValue={v => `${nf(v)} NF${v !== 1 ? 'Ds' : 'D'}`}
                 onPointClick={pt => openDrill(`Lançamentos de ${fmtMes(pt.mes)}`, r => r.mes_referencia === pt.mes)} />
             </Card>
           </div>
