@@ -227,8 +227,7 @@ function BarDual({ data, onBarClick }) {
 }
 
 /* ── Modal drill-down: lista de notas do grupo clicado ───────────────────── */
-function DrillModal({ title, items, onClose }) {
-  if (!items) return null;
+function DrillModal({ title, items, loading, onClose }) {
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 200,
@@ -251,6 +250,17 @@ function DrillModal({ title, items, onClose }) {
         </div>
         {/* Lista */}
         <div style={{ overflowY: 'auto', flex: 1 }}>
+          {loading && (
+            <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-3)', fontSize: 12 }}>
+              Buscando notas…
+            </div>
+          )}
+          {!loading && items?.length === 0 && (
+            <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-3)', fontSize: 12 }}>
+              Nenhuma NFD encontrada neste grupo.
+            </div>
+          )}
+          {!loading && items?.length > 0 && (
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead style={{ position: 'sticky', top: 0, background: 'var(--surface)', zIndex: 1 }}>
               <tr style={{ borderBottom: '1px solid var(--border)' }}>
@@ -288,6 +298,7 @@ function DrillModal({ title, items, onClose }) {
               ))}
             </tbody>
           </table>
+          )}
         </div>
       </div>
     </div>
@@ -299,7 +310,8 @@ export default function Protheus() {
   const [data,    setData]    = useState(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
-  const [drill,   setDrill]   = useState(null); // { title, items }
+  const [drill,      setDrill]      = useState(null);
+  const [drillLoading, setDrillLoading] = useState(false);
   const [filters, setFilters] = useState({
     dt_inicio: '2026-01-01',
     dt_fim:    new Date().toISOString().slice(0, 10),
@@ -335,11 +347,26 @@ export default function Protheus() {
     debRef.current = setTimeout(() => load(next), 300);
   };
 
-  // Drill-down: filtra a lista de NFDs por critério e abre modal
-  const openDrill = (title, filterFn) => {
-    const lista = data?.lista || [];
-    const items = lista.filter(filterFn);
-    setDrill({ title, items });
+  // Drill-down: busca direto do banco — sem limite de lista
+  const openDrill = async (title, tipo, valor) => {
+    setDrill({ title, items: null });
+    setDrillLoading(true);
+    try {
+      syncAuthToken();
+      const { data: rows, error } = await supabase.rpc('get_protheus_drill', {
+        p_tipo:   tipo,
+        p_valor:  valor ?? null,
+        p_inicio: filters.dt_inicio || null,
+        p_fim:    filters.dt_fim    || null,
+      });
+      if (error) throw error;
+      setDrill({ title, items: rows || [] });
+    } catch (e) {
+      console.error('drill error:', e);
+      setDrill({ title, items: [] });
+    } finally {
+      setDrillLoading(false);
+    }
   };
 
   const handleSync = async () => {
@@ -404,14 +431,14 @@ export default function Protheus() {
               sub={`${nf(kpis.total_lancamentos)} NFDs escrituradas via GoBi`} hue={PAL.accent}
               icon="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"
               delta={ultMes && pentMes ? { atual: ultMes.valor, anterior: pentMes.valor } : null}
-              deltaInv onClick={() => openDrill('Todas as NFDs escrituradas', () => true)} />
+              deltaInv onClick={() => openDrill('Todas as NFDs escrituradas', 'todos', null)} />
             <KpiCard label="Ticket médio / NFD" value={fmtBRL(ticket)}
               sub={`${nf(kpis.clientes_distintos)} clientes distintos`} hue={PAL.violet}
               icon="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             <KpiCard label="Maior valor por cliente" value={fmtBRL(clientes[0]?.valor || 0)}
               sub={clientes[0]?.cliente?.trim()?.split(' ').slice(0,3).join(' ') || '—'} hue={PAL.amber}
               icon="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-              onClick={() => clientes[0] && openDrill(`${clientes[0]?.cliente?.trim()}`, r => r.razao_social?.trim() === clientes[0]?.cliente?.trim())} />
+              onClick={() => clientes[0] && openDrill(clientes[0]?.cliente?.trim(), 'cliente', clientes[0]?.cliente?.trim())} />
           </div>
 
           {/* ── Gráficos linha + barras ── */}
@@ -422,7 +449,7 @@ export default function Protheus() {
               <TrendChart data={evolucao} valueKey="valor" labelKey="label"
                 color={PAL.accent} height={150}
                 formatValue={fmtBRL}
-                onPointClick={pt => openDrill(`Lançamentos de ${fmtMes(pt.mes)}`, r => r.mes_referencia === pt.mes)} />
+                onPointClick={pt => openDrill(`Lançamentos de ${fmtMes(pt.mes)}`, 'mes', pt.mes)} />
               {ultMes && pentMes && (
                 <div style={{ display: 'flex', gap: 24, marginTop: 20, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
                   <div>
@@ -447,7 +474,7 @@ export default function Protheus() {
               <TrendChart data={evolucao} valueKey="qtd" labelKey="label"
                 color={PAL.violet} height={130}
                 formatValue={v => `${nf(v)} NF${v !== 1 ? 'Ds' : 'D'}`}
-                onPointClick={pt => openDrill(`Lançamentos de ${fmtMes(pt.mes)}`, r => r.mes_referencia === pt.mes)} />
+                onPointClick={pt => openDrill(`Lançamentos de ${fmtMes(pt.mes)}`, 'mes', pt.mes)} />
             </Card>
           </div>
 
@@ -461,7 +488,7 @@ export default function Protheus() {
                   return (
                     <div key={i} className="drill-row"
                       style={{ padding: '9px 0', ...rowBorder(i, arr.length) }}
-                      onClick={() => openDrill(`${c.cliente?.trim()}`, r => r.razao_social?.trim() === c.cliente?.trim())}
+                      onClick={() => openDrill(c.cliente?.trim(), 'cliente', c.cliente?.trim())}
                       title={`Ver notas de ${c.cliente?.trim()}`}>
                       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 60px 90px', alignItems: 'center', gap: 10 }}>
                         <div>
@@ -490,7 +517,7 @@ export default function Protheus() {
                   return (
                     <div key={i} className="drill-row"
                       style={{ padding: '9px 0', ...rowBorder(i, arr.length) }}
-                      onClick={() => openDrill(`${m.motivo}`, r => (r.motivo_descricao?.trim() || 'SEM MOTIVO') === m.motivo)}
+                      onClick={() => openDrill(m.motivo, 'motivo', m.motivo)}
                       title={`Ver notas: ${m.motivo}`}>
                       <div style={{ display: 'grid', gridTemplateColumns: '8px minmax(0,1fr) 44px 90px', alignItems: 'center', gap: 10 }}>
                         <span style={{ width: 8, height: 8, borderRadius: '50%', background: cor, opacity: 0.85, flexShrink: 0 }} />
@@ -544,7 +571,7 @@ export default function Protheus() {
       </div>
 
       {/* ── Modal drill-down ── */}
-      {drill && <DrillModal title={drill.title} items={drill.items} onClose={() => setDrill(null)} />}
+      {drill && <DrillModal title={drill.title} items={drill.items} loading={drillLoading} onClose={() => setDrill(null)} />}
     </div>
   );
 }
