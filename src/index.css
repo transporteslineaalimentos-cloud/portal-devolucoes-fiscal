@@ -579,8 +579,9 @@ select.input { cursor: pointer; }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
 
 /* ─── DRILL-DOWN (dashboard clicável) ─────────────────── */
-.drill-row { cursor: pointer; transition: background 100ms ease; border-radius: 6px; }
+.drill-row { cursor: pointer; transition: background 120ms ease, box-shadow 120ms ease; border-radius: 6px; position: relative; }
 .drill-row:hover { background: var(--blue-dim); }
+.drill-row:hover::after { content: '→'; position: absolute; right: 4px; top: 50%; transform: translateY(-50%); font-size: 11px; color: var(--accent); opacity: 0.7; }
 tr.drill-row:hover td { background: var(--blue-dim); }
 .kpi-clickable { transition: border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease; }
 .kpi-clickable:hover { border-color: var(--blue-mid); box-shadow: 0 2px 10px rgba(30,77,183,0.10); transform: translateY(-1px); }

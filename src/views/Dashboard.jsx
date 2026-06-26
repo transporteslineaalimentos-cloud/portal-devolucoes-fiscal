@@ -507,12 +507,56 @@ export default function Dashboard({ onGoTo }) {
           };
           return (
             <>
-              <KpiMini label="Devoluções" value={nf(k.total_count)} sub={fmtBRL(k.total_valor)}
-                hue={PAL.accent} icon="M9 14l-4-4 4-4M5 10h11a4 4 0 010 8h-1"
-                delta={mesAtual && mesAnt ? { atual: mesAtual.qtd, anterior: mesAnt.qtd } : null} deltaInv
-                onClick={() => goDev()}
-                extra={comparar && <CompVal atual={k.total_valor} anterior={tc.valor} inverted/>}
-              />
+              <div onClick={() => goDev()} className="kpi-clickable" style={{
+                background: 'var(--surface)', border: '1px solid var(--border)',
+                borderRadius: 10, padding: '18px 20px', cursor: 'pointer',
+                boxShadow: '0 1px 2px rgba(15,25,35,0.04)', gridColumn: 'span 1',
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                  <span style={T.overline}>Devoluções</span>
+                  <div style={{ width: 28, height: 28, borderRadius: 7, background: PAL.accent + '14',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Ic d="M9 14l-4-4 4-4M5 10h11a4 4 0 010 8h-1" size={14} color={PAL.accent}/>
+                  </div>
+                </div>
+                {/* Linha OOBJ */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
+                  <div>
+                    <div style={{ fontSize: 10, color: 'var(--text-3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 }}>OOBJ · Total emitido</div>
+                    <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)', fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>{nf(k.total_count)}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 3 }}>{fmtBRL(k.total_valor)}</div>
+                  </div>
+                  {mesAtual && mesAnt && <Delta atual={mesAtual.qtd} anterior={mesAnt.qtd} invertido/>}
+                </div>
+                {/* Divisor */}
+                <div style={{ borderTop: '1px dashed var(--border)', margin: '10px 0' }}/>
+                {/* Linha Protheus */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                  <div>
+                    <div style={{ fontSize: 10, color: 'var(--text-3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 }}>Protheus · Escrituradas</div>
+                    <div style={{ fontSize: 22, fontWeight: 700, color: PAL.violet, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
+                      {nf(d.evolucao?.reduce((s, m) => s + (m.qtd || 0), 0) ?? '—')}
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 3 }}>
+                      {fmtBRL(d.evolucao?.reduce((s, m) => s + (m.valor || 0), 0) ?? 0)}
+                    </div>
+                  </div>
+                  {(() => {
+                    const totalOobj = k.total_count || 0;
+                    const totalProt = d.evolucao?.reduce((s, m) => s + (m.qtd || 0), 0) ?? 0;
+                    const pctEsc = totalOobj > 0 ? Math.round((totalProt / totalOobj) * 100) : 0;
+                    return (
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: 18, fontWeight: 800, color: pctEsc >= 80 ? '#22c55e' : pctEsc >= 50 ? PAL.amber : PAL.red, fontVariantNumeric: 'tabular-nums' }}>
+                          {pctEsc}%
+                        </div>
+                        <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 2 }}>escrituradas</div>
+                      </div>
+                    );
+                  })()}
+                </div>
+                {comparar && <div style={{ marginTop: 4 }}><CompVal atual={k.total_valor} anterior={tc.valor} inverted/></div>}
+              </div>
               <KpiMini label="Pendentes de análise" value={nf(k.pendente_count)} sub={fmtBRL(k.pendente_valor)}
                 hue={PAL.amber} icon="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
                 onClick={() => goDev({ status: 'pendente' })}
