@@ -421,6 +421,7 @@ export default function Protheus() {
               subtitle="Valor total escriturado por mês de digitação no Protheus">
               <TrendChart data={evolucao} valueKey="valor" labelKey="label"
                 color={PAL.accent} height={150}
+                formatValue={fmtBRL}
                 onPointClick={pt => openDrill(`Lançamentos de ${fmtMes(pt.mes)}`, r => r.mes_referencia === pt.mes)} />
               {ultMes && pentMes && (
                 <div style={{ display: 'flex', gap: 24, marginTop: 20, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
