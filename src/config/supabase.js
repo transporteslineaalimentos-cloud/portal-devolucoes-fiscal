@@ -115,7 +115,8 @@ function applyDevolucoesFilters(q, filters = {}) {
   if (filters.retornou_cd === 'sim')    q = q.eq('retornou_cd', true);
   if (filters.retornou_cd === 'nao')    q = q.or('retornou_cd.eq.false,retornou_cd.is.null');
   if (filters.retornou_cd === 'cobrar') q = q.eq('retornou_cd', true).eq('tem_itens_cobrar', true);
-  else if (filters.centro_custo)              q = q.eq('centro_custo', filters.centro_custo);
+  if (filters.centro_custo === 'sem')   q = q.is('centro_custo', null);
+  else if (filters.centro_custo)        q = q.eq('centro_custo', filters.centro_custo);
 
   if (filters.transportador === '__sem__')    q = q.is('transportador_cobranca', null);
   else if (filters.transportador) {
@@ -368,6 +369,7 @@ export async function dbGetDashboard(periodo) {
   const piorMesValor = [...evolucao].sort((a, b) => b.valor - a.valor)[0] || null;
   return {
     totais:        d?.totais       || { qtd: 0, valor: 0, ticket_medio: 0, clientes: 0 },
+    totaisProtheus: d?.totais_protheus || { qtd: 0, valor: 0 },
     evolucao,
     piorMesQtd,
     piorMesValor,

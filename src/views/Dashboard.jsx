@@ -535,15 +535,15 @@ export default function Dashboard({ onGoTo }) {
                   <div>
                     <div style={{ fontSize: 10, color: 'var(--text-3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 }}>Protheus · Escrituradas (GoBi)</div>
                     <div style={{ fontSize: 22, fontWeight: 700, color: PAL.violet, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
-                      {nf(d.totais_protheus?.qtd ?? '—')}
+                      {nf(d.totaisProtheus?.qtd ?? '—')}
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 3 }}>
-                      {fmtBRL(d.totais_protheus?.valor ?? 0)}
+                      {fmtBRL(d.totaisProtheus?.valor ?? 0)}
                     </div>
                   </div>
                   {(() => {
                     const totalOobj = k.total_count || 0;
-                    const totalProt = d.totais_protheus?.qtd || 0;
+                    const totalProt = d.totaisProtheus?.qtd || 0;
                     const pctEsc = totalOobj > 0 ? Math.round((totalProt / totalOobj) * 100) : 0;
                     return (
                       <div style={{ textAlign: 'right' }}>
@@ -918,70 +918,7 @@ export default function Dashboard({ onGoTo }) {
 
       </div>
 
-      {/* ── Lançamentos no Protheus por mês ─────────────── */}
-      {(d.evolucaoProtheus || []).length > 0 && (
-        <Card title="Lançamentos no Protheus por mês" subtitle="NFDs escrituradas · acumulado geral independente do período selecionado" noPad>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
-            <thead>
-              <tr>
-                {['Mês','NFDs lançadas','Valor lançado','% do total lançado','Variação'].map((h, i) => (
-                  <th key={h} style={{
-                    padding: '8px 20px', textAlign: i > 0 ? 'right' : 'left',
-                    ...T.overline, fontSize: 10,
-                    borderBottom: '1px solid var(--border)',
-                    background: 'var(--surface-2)',
-                  }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {(() => {
-                const ep = d.evolucaoProtheus || [];
-                const totalValor = ep.reduce((s, m) => s + m.valor, 0);
-                return ep.map((m, i) => {
-                  const ant = ep[i - 1];
-                  const pct = totalValor > 0 ? (m.valor / totalValor * 100).toFixed(1) : '0';
-                  const maxValor = Math.max(...ep.map(e => e.valor));
-                  const cell = { padding: '10px 20px', textAlign: 'right', borderBottom: '1px solid var(--surface-3)', fontVariantNumeric: 'tabular-nums' };
-                  return (
-                    <tr key={m.mes}>
-                      <td style={{ ...cell, textAlign: 'left', fontWeight: 600, color: 'var(--text)' }}>
-                        {fmtMes(m.mes)}
-                      </td>
-                      <td style={{ ...cell, fontWeight: 500, color: 'var(--text-2)' }}>{m.qtd}</td>
-                      <td style={{ ...cell, fontWeight: 600, color: 'var(--text)' }}>
-                        <div>{fmtBRL(m.valor)}</div>
-                        <div style={{ marginTop: 3 }}>
-                          <Bar valor={m.valor} max={maxValor} color={PAL.violet} height={3}/>
-                        </div>
-                      </td>
-                      <td style={{ ...cell, color: 'var(--text-2)' }}>{pct}%</td>
-                      <td style={cell}>
-                        {ant ? <Delta atual={m.valor} anterior={ant.valor} invertido/> : <span style={{ color: 'var(--text-3)' }}>—</span>}
-                      </td>
-                    </tr>
-                  );
-                });
-              })()}
-            </tbody>
-            <tfoot>
-              <tr style={{ background: 'var(--surface-2)' }}>
-                <td style={{ padding: '10px 20px', fontWeight: 600, color: 'var(--text)', fontSize: 12 }}>Total</td>
-                <td style={{ padding: '10px 20px', textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
-                  {(d.evolucaoProtheus || []).reduce((s, m) => s + m.qtd, 0)}
-                </td>
-                <td style={{ padding: '10px 20px', textAlign: 'right', fontWeight: 700, color: PAL.violet, fontVariantNumeric: 'tabular-nums' }}>
-                  {fmtBRL((d.evolucaoProtheus || []).reduce((s, m) => s + m.valor, 0))}
-                </td>
-                <td style={{ padding: '10px 20px', textAlign: 'right', color: 'var(--text-3)' }}>100%</td>
-                <td/>
-              </tr>
-            </tfoot>
-          </table>
-        </Card>
-      )}
-
-      {/* ── Centro de custo ─────────────────────────────── */}
+       {/* ── Centro de custo ─────────────────────────────── */}
       {(d.porCentroCusto || []).length > 0 && (
         <Card title="Centro de custo" subtitle="Valor e participação no período" noPad>
           <div style={{ padding: '6px 20px 14px' }}>
