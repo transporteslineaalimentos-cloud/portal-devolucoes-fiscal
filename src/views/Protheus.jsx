@@ -363,7 +363,7 @@ export default function Protheus() {
 
   const ultMes  = evolucao[evolucao.length - 1];
   const pentMes = evolucao[evolucao.length - 2];
-  const cobPct  = kpis.total_lancamentos > 0 ? Math.round((kpis.total_no_portal / kpis.total_lancamentos) * 100) : 0;
+  // cobPct removido — aba Protheus não compara com portal
   const ticket  = kpis.total_lancamentos > 0 ? (kpis.total_valor / kpis.total_lancamentos) : 0;
 
   const rowBorder = (i, len) => i < len - 1 ? { borderBottom: '1px solid var(--border)' } : {};
@@ -403,24 +403,19 @@ export default function Protheus() {
         ) : (<>
 
           {/* ── KPIs ── */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
-            <KpiCard label="Total escriturado" value={fmtBRL(kpis.total_valor || 0)}
-              sub={`${nf(kpis.total_lancamentos)} NFDs`} hue={PAL.accent}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+            <KpiCard label="Total escriturado Protheus" value={fmtBRL(kpis.total_valor || 0)}
+              sub={`${nf(kpis.total_lancamentos)} NFDs escrituradas via GoBi`} hue={PAL.accent}
               icon="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"
               delta={ultMes && pentMes ? { atual: ultMes.valor, anterior: pentMes.valor } : null}
               deltaInv onClick={() => openDrill('Todas as NFDs escrituradas', () => true)} />
             <KpiCard label="Ticket médio / NFD" value={fmtBRL(ticket)}
-              sub={`${nf(kpis.clientes_distintos)} clientes`} hue={PAL.violet}
+              sub={`${nf(kpis.clientes_distintos)} clientes distintos`} hue={PAL.violet}
               icon="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            <KpiCard label="Cobertura no portal" value={`${cobPct}%`}
-              sub={`${nf(kpis.total_no_portal)} de ${nf(kpis.total_lancamentos)} NFDs`}
-              hue={cobPct >= 80 ? PAL.green : cobPct >= 50 ? PAL.amber : PAL.red}
-              icon="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-              onClick={() => openDrill('NFDs vinculadas ao portal', r => r.no_portal)} />
-            <KpiCard label="Fora do portal" value={fmtBRL(kpis.valor_fora_portal || 0)}
-              sub={`${nf(kpis.total_fora_portal)} NFDs sem correspondência OOBJ`}
-              hue={PAL.red} icon="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-              onClick={() => openDrill('NFDs somente no Protheus (sem OOBJ)', r => !r.no_portal)} />
+            <KpiCard label="Maior valor por cliente" value={fmtBRL(clientes[0]?.valor || 0)}
+              sub={clientes[0]?.cliente?.trim()?.split(' ').slice(0,3).join(' ') || '—'} hue={PAL.amber}
+              icon="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+              onClick={() => clientes[0] && openDrill(`${clientes[0]?.cliente?.trim()}`, r => r.razao_social?.trim() === clientes[0]?.cliente?.trim())} />
           </div>
 
           {/* ── Gráficos linha + barras ── */}
@@ -450,20 +445,11 @@ export default function Protheus() {
               )}
             </Card>
 
-            <Card title="Portal vs. Somente Protheus"
-              subtitle="Clique em uma barra para ver as NFDs do mês"
-              action={
-                <div style={{ display: 'flex', gap: 10, fontSize: 10.5, color: 'var(--text-3)' }}>
-                  <span style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                    <span style={{ width: 8, height: 8, background: PAL.accent, display: 'inline-block', borderRadius: 2 }} /> Portal
-                  </span>
-                  <span style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                    <span style={{ width: 8, height: 8, background: PAL.red, display: 'inline-block', borderRadius: 2 }} /> Só Protheus
-                  </span>
-                </div>
-              }>
-              <BarDual data={data?.evolucao || []}
-                onBarClick={pt => openDrill(`Lançamentos de ${fmtMes(pt.mes)}`, r => r.mes_referencia === pt.mes)} />
+            <Card title="NFDs escrituradas por mês"
+              subtitle="Quantidade de notas — clique em uma barra para ver as NFDs">
+              <TrendChart data={evolucao} valueKey="qtd" labelKey="label"
+                color={PAL.violet} height={130}
+                onPointClick={pt => openDrill(`Lançamentos de ${fmtMes(pt.mes)}`, r => r.mes_referencia === pt.mes)} />
             </Card>
           </div>
 

@@ -530,24 +530,24 @@ export default function Dashboard({ onGoTo }) {
                 </div>
                 {/* Divisor */}
                 <div style={{ borderTop: '1px dashed var(--border)', margin: '10px 0' }}/>
-                {/* Linha Protheus */}
+                {/* Linha Protheus — dados puros do GoBi via protheus_lancamentos */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
                   <div>
-                    <div style={{ fontSize: 10, color: 'var(--text-3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 }}>Protheus · Escrituradas</div>
+                    <div style={{ fontSize: 10, color: 'var(--text-3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 }}>Protheus · Escrituradas (GoBi)</div>
                     <div style={{ fontSize: 22, fontWeight: 700, color: PAL.violet, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
-                      {nf(d.evolucao?.reduce((s, m) => s + (m.qtd || 0), 0) ?? '—')}
+                      {nf(d.totais_protheus?.qtd ?? '—')}
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 3 }}>
-                      {fmtBRL(d.evolucao?.reduce((s, m) => s + (m.valor || 0), 0) ?? 0)}
+                      {fmtBRL(d.totais_protheus?.valor ?? 0)}
                     </div>
                   </div>
                   {(() => {
                     const totalOobj = k.total_count || 0;
-                    const totalProt = d.evolucao?.reduce((s, m) => s + (m.qtd || 0), 0) ?? 0;
+                    const totalProt = d.totais_protheus?.qtd || 0;
                     const pctEsc = totalOobj > 0 ? Math.round((totalProt / totalOobj) * 100) : 0;
                     return (
                       <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontSize: 18, fontWeight: 800, color: pctEsc >= 80 ? '#22c55e' : pctEsc >= 50 ? PAL.amber : PAL.red, fontVariantNumeric: 'tabular-nums' }}>
+                        <div style={{ fontSize: 18, fontWeight: 800, color: pctEsc >= 80 ? PAL.green : pctEsc >= 50 ? PAL.amber : PAL.red, fontVariantNumeric: 'tabular-nums' }}>
                           {pctEsc}%
                         </div>
                         <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 2 }}>escrituradas</div>
