@@ -316,7 +316,9 @@ export default function Protheus() {
     dt_inicio: '2026-01-01',
     dt_fim:    new Date().toISOString().slice(0, 10),
   });
-  const debRef = useRef(null);
+  const debRef   = useRef(null);
+  const filtersRef = useRef(filters);
+  useEffect(() => { filtersRef.current = filters; }, [filters]);
 
   const load = async (f) => {
     setLoading(true);
@@ -369,8 +371,11 @@ export default function Protheus() {
     }
   };
 
+  const [syncMsg, setSyncMsg] = useState(null);
+
   const handleSync = async () => {
     setSyncing(true);
+    setSyncMsg(null);
     try {
       const hoje = new Date();
       const d4 = new Date(hoje); d4.setDate(d4.getDate() - 4);
@@ -379,9 +384,16 @@ export default function Protheus() {
         body: JSON.stringify({ start_date: d4.toISOString().slice(0,10), end_date: hoje.toISOString().slice(0,10) }),
       });
       const res = await resp.json();
-      alert(`Sync concluído!\n${res.atualizados} novas · ${res.ja_lancados} atualizadas · ${res.nao_encontrados_count} só no Protheus`);
-      load(filters);
-    } catch (e) { alert('Erro: ' + e.message); }
+      // Usa filtersRef.current para garantir filtros mais recentes (evita stale closure)
+      await load(filtersRef.current);
+      setSyncMsg(res.atualizados > 0 || res.ja_lancados > 0
+        ? `✓ ${res.atualizados} novas · ${res.ja_lancados} atualizadas · ${res.nao_encontrados_count} fora do portal`
+        : `✓ Nenhum lançamento novo no período`);
+      setTimeout(() => setSyncMsg(null), 5000);
+    } catch (e) {
+      setSyncMsg(`Erro: ${e.message}`);
+      setTimeout(() => setSyncMsg(null), 5000);
+    }
     finally { setSyncing(false); }
   };
 
@@ -411,13 +423,25 @@ export default function Protheus() {
           style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 6,
             padding: '5px 8px', fontSize: 12, color: 'var(--text)' }} />
 
-        <button onClick={handleSync} disabled={syncing}
-          style={{ marginLeft: 'auto', background: 'var(--bg)', border: '1px solid var(--border)',
-            color: 'var(--text-2)', borderRadius: 6, padding: '5px 12px', fontSize: 12,
-            cursor: 'pointer', display: 'flex', gap: 6, alignItems: 'center', opacity: syncing ? 0.6 : 1 }}>
-          <Ic d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" size={12} />
-          {syncing ? 'Sincronizando…' : 'Sync agora'}
-        </button>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+          {syncMsg && (
+            <span style={{
+              fontSize: 11, color: syncMsg.startsWith('Erro') ? '#ef4444' : '#22c55e',
+              fontWeight: 600, background: syncMsg.startsWith('Erro') ? '#ef444415' : '#22c55e15',
+              padding: '4px 10px', borderRadius: 6,
+            }}>
+              {syncMsg}
+            </span>
+          )}
+          <button onClick={handleSync} disabled={syncing}
+            style={{ background: 'var(--bg)', border: '1px solid var(--border)',
+              color: 'var(--text-2)', borderRadius: 6, padding: '5px 12px', fontSize: 12,
+              cursor: syncing ? 'not-allowed' : 'pointer', display: 'flex', gap: 6,
+              alignItems: 'center', opacity: syncing ? 0.6 : 1 }}>
+            <Ic d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" size={12} />
+            {syncing ? 'Sincronizando…' : 'Sync agora'}
+          </button>
+        </div>
       </div>
 
       <div style={{ padding: '18px 24px 40px', display: 'flex', flexDirection: 'column', gap: 14 }}>
