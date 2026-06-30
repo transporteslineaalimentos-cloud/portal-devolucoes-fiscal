@@ -379,11 +379,11 @@ export default function Protheus() {
     try {
       const hoje = new Date();
       const d4 = new Date(hoje); d4.setDate(d4.getDate() - 4);
-      const resp = await fetch('https://opcrtjdnpgqcjlksofjw.supabase.co/functions/v1/sync-protheus', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ start_date: d4.toISOString().slice(0,10), end_date: hoje.toISOString().slice(0,10) }),
+      // Usa supabase.functions.invoke para evitar problemas de CORS
+      const { data: res, error: fnErr } = await supabase.functions.invoke('sync-protheus', {
+        body: { start_date: d4.toISOString().slice(0,10), end_date: hoje.toISOString().slice(0,10) },
       });
-      const res = await resp.json();
+      if (fnErr) throw new Error(fnErr.message);
       // Usa filtersRef.current para garantir filtros mais recentes (evita stale closure)
       await load(filtersRef.current);
       setSyncMsg(res.atualizados > 0 || res.ja_lancados > 0
