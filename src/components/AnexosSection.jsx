@@ -52,6 +52,8 @@ export default function AnexosSection({ devolucaoId, user }) {
 
   useEffect(() => { reload(); }, [devolucaoId]); // eslint-disable-line
 
+  const sectionRef = useRef(null);
+
   const handleFile = (f) => {
     if (!f) return;
     if (f.size > 20 * 1024 * 1024) { setUploadErr('Arquivo muito grande (máx. 20 MB).'); return; }
@@ -59,6 +61,8 @@ export default function AnexosSection({ devolucaoId, user }) {
     setShowForm(true);
     setUploadErr('');
     setDescricao('');
+    // Rola até a seção de anexos para o usuário ver o preview do arquivo selecionado
+    setTimeout(() => sectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 80);
   };
 
   const handleUpload = async () => {
@@ -92,7 +96,7 @@ export default function AnexosSection({ devolucaoId, user }) {
   };
 
   return (
-    <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', marginBottom: 12, boxShadow: 'var(--shadow-xs)' }}>
+    <div ref={sectionRef} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', marginBottom: 12, boxShadow: 'var(--shadow-xs)' }}>
 
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', padding: '12px 16px', borderBottom: showForm || anexos.length > 0 ? '1px solid var(--border)' : 'none' }}>
@@ -105,10 +109,21 @@ export default function AnexosSection({ devolucaoId, user }) {
             <span style={{ fontSize: 10, fontWeight: 700, background: 'rgba(14,165,233,0.12)', color: '#0EA5E9', padding: '1px 7px', borderRadius: 20 }}>{anexos.length}</span>
           )}
         </div>
-        {/* Botão oculto — acionado pelo botão do hero via id */}
+        {/* Botão oculto — acionado pelo botão do hero via id.
+            Abre o seletor de arquivos DIRETAMENTE, sem precisar abrir o form antes
+            nem rolar a tela até a seção de anexos. */}
         <button id="btn-add-anexo" style={{ display: 'none' }}
-          onClick={() => { setShowForm(v => !v); setPendingFile(null); setDescricao(''); setUploadErr(''); }}/>
+          onClick={() => {
+            setPendingFile(null); setDescricao(''); setUploadErr('');
+            setShowForm(true);
+            // Pequeno delay para garantir que o input já está montado/visível antes do click
+            setTimeout(() => fileRef.current?.click(), 0);
+          }}/>
       </div>
+
+      {/* Input de arquivo — sempre montado, acionado pelo botão do hero ou pela área de drop */}
+      <input ref={fileRef} type="file" accept={ACCEPT} style={{ display: 'none' }}
+        onChange={e => { handleFile(e.target.files?.[0]); e.target.value = ''; }}/>
 
       {/* Form de upload */}
       {showForm && (
@@ -124,8 +139,6 @@ export default function AnexosSection({ devolucaoId, user }) {
                 padding: '24px 16px', textAlign: 'center', cursor: 'pointer',
                 transition: 'border-color 120ms',
               }}>
-              <input ref={fileRef} type="file" accept={ACCEPT} style={{ display: 'none' }}
-                onChange={e => handleFile(e.target.files?.[0])}/>
               <Ic d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" size={20} color="var(--text-3)"/>
               <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-2)', marginTop: 8 }}>Clique ou arraste o arquivo</div>
               <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 3 }}>Imagens, PDF, Excel · máx. 20 MB</div>
