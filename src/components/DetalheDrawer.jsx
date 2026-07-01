@@ -363,6 +363,17 @@ export default function DetalheDrawer({ id, user, onClose, onSaved, onNav }) {
                   : <span style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.5)' }}>Pendente</span>
                 }
               </div>
+              {dev.linha_produto && (
+                <div className="dd-kpi">
+                  <span className="dd-kpi-label">Linha</span>
+                  <span style={{
+                    fontSize: 12, fontWeight: 700,
+                    color: dev.linha_produto === 'CHOCOLATE' ? '#D97706' : '#6EE7A8',
+                  }}>
+                    {dev.linha_produto === 'CHOCOLATE' ? '🍫 Chocolate' : '🟢 Mix'}
+                  </span>
+                </div>
+              )}
             </div>
           )}
 

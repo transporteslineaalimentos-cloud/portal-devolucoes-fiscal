@@ -30,7 +30,7 @@ const CNPJ_OPTIONS = [
 ];
 
 const EMPTY_FILTERS = {
-  search: '', status: '', cnpj_dest: '', cnpj_emitente: '', uf: '',
+  search: '', status: '', cnpj_dest: '', cnpj_emitente: '', uf: '', linha_produto: '',
   dt_inicio: '', dt_fim: '', mes: '', area: '', motivo: '',
   devolucao_total: '', com_motivo: '', flag_emissao: '', lancado: '', nf_venda: '',
   centro_custo: '', transportador: '', retornou_cd: '',
@@ -441,6 +441,12 @@ export default function Devolucoes({ user, initialFilters = {} }) {
               <option value="ECOMMERCE">E-commerce</option>
               <option value="CANAL VERDE">Canal Verde</option>
               <option value="EIC">EIC</option>
+            </select>
+            <select value={filters.linha_produto} onChange={e => applyFilter({ linha_produto: e.target.value })}
+              className="input" style={{ fontSize: 12 }}>
+              <option value="">Todas as linhas</option>
+              <option value="MIX">🟢 Mix</option>
+              <option value="CHOCOLATE">🍫 Chocolate</option>
             </select>
             <input type="text" placeholder="UF" maxLength={2}
               value={filters.uf}

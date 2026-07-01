@@ -112,6 +112,7 @@ function applyDevolucoesFilters(q, filters = {}) {
   if (filters.nf_venda === 'nao_localizada')  q = q.eq('nf_venda_localizada', false);
   if (filters.com_motivo === 'com')           q = q.not('motivo_devolucao', 'is', null);
   if (filters.com_motivo === 'sem')           q = q.is('motivo_devolucao', null);
+  if (filters.linha_produto)                  q = q.eq('linha_produto', filters.linha_produto);
   if (filters.retornou_cd === 'sim')    q = q.eq('retornou_cd', true);
   if (filters.retornou_cd === 'nao')    q = q.or('retornou_cd.eq.false,retornou_cd.is.null');
   if (filters.retornou_cd === 'cobrar') q = q.eq('retornou_cd', true).eq('tem_itens_cobrar', true);
@@ -175,7 +176,7 @@ export async function dbListDevolucoes({ page = 0, filters = {} }) {
       chave_nfe_referenciada, itens, created_at,
       inf_complementar, motivo_devolucao, devolucao_total, lancamento_manual,
       nf_venda_localizada, area_responsavel, flag_emissao_entrega,
-      lancado_protheus, dt_lancamento_protheus
+      lancado_protheus, dt_lancamento_protheus, linha_produto
     `, { count: 'exact' })
     .eq('tipo', 'devolucao')
     .or('status_sefaz.neq.CANCELADA,status_sefaz.is.null')   // ocultar canceladas
@@ -214,7 +215,7 @@ export async function dbExportDevolucoes({ filters = {} } = {}) {
         lancado_protheus, dt_lancamento_protheus,
         status_cobranca, nf_debito, data_cobranca, cobrado_por, obs_cobranca,
         transportador_cobranca, transportador_cnpj_cobranca, centro_custo,
-        retornou_cd, tem_itens_cobrar, valor_cobrar_transp
+        retornou_cd, tem_itens_cobrar, valor_cobrar_transp, linha_produto
       `)
       .eq('tipo', 'devolucao')
       .gte('dt_emissao', '2026-01-01')
