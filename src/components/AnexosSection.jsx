@@ -30,50 +30,71 @@ const ICON_BY_MIME = (mime) => {
 };
 
 const ACCEPT = '.jpg,.jpeg,.png,.gif,.webp,.pdf,.xlsx,.xls,.txt';
+const MAX_SIZE = 20 * 1024 * 1024; // 20MB
 
 export default function AnexosSection({ devolucaoId, user }) {
-  const [anexos, setAnexos]   = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [uploading, setUploading] = useState(false);
-  const [uploadErr, setUploadErr] = useState('');
-  const [descricao, setDescricao] = useState('');
+  const [anexos, setAnexos]     = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [preview, setPreview]   = useState(null);
+
+  // Fila de arquivos pendentes: [{ file, descricao, status: 'pending'|'uploading'|'done'|'error', erro }]
+  const [fila, setFila]         = useState([]);
   const [showForm, setShowForm] = useState(false);
-  const [pendingFile, setPendingFile] = useState(null);
-  const [preview, setPreview]    = useState(null); // { url, nome, mime }
-  const fileRef = useRef(null);
-  const dropRef = useRef(null);
+  const [uploading, setUploading] = useState(false);
+
+  const fileRef    = useRef(null);
+  const sectionRef = useRef(null);
 
   const reload = () => {
     setLoading(true);
-    dbListAnexos(devolucaoId)
-      .then(setAnexos)
-      .finally(() => setLoading(false));
+    dbListAnexos(devolucaoId).then(setAnexos).finally(() => setLoading(false));
   };
-
   useEffect(() => { reload(); }, [devolucaoId]); // eslint-disable-line
 
-  const sectionRef = useRef(null);
+  // Adiciona arquivos à fila (validando tamanho)
+  const handleFiles = (files) => {
+    const validos = [...files].filter(f => f.size <= MAX_SIZE);
+    const grandes = [...files].filter(f => f.size > MAX_SIZE);
+    if (grandes.length) alert(`${grandes.length} arquivo(s) ignorado(s) por exceder 20 MB.`);
+    if (!validos.length) return;
 
-  const handleFile = (f) => {
-    if (!f) return;
-    if (f.size > 20 * 1024 * 1024) { setUploadErr('Arquivo muito grande (máx. 20 MB).'); return; }
-    setPendingFile(f);
+    setFila(prev => [
+      ...prev,
+      ...validos.map(f => ({ id: Math.random(), file: f, descricao: '', status: 'pending', erro: '' }))
+    ]);
     setShowForm(true);
-    setUploadErr('');
-    setDescricao('');
-    // Rola até a seção de anexos para o usuário ver o preview do arquivo selecionado
     setTimeout(() => sectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 80);
   };
 
-  const handleUpload = async () => {
-    if (!pendingFile) return;
-    setUploading(true); setUploadErr('');
-    try {
-      await dbUploadAnexo(devolucaoId, pendingFile, { descricao, userName: user?.name || user?.email || '' });
-      setPendingFile(null); setShowForm(false); setDescricao('');
-      reload();
-    } catch (e) { setUploadErr(e.message); }
-    finally { setUploading(false); }
+  const removerDaFila = (id) => setFila(prev => prev.filter(f => f.id !== id));
+  const setDesc = (id, v) => setFila(prev => prev.map(f => f.id === id ? { ...f, descricao: v } : f));
+
+  // Envia todos da fila com status 'pending'
+  const handleUploadAll = async () => {
+    const pendentes = fila.filter(f => f.status === 'pending');
+    if (!pendentes.length) return;
+    setUploading(true);
+
+    for (const item of pendentes) {
+      setFila(prev => prev.map(f => f.id === item.id ? { ...f, status: 'uploading' } : f));
+      try {
+        await dbUploadAnexo(devolucaoId, item.file, { descricao: item.descricao, userName: user?.name || user?.email || '' });
+        setFila(prev => prev.map(f => f.id === item.id ? { ...f, status: 'done' } : f));
+      } catch (e) {
+        setFila(prev => prev.map(f => f.id === item.id ? { ...f, status: 'error', erro: e.message } : f));
+      }
+    }
+
+    setUploading(false);
+    reload();
+    // Limpa os que deram certo depois de 1s
+    setTimeout(() => {
+      setFila(prev => {
+        const restantes = prev.filter(f => f.status !== 'done');
+        if (!restantes.length) setShowForm(false);
+        return restantes;
+      });
+    }, 1000);
   };
 
   const handleOpen = async (anexo) => {
@@ -89,11 +110,11 @@ export default function AnexosSection({ devolucaoId, user }) {
 
   const handleDelete = async (anexo) => {
     if (!window.confirm(`Remover "${anexo.nome_arquivo}"?`)) return;
-    try {
-      await dbDeleteAnexo(anexo.id, anexo.storage_path);
-      reload();
-    } catch (e) { alert('Erro ao remover: ' + e.message); }
+    try { await dbDeleteAnexo(anexo.id, anexo.storage_path); reload(); }
+    catch (e) { alert('Erro ao remover: ' + e.message); }
   };
+
+  const pendentes = fila.filter(f => f.status === 'pending' || f.status === 'uploading');
 
   return (
     <div ref={sectionRef} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', marginBottom: 12, boxShadow: 'var(--shadow-xs)' }}>
@@ -109,70 +130,103 @@ export default function AnexosSection({ devolucaoId, user }) {
             <span style={{ fontSize: 10, fontWeight: 700, background: 'rgba(14,165,233,0.12)', color: '#0EA5E9', padding: '1px 7px', borderRadius: 20 }}>{anexos.length}</span>
           )}
         </div>
-        {/* Botão oculto — acionado pelo botão do hero via id.
-            Abre o seletor de arquivos DIRETAMENTE, sem precisar abrir o form antes
-            nem rolar a tela até a seção de anexos. */}
+
+        {/* Botão oculto acionado pelo hero */}
         <button id="btn-add-anexo" style={{ display: 'none' }}
           onClick={() => {
-            setPendingFile(null); setDescricao(''); setUploadErr('');
             setShowForm(true);
-            // Pequeno delay para garantir que o input já está montado/visível antes do click
             setTimeout(() => fileRef.current?.click(), 0);
           }}/>
+
+        {/* Botão visível dentro da seção */}
+        <button onClick={() => fileRef.current?.click()}
+          style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 5, fontSize: 11,
+            background: 'none', border: '1px solid var(--border)', borderRadius: 6,
+            padding: '4px 10px', cursor: 'pointer', color: 'var(--text-2)', fontWeight: 600 }}>
+          <Ic d="M12 4v16m8-8H4" size={11}/> Adicionar
+        </button>
       </div>
 
-      {/* Input de arquivo — sempre montado, acionado pelo botão do hero ou pela área de drop */}
-      <input ref={fileRef} type="file" accept={ACCEPT} style={{ display: 'none' }}
-        onChange={e => { handleFile(e.target.files?.[0]); e.target.value = ''; }}/>
+      {/* Input múltiplo — sempre montado */}
+      <input ref={fileRef} type="file" accept={ACCEPT} multiple style={{ display: 'none' }}
+        onChange={e => { handleFiles(e.target.files); e.target.value = ''; }}/>
 
-      {/* Form de upload */}
+      {/* Fila de upload */}
       {showForm && (
         <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', background: 'var(--surface-2)' }}>
-          {!pendingFile ? (
-            <div
-              ref={dropRef}
-              onClick={() => fileRef.current?.click()}
-              onDragOver={e => e.preventDefault()}
-              onDrop={e => { e.preventDefault(); handleFile(e.dataTransfer.files?.[0]); }}
-              style={{
-                border: '2px dashed var(--border-2)', borderRadius: 10,
-                padding: '24px 16px', textAlign: 'center', cursor: 'pointer',
-                transition: 'border-color 120ms',
-              }}>
-              <Ic d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" size={20} color="var(--text-3)"/>
-              <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-2)', marginTop: 8 }}>Clique ou arraste o arquivo</div>
-              <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 3 }}>Imagens, PDF, Excel · máx. 20 MB</div>
+
+          {/* Área de drop (sempre visível quando form aberto) */}
+          <div
+            onClick={() => fileRef.current?.click()}
+            onDragOver={e => e.preventDefault()}
+            onDrop={e => { e.preventDefault(); handleFiles(e.dataTransfer.files); }}
+            style={{
+              border: '2px dashed var(--border-2)', borderRadius: 10,
+              padding: fila.length ? '12px 16px' : '24px 16px',
+              textAlign: 'center', cursor: 'pointer', marginBottom: fila.length ? 12 : 0,
+            }}>
+            <Ic d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" size={18} color="var(--text-3)"/>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', marginTop: 6 }}>
+              Clique ou arraste arquivos aqui
             </div>
-          ) : (
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: 'var(--blue-dim)', borderRadius: 8, marginBottom: 10 }}>
-                <Ic d={ICON_BY_MIME(pendingFile.type)} size={16} color="var(--blue)"/>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pendingFile.name}</div>
-                  <div style={{ fontSize: 10.5, color: 'var(--text-3)', marginTop: 1 }}>{fmtBytes(pendingFile.size)}</div>
+            <div style={{ fontSize: 10.5, color: 'var(--text-3)', marginTop: 2 }}>
+              Múltiplos arquivos permitidos · Imagens, PDF, Excel · máx. 20 MB cada
+            </div>
+          </div>
+
+          {/* Lista da fila */}
+          {fila.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {fila.map(item => (
+                <div key={item.id} style={{
+                  display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px',
+                  background: item.status === 'done' ? '#22c55e18' : item.status === 'error' ? '#ef444418' : 'var(--blue-dim)',
+                  borderRadius: 8, border: `1px solid ${item.status === 'done' ? '#22c55e33' : item.status === 'error' ? '#ef444433' : 'transparent'}`,
+                }}>
+                  <Ic d={ICON_BY_MIME(item.file.type)} size={15} color="var(--blue)"/>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {item.file.name}
+                      <span style={{ fontWeight: 400, color: 'var(--text-3)', marginLeft: 6 }}>{fmtBytes(item.file.size)}</span>
+                    </div>
+                    {item.status === 'pending' && (
+                      <input type="text" value={item.descricao}
+                        onChange={e => setDesc(item.id, e.target.value)}
+                        placeholder="Descrição (opcional)"
+                        style={{ marginTop: 4, width: '100%', fontSize: 11, padding: '3px 7px',
+                          border: '1px solid var(--border)', borderRadius: 5, background: 'var(--bg)', color: 'var(--text)' }}
+                        onClick={e => e.stopPropagation()}/>
+                    )}
+                    {item.status === 'uploading' && <div style={{ fontSize: 10.5, color: 'var(--text-3)', marginTop: 2 }}>Enviando…</div>}
+                    {item.status === 'done'     && <div style={{ fontSize: 10.5, color: '#22c55e', marginTop: 2 }}>✓ Enviado</div>}
+                    {item.status === 'error'    && <div style={{ fontSize: 10.5, color: '#ef4444', marginTop: 2 }}>Erro: {item.erro}</div>}
+                  </div>
+                  {item.status === 'pending' && (
+                    <button onClick={() => removerDaFila(item.id)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 2, flexShrink: 0 }}>
+                      <Ic d="M18 6L6 18M6 6l12 12" size={13}/>
+                    </button>
+                  )}
                 </div>
-                <button onClick={() => { setPendingFile(null); setUploadErr(''); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 2 }}>
-                  <Ic d="M18 6L6 18M6 6l12 12" size={14}/>
+              ))}
+
+              {/* Ações */}
+              <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                <button onClick={() => { setFila([]); setShowForm(false); }} className="btn btn-ghost btn-sm">
+                  Cancelar
                 </button>
-              </div>
-              <div style={{ marginBottom: 10 }}>
-                <label className="input-label">Descrição (opcional)</label>
-                <input type="text" value={descricao} onChange={e => setDescricao(e.target.value)}
-                  className="input" placeholder="Ex: Print do e-mail de reclamação, foto da avaria..."/>
-              </div>
-              {uploadErr && <div style={{ fontSize: 11, color: 'var(--red)', marginBottom: 8 }}>{uploadErr}</div>}
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={() => { setShowForm(false); setPendingFile(null); }} className="btn btn-ghost btn-sm">Cancelar</button>
-                <button onClick={handleUpload} disabled={uploading} className="btn btn-primary btn-sm">
-                  {uploading ? 'Enviando...' : 'Enviar arquivo'}
-                </button>
+                {pendentes.length > 0 && (
+                  <button onClick={handleUploadAll} disabled={uploading} className="btn btn-primary btn-sm">
+                    {uploading ? 'Enviando…' : `Enviar ${pendentes.length} arquivo${pendentes.length > 1 ? 's' : ''}`}
+                  </button>
+                )}
               </div>
             </div>
           )}
         </div>
       )}
 
-      {/* Lista de anexos */}
+      {/* Lista de anexos existentes */}
       <div style={{ padding: '6px 16px 10px' }}>
         {loading ? (
           <div style={{ padding: '14px 0', fontSize: 12, color: 'var(--text-3)', textAlign: 'center' }}>Carregando...</div>
@@ -194,7 +248,7 @@ export default function AnexosSection({ devolucaoId, user }) {
                     {a.descricao || a.nome_arquivo}
                   </div>
                   <div style={{ fontSize: 10.5, color: 'var(--text-3)', marginTop: 1 }}>
-                    {a.descricao && <span style={{ marginRight: 6, color: 'var(--text-3)' }}>{a.nome_arquivo} ·</span>}
+                    {a.descricao && <span style={{ marginRight: 6 }}>{a.nome_arquivo} ·</span>}
                     {fmtBytes(a.tamanho_bytes)}
                     {a.uploader && ` · ${a.uploader}`}
                     {a.created_at && ` · ${fmtDateTime(a.created_at)}`}
@@ -216,7 +270,7 @@ export default function AnexosSection({ devolucaoId, user }) {
         )}
       </div>
 
-      {/* Lightbox de imagem */}
+      {/* Lightbox */}
       {preview && (
         <div onClick={() => setPreview(null)} style={{
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 9999,
