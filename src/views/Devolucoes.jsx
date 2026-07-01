@@ -445,8 +445,8 @@ export default function Devolucoes({ user, initialFilters = {} }) {
             <select value={filters.linha_produto} onChange={e => applyFilter({ linha_produto: e.target.value })}
               className="input" style={{ fontSize: 12 }}>
               <option value="">Todas as linhas</option>
-              <option value="MIX">🟢 Mix</option>
-              <option value="CHOCOLATE">🍫 Chocolate</option>
+              <option value="MIX">Mix</option>
+              <option value="CHOCOLATE">Chocolate</option>
             </select>
             <input type="text" placeholder="UF" maxLength={2}
               value={filters.uf}
@@ -613,7 +613,7 @@ export default function Devolucoes({ user, initialFilters = {} }) {
                     background: row.linha_produto === 'CHOCOLATE' ? 'rgba(217,119,6,0.10)' : 'rgba(22,163,74,0.10)',
                     padding: '1px 6px', borderRadius: 4,
                   }}>
-                    {row.linha_produto === 'CHOCOLATE' ? '🍫 CHOC' : '🟢 MIX'}
+                    {row.linha_produto === 'CHOCOLATE' ? 'CHOCOLATE' : 'MIX'}
                   </div>
                 )}
                 {!row.linha_produto && empresaDest && (

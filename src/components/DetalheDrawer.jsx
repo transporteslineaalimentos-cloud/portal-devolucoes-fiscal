@@ -370,7 +370,7 @@ export default function DetalheDrawer({ id, user, onClose, onSaved, onNav }) {
                     fontSize: 12, fontWeight: 700,
                     color: dev.linha_produto === 'CHOCOLATE' ? '#D97706' : '#6EE7A8',
                   }}>
-                    {dev.linha_produto === 'CHOCOLATE' ? '🍫 Chocolate' : '🟢 Mix'}
+                    {dev.linha_produto === 'CHOCOLATE' ? 'Chocolate' : 'Mix'}
                   </span>
                 </div>
               )}
