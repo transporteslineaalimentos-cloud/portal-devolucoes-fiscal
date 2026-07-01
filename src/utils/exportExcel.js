@@ -1,7 +1,16 @@
 import * as XLSX from 'xlsx';
 import { CNPJ_MAP } from '../utils.jsx';
 
-const fmtDateCell = (d) => d || '';
+const fmtDateCell = (d) => {
+  if (!d) return '';
+  try {
+    // Aceita 'YYYY-MM-DD' ou ISO datetime — converte para 'DD/MM/AAAA'
+    const s = String(d).slice(0, 10); // pega só a parte da data
+    const [y, m, dia] = s.split('-');
+    if (!y || !m || !dia) return d;
+    return `${dia.padStart(2,'0')}/${m.padStart(2,'0')}/${y}`;
+  } catch { return d; }
+};
 
 const STATUS_LABELS = {
   pendente:   'Pendente',
@@ -132,8 +141,8 @@ export function exportCobrancasToExcel(rows, { filename = 'cobrancas_transportad
       'Emitente':             r.nome_emitente ?? '',
       'UF':                   r.uf_emitente ?? '',
       'Município':            r.municipio_emitente ?? '',
-      'Data Emissão':         r.dt_emissao ?? '',
-      'Data Lançamento Protheus': r.dt_lancamento_protheus ?? '',
+      'Data Emissão':         fmtDateCell(r.dt_emissao),
+      'Data Lançamento Protheus': fmtDateCell(r.dt_lancamento_protheus),
       'Valor NFD':            r.valor ?? 0,
       'Motivo':               r.motivo_devolucao ?? '',
       'Área':                 r.area_responsavel ?? '',
@@ -142,7 +151,7 @@ export function exportCobrancasToExcel(rows, { filename = 'cobrancas_transportad
       'CNPJ Transportador':   r.transportador_cnpj_cobranca ?? '',
       'Status Cobrança':      COBRANCA_STATUS[r.status_cobranca] || r.status_cobranca || '',
       'NF Débito':            r.nf_debito ?? '',
-      'Data Cobrança':        r.data_cobranca ? r.data_cobranca.slice(0, 10) : '',
+      'Data Cobrança':        fmtDateCell(r.data_cobranca),
       'Cobrado Por':          r.cobrado_por ?? '',
       'Obs. Cobrança':        r.obs_cobranca ?? '',
       'Dias desde lançamento': calcAging(r.dt_lancamento_protheus),
