@@ -605,7 +605,18 @@ export default function Devolucoes({ user, initialFilters = {} }) {
                 ) : (
                   <span style={{ fontSize: 12, color: 'var(--text-3)' }}>—</span>
                 )}
-                {empresaDest && (
+                {row.linha_produto && (
+                  <div style={{
+                    fontSize: 9.5, fontWeight: 700, letterSpacing: '.03em', marginTop: 3,
+                    display: 'inline-flex', alignItems: 'center', gap: 3,
+                    color: row.linha_produto === 'CHOCOLATE' ? '#D97706' : '#16A34A',
+                    background: row.linha_produto === 'CHOCOLATE' ? 'rgba(217,119,6,0.10)' : 'rgba(22,163,74,0.10)',
+                    padding: '1px 6px', borderRadius: 4,
+                  }}>
+                    {row.linha_produto === 'CHOCOLATE' ? '🍫 CHOC' : '🟢 MIX'}
+                  </div>
+                )}
+                {!row.linha_produto && empresaDest && (
                   <div style={{ fontSize: 9.5, color: 'var(--gold)', marginTop: 2, fontWeight: 700, letterSpacing: '.03em' }}>
                     {empresaDest}
                   </div>
