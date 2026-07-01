@@ -41,6 +41,7 @@ export function exportDevolucoesToExcel(rows, { filename = 'devolucoes_fiscais' 
     'CNPJ Emitente':       r.cnpj_emitente ?? '',
     'Município':           r.municipio_emitente ?? '',
     'UF':                  r.uf_emitente ?? '',
+    'Linha Produto':       r.linha_produto || '',
     'Empresa Destino':     CNPJ_MAP[r.cnpj_destinatario] || r.cnpj_destinatario || '',
     'Natureza Operação':   r.nat_operacao ?? '',
     'CFOPs':               Array.isArray(r.cfops) ? r.cfops.join(', ') : (r.cfops ?? ''),

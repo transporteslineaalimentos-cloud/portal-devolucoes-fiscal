@@ -21,8 +21,6 @@ export function fmtCNPJ(s) {
 }
 
 export const CNPJ_MAP = {
-  '05207076000297': 'MIX',
-  '05207076000459': 'CHOCOLATE',
 };
 
 export const STATUS_CFG = {
