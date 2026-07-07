@@ -623,11 +623,16 @@ export default function Devolucoes({ user, initialFilters = {} }) {
                 )}
               </div>
 
-              {/* Emissão + UF */}
+              {/* Emissão + Devolução (se total) + UF */}
               <div>
                 <div style={{ fontSize: 12, color: 'var(--text-2)', fontVariantNumeric: 'tabular-nums', fontWeight: 500 }}>
                   {fmtDate(row.dt_emissao)}
                 </div>
+                {row.devolucao_total && row.dt_devolucao && (
+                  <div style={{ fontSize: 10.5, color: 'var(--red)', fontVariantNumeric: 'tabular-nums', fontWeight: 600, marginTop: 1 }}>
+                    Dev: {fmtDate(row.dt_devolucao)}
+                  </div>
+                )}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 3 }}>
                   <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', letterSpacing: '.04em' }}>
                     {row.uf_emitente || '—'}
