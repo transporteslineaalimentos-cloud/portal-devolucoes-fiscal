@@ -344,9 +344,12 @@ export async function dbGetXmlUrl(xmlPath) {
 
 // Uma única chamada RPC que agrega tudo no banco (SECURITY DEFINER ignora RLS)
 async function fetchDashboardRPC({ inicio, fim } = {}) {
-  const params = {};
-  if (inicio) params.p_inicio = inicio;
-  if (fim)    params.p_fim    = fim;
+  // Sempre envia os dois parâmetros explicitamente (mesmo que null) para
+  // evitar ambiguidade de overload no Postgres entre versões da função
+  const params = {
+    p_inicio: inicio || null,
+    p_fim:    fim    || null,
+  };
   const { data, error } = await supabase.rpc('get_dashboard_data', params);
   if (error) throw new Error(error.message);
   return data;
