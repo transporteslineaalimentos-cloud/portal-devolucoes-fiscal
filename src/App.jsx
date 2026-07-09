@@ -8,12 +8,14 @@ import { dbGetCobrancasCount, dbGetPendencias } from './config/supabase';
 const Devolucoes = lazy(() => import('./views/Devolucoes'));
 const Cobrancas  = lazy(() => import('./views/Cobrancas'));
 const Protheus   = lazy(() => import('./views/Protheus'));
+const Historico  = lazy(() => import('./views/Historico'));
 
 const PAGE_META = {
   dashboard:  { title: 'Dashboard',          sub: null },
   devolucoes: { title: 'Devoluções Fiscais',  sub: 'NF-e recebidas classificadas por CFOP · sincronizado a cada hora' },
   cobrancas:  { title: 'Cobranças',          sub: 'Devoluções com responsabilidade do transportador já lançadas no Protheus' },
   protheus:   { title: 'Controle Protheus',  sub: 'Todos os lançamentos de devolução escriturados no Protheus via GoBi' },
+  historico:  { title: 'Histórico',          sub: 'Registro de todas as alterações feitas no portal, por usuário' },
 };
 
 function Fallback() {
@@ -251,6 +253,11 @@ function Portal() {
           {tab === 'protheus' && (
             <Suspense fallback={<Fallback />}>
               <Protheus user={user} />
+            </Suspense>
+          )}
+          {tab === 'historico' && user?.role === 'admin' && (
+            <Suspense fallback={<Fallback />}>
+              <Historico />
             </Suspense>
           )}
         </main>
