@@ -135,6 +135,31 @@ function applyDevolucoesFilters(q, filters = {}) {
   if (filters.lancado === 'sim')   q = q.eq('lancado_protheus', true);
   if (filters.lancado === 'nao')   q = q.or('lancado_protheus.is.null,lancado_protheus.eq.false');
 
+  // Farol de prazo Protheus (90 dias corridos): calcula datas de corte em JS
+  // pois depende da data de hoje. dt_devolucao p/ lançamento manual (total),
+  // dt_emissao p/ parcial — mesma convenção usada no resto do portal.
+  if (filters.farol) {
+    const hoje = new Date();
+    const cutoff = (dias) => {
+      const d = new Date(hoje); d.setDate(d.getDate() - dias);
+      return d.toISOString().slice(0, 10);
+    };
+    const cutoff74 = cutoff(74); // até aqui = verde (dias <=74)
+    const cutoff75 = cutoff(75); // início da faixa amarela
+    const cutoff89 = cutoff(89); // fim da faixa amarela
+    const cutoff90 = cutoff(90); // início da faixa vermelha
+
+    q = q.or('lancado_protheus.is.null,lancado_protheus.eq.false');
+    // não lançada + dentro da faixa de data correta, considerando a regra dupla (manual x automática)
+    if (filters.farol === 'verde') {
+      q = q.or(`and(lancamento_manual.is.null,dt_emissao.gte.${cutoff74}),and(lancamento_manual.eq.false,dt_emissao.gte.${cutoff74}),and(lancamento_manual.eq.true,dt_devolucao.gte.${cutoff74})`);
+    } else if (filters.farol === 'amarelo') {
+      q = q.or(`and(lancamento_manual.is.null,dt_emissao.lte.${cutoff75},dt_emissao.gte.${cutoff89}),and(lancamento_manual.eq.false,dt_emissao.lte.${cutoff75},dt_emissao.gte.${cutoff89}),and(lancamento_manual.eq.true,dt_devolucao.lte.${cutoff75},dt_devolucao.gte.${cutoff89})`);
+    } else if (filters.farol === 'vermelho') {
+      q = q.or(`and(lancamento_manual.is.null,dt_emissao.lte.${cutoff90}),and(lancamento_manual.eq.false,dt_emissao.lte.${cutoff90}),and(lancamento_manual.eq.true,dt_devolucao.lte.${cutoff90})`);
+    }
+  }
+
   // Busca
   if (filters.search) {
     const s = filters.search.trim().replace(/\./g,'').replace(/\//g,'').replace(/-/g,'');
@@ -374,6 +399,7 @@ export async function dbGetDashboard(periodo) {
   return {
     totais:        d?.totais       || { qtd: 0, valor: 0, ticket_medio: 0, clientes: 0 },
     totaisProtheus: d?.totais_protheus || { qtd: 0, valor: 0 },
+    farolProtheus:  d?.farol_protheus  || { verde: 0, amarelo: 0, vermelho: 0, valor_amarelo: 0, valor_vermelho: 0 },
     evolucao,
     piorMesQtd,
     piorMesValor,

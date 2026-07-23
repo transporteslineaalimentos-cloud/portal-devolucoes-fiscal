@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { dbListDevolucoes, dbExportDevolucoes, dbGetTransportadoras } from '../config/supabase';
-import { fmtBRL, fmtDate, CNPJ_MAP, STATUS_CFG, Badge } from '../utils.jsx';
+import { fmtBRL, fmtDate, CNPJ_MAP, STATUS_CFG, Badge, calcFarolProtheus, FAROL_CFG } from '../utils.jsx';
 import DetalheDrawer from '../components/DetalheDrawer.jsx';
 import ModalLancamentoManual from '../components/ModalLancamentoManual.jsx';
 import ModalImportProtheus from '../components/ModalImportProtheus.jsx';
@@ -33,7 +33,7 @@ const EMPTY_FILTERS = {
   search: '', status: '', cnpj_dest: '', cnpj_emitente: '', uf: '', linha_produto: '',
   dt_inicio: '', dt_fim: '', mes: '', area: '', motivo: '',
   devolucao_total: '', com_motivo: '', flag_emissao: '', lancado: '', nf_venda: '',
-  centro_custo: '', transportador: '', retornou_cd: '',
+  centro_custo: '', transportador: '', retornou_cd: '', farol: '',
 };
 
 // Componente multi-select de transportadoras com busca e checkbox
@@ -428,6 +428,13 @@ export default function Devolucoes({ user, initialFilters = {} }) {
               <option value="localizada">✓ NF venda localizada</option>
               <option value="nao_localizada">✗ NF venda não localizada</option>
             </select>
+            <select value={filters.farol || ''} onChange={e => applyFilter({ farol: e.target.value })}
+              className="input" style={{ width: 'auto', minWidth: 190 }}>
+              <option value="">Farol 90 dias: todos</option>
+              <option value="vermelho">🔴 Estourou o prazo</option>
+              <option value="amarelo">🟡 Últimos 15 dias</option>
+              <option value="verde">🟢 Dentro do prazo</option>
+            </select>
             <select value={filters.centro_custo || ''} onChange={e => applyFilter({ centro_custo: e.target.value })}
               className="input" style={{ width: 'auto', minWidth: 180 }}>
               <option value="">Centro de custo: todos</option>
@@ -670,7 +677,18 @@ export default function Devolucoes({ user, initialFilters = {} }) {
                       <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
                       Protheus
                     </span>
-                  : <span style={{ fontSize: 9.5, fontWeight: 500, color: 'var(--text-3)' }}>Fora do Protheus</span>
+                  : (() => {
+                      const farol = calcFarolProtheus(row);
+                      const cfg = FAROL_CFG[farol.cor];
+                      return (
+                        <span title="Prazo de 90 dias corridos para lançamento no Protheus"
+                          style={{ fontSize: 9.5, fontWeight: 700, color: cfg.color, background: cfg.bg,
+                            padding: farol.cor === 'sem_data' ? 0 : '2px 6px', borderRadius: 5,
+                            display: 'flex', alignItems: 'center', gap: 3 }}>
+                          {cfg.dot} {farol.label}
+                        </span>
+                      );
+                    })()
                 }
               </div>
             </div>

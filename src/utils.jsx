@@ -23,6 +23,34 @@ export function fmtCNPJ(s) {
 export const CNPJ_MAP = {
 };
 
+// Farol de prazo Protheus: 90 dias corridos a partir da emissão da NFD
+// (dt_devolucao para devolução total / lançamento manual, dt_emissao para parcial)
+// para lançar no Protheus. Alerta amarelo nos últimos 15 dias do prazo.
+export function calcFarolProtheus(row) {
+  if (row.lancado_protheus) {
+    return { cor: 'lancada', label: 'Lançada', dias: null, diasRestantes: null };
+  }
+  const dataRef = row.lancamento_manual ? row.dt_devolucao : row.dt_emissao;
+  if (!dataRef) return { cor: 'sem_data', label: '—', dias: null, diasRestantes: null };
+
+  const hoje = new Date();
+  const ref = new Date(dataRef + 'T00:00:00');
+  const dias = Math.floor((hoje - ref) / 86400000);
+  const diasRestantes = 90 - dias;
+
+  if (diasRestantes > 15) return { cor: 'verde', label: `${diasRestantes}d restantes`, dias, diasRestantes };
+  if (diasRestantes > 0)  return { cor: 'amarelo', label: `${diasRestantes}d restantes`, dias, diasRestantes };
+  return { cor: 'vermelho', label: `${Math.abs(diasRestantes)}d em atraso`, dias, diasRestantes };
+}
+
+export const FAROL_CFG = {
+  verde:    { color: '#22c55e', bg: '#22c55e18', dot: '🟢' },
+  amarelo:  { color: '#eab308', bg: '#eab30818', dot: '🟡' },
+  vermelho: { color: '#ef4444', bg: '#ef444418', dot: '🔴' },
+  lancada:  { color: 'var(--text-3)', bg: 'transparent', dot: '' },
+  sem_data: { color: 'var(--text-3)', bg: 'transparent', dot: '' },
+};
+
 export const STATUS_CFG = {
   evidencia_solicitada: { l: 'Evidência solicitada', dot: '#D97706', color: '#92400E', bg: '#FFFBEB', border: '#FDE68A' },
   evidencia_anexada:    { l: 'Evidência anexada',    dot: '#16A34A', color: '#14532D', bg: '#F0FDF4', border: '#BBF7D0' },
