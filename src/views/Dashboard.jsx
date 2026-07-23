@@ -438,7 +438,7 @@ export default function Dashboard({ onGoTo }) {
   const goDev = (extra = {}) => {
     const base = { dt_inicio: periodo.inicio, dt_fim: periodo.fim };
     // Se filtra por mês específico, ignora o range do período (o mês é mais preciso)
-    if (extra.mes || extra.farol) { delete base.dt_inicio; delete base.dt_fim; }
+    if (extra.mes || extra.farol || extra.validacao_fiscal) { delete base.dt_inicio; delete base.dt_fim; }
     onGoTo?.('devolucoes', { ...base, ...extra });
   };
 
@@ -569,6 +569,10 @@ export default function Dashboard({ onGoTo }) {
               <KpiMini label="Prazo Protheus — atenção" value={nf(d.farolProtheus?.amarelo)} sub={`${fmtBRL(d.farolProtheus?.valor_amarelo || 0)} · últimos 15 dias`}
                 hue={PAL.amber} icon="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
                 onClick={() => goDev({ farol: 'amarelo' })}
+              />
+              <KpiMini label="Divergência fiscal" value={nf(d.validacaoFiscal?.divergente)} sub="Consistência interna do XML"
+                hue={PAL.red} icon="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                onClick={() => goDev({ validacao_fiscal: 'divergente' })}
               />
               <KpiMini label="Ticket médio" value={d.totais?.ticket_medio ? fmtBRL(d.totais.ticket_medio) : '—'}
                 sub={`${nf(d.totais?.clientes)} clientes distintos`}

@@ -134,6 +134,8 @@ function applyDevolucoesFilters(q, filters = {}) {
   if (filters.flag_emissao === 'aguardando')       q = q.eq('flag_emissao_entrega', 'aguardando_entrega');
   if (filters.lancado === 'sim')   q = q.eq('lancado_protheus', true);
   if (filters.lancado === 'nao')   q = q.or('lancado_protheus.is.null,lancado_protheus.eq.false');
+  if (filters.validacao_fiscal === 'divergente') q = q.eq('validacao_fiscal->>status', 'divergente');
+  if (filters.validacao_fiscal === 'ok')         q = q.eq('validacao_fiscal->>status', 'ok');
 
   // Farol de prazo Protheus (90 dias corridos): calcula datas de corte em JS
   // pois depende da data de hoje. dt_devolucao p/ lançamento manual (total),
@@ -201,7 +203,7 @@ export async function dbListDevolucoes({ page = 0, filters = {} }) {
       chave_nfe_referenciada, itens, created_at,
       inf_complementar, motivo_devolucao, devolucao_total, lancamento_manual,
       nf_venda_localizada, area_responsavel, flag_emissao_entrega,
-      lancado_protheus, dt_lancamento_protheus, linha_produto
+      lancado_protheus, dt_lancamento_protheus, linha_produto, validacao_fiscal
     `, { count: 'exact' })
     .eq('tipo', 'devolucao')
     .or('status_sefaz.neq.CANCELADA,status_sefaz.is.null')   // ocultar canceladas
@@ -240,7 +242,7 @@ export async function dbExportDevolucoes({ filters = {} } = {}) {
         lancado_protheus, dt_lancamento_protheus,
         status_cobranca, nf_debito, data_cobranca, cobrado_por, obs_cobranca,
         transportador_cobranca, transportador_cnpj_cobranca, centro_custo,
-        retornou_cd, tem_itens_cobrar, valor_cobrar_transp, linha_produto
+        retornou_cd, tem_itens_cobrar, valor_cobrar_transp, linha_produto, validacao_fiscal
       `)
       .eq('tipo', 'devolucao')
       .gte('dt_emissao', '2026-01-01')
@@ -400,6 +402,7 @@ export async function dbGetDashboard(periodo) {
     totais:        d?.totais       || { qtd: 0, valor: 0, ticket_medio: 0, clientes: 0 },
     totaisProtheus: d?.totais_protheus || { qtd: 0, valor: 0 },
     farolProtheus:  d?.farol_protheus  || { verde: 0, amarelo: 0, vermelho: 0, valor_amarelo: 0, valor_vermelho: 0 },
+    validacaoFiscal: d?.validacao_fiscal_totais || { divergente: 0, ok: 0, sem_dados: 0 },
     evolucao,
     piorMesQtd,
     piorMesValor,

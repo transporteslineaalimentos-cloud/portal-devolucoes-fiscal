@@ -33,7 +33,7 @@ const EMPTY_FILTERS = {
   search: '', status: '', cnpj_dest: '', cnpj_emitente: '', uf: '', linha_produto: '',
   dt_inicio: '', dt_fim: '', mes: '', area: '', motivo: '',
   devolucao_total: '', com_motivo: '', flag_emissao: '', lancado: '', nf_venda: '',
-  centro_custo: '', transportador: '', retornou_cd: '', farol: '',
+  centro_custo: '', transportador: '', retornou_cd: '', farol: '', validacao_fiscal: '',
 };
 
 // Componente multi-select de transportadoras com busca e checkbox
@@ -435,6 +435,12 @@ export default function Devolucoes({ user, initialFilters = {} }) {
               <option value="amarelo">🟡 Últimos 15 dias</option>
               <option value="verde">🟢 Dentro do prazo</option>
             </select>
+            <select value={filters.validacao_fiscal || ''} onChange={e => applyFilter({ validacao_fiscal: e.target.value })}
+              className="input" style={{ width: 'auto', minWidth: 190 }}>
+              <option value="">Validação fiscal: todas</option>
+              <option value="divergente">⚠ Com divergência</option>
+              <option value="ok">✓ Consistente</option>
+            </select>
             <select value={filters.centro_custo || ''} onChange={e => applyFilter({ centro_custo: e.target.value })}
               className="input" style={{ width: 'auto', minWidth: 180 }}>
               <option value="">Centro de custo: todos</option>
@@ -671,7 +677,17 @@ export default function Devolucoes({ user, initialFilters = {} }) {
 
               {/* Situação: status + Protheus */}
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
-                <Badge status={row.status_portal} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                  {row.validacao_fiscal?.status === 'divergente' && (
+                    <span title={`Divergência fiscal: ${row.validacao_fiscal.issues?.[0]?.descricao || ''}`}
+                      style={{ display: 'flex', alignItems: 'center', color: '#ef4444', cursor: 'help' }}>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                      </svg>
+                    </span>
+                  )}
+                  <Badge status={row.status_portal} />
+                </div>
                 {row.lancado_protheus
                   ? <span style={{ fontSize: 9.5, fontWeight: 600, color: 'var(--green)', display: 'flex', alignItems: 'center', gap: 3 }}>
                       <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>

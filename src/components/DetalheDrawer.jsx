@@ -927,6 +927,28 @@ export default function DetalheDrawer({ id, user, onClose, onSaved, onNav }) {
               </SectionCard>
             )}
 
+            {/* ── Validação Fiscal (nível 1: consistência interna) ── */}
+            {dev.validacao_fiscal?.status === 'divergente' && (
+              <SectionCard title="Validação fiscal" icon="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z">
+                <div style={{ background: '#ef444412', border: '1px solid #ef444440', borderRadius: 8, padding: '10px 12px', marginBottom: 8 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#ef4444', marginBottom: 6 }}>
+                    ⚠ {dev.validacao_fiscal.issues?.length} divergência(s) encontrada(s) nos valores da nota
+                  </div>
+                  {dev.validacao_fiscal.issues?.map((iss, i) => (
+                    <div key={i} style={{ fontSize: 12, color: 'var(--text-2)', padding: '4px 0', borderTop: i > 0 ? '1px solid #ef444422' : 'none' }}>
+                      <div>{iss.descricao}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>
+                        Esperado: <strong>{String(iss.esperado)}</strong> · Encontrado: <strong>{String(iss.encontrado)}</strong>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ fontSize: 10.5, color: 'var(--text-3)' }}>
+                  Validação automática de consistência interna dos valores do XML (soma dos itens, ICMS, ICMS-ST). Não substitui a análise do time fiscal.
+                </div>
+              </SectionCard>
+            )}
+
             {/* ── Bloco 7: Retorno ao CD ── */}
             <RetornoCDSection dev={dev}/>
 
