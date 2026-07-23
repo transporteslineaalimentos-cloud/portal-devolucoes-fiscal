@@ -442,6 +442,30 @@ export async function dbUpdateMotivo(id, { motivo_devolucao, devolucao_total, ar
 export async function dbLancarDevolucaoManual(dados) {
   syncAuthToken();
 
+  // Trava de unicidade: só pode existir 1 devolução TOTAL por NF de venda
+  // (mesma chave_nfe_referenciada). Bloqueia lançamento duplicado.
+  if (dados.chave_nfe_referenciada) {
+    const { data: existente } = await supabase
+      .from('oobj_nfe_recebidas')
+      .select('id, nf_numero, dt_devolucao, lancamento_manual')
+      .eq('chave_nfe_referenciada', dados.chave_nfe_referenciada)
+      .eq('devolucao_total', true)
+      .eq('tipo', 'devolucao')
+      .or('status_sefaz.is.null,status_sefaz.neq.CANCELADA')
+      .limit(1)
+      .maybeSingle();
+
+    if (existente) {
+      const dtRef = existente.dt_devolucao
+        ? new Date(existente.dt_devolucao + 'T00:00:00').toLocaleDateString('pt-BR')
+        : '—';
+      throw new Error(
+        `Já existe uma devolução total lançada para essa NF de venda (data: ${dtRef}). ` +
+        `Só é permitido 1 lançamento de devolução total por NF.`
+      );
+    }
+  }
+
   // Buscar dados da NF de venda na active_webhooks para preenchimento automático
   let nfVenda = null;
   if (dados.chave_nfe_referenciada) {
@@ -485,7 +509,14 @@ export async function dbLancarDevolucaoManual(dados) {
     .insert(row)
     .select('id')
     .single();
-  if (error) throw new Error(error.message);
+  if (error) {
+    // Segunda camada: se o índice único do banco pegar (ex: cliques simultâneos),
+    // traduz o erro técnico do Postgres para mensagem amigável
+    if (error.code === '23505' || /duplicate key|unique/i.test(error.message)) {
+      throw new Error('Já existe uma devolução total lançada para essa NF de venda. Só é permitido 1 lançamento por NF.');
+    }
+    throw new Error(error.message);
+  }
   return data;
 }
 
