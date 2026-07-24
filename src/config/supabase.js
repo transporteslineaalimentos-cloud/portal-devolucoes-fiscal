@@ -499,7 +499,13 @@ export async function dbLancarDevolucaoManual(dados) {
     motivo_devolucao:       dados.motivo_devolucao || null,
     inf_complementar:       dados.observacao || null,
     chave_nfe_referenciada: dados.chave_nfe_referenciada || null,
-    nf_numero:              null,  // sem NFD emitida
+    // Devolução total manual não tem NFD real emitida pelo cliente —
+    // usa o próprio número da NF de venda como identificador (padrão
+    // usado em todo lançamento manual existente). Sem isso, o portal
+    // exibia "NF-e —" / "null" no cabeçalho da nota.
+    nf_numero:              dados.chave_nfe_referenciada
+                               ? parseInt(dados.chave_nfe_referenciada.slice(25, 34), 10) || null
+                               : null,
     xml_baixado:            false,
     raw_json:               { lancado_por: dados.usuario, lancado_em: new Date().toISOString() },
   };

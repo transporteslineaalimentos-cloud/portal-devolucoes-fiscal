@@ -669,7 +669,7 @@ export default function DetalheDrawer({ id, user, onClose, onSaved, onNav }) {
 
               {/* Devolução */}
               <SectionCard title="NF-e de Devolução" icon="M9 14l-4-4 4-4M5 10h11a4 4 0 010 8h-1" color="var(--blue)">
-                <DataItem label="Número / Série" value={`${dev.nf_numero} · Série ${dev.nf_serie}`}/>
+                <DataItem label="Número / Série" value={`${dev.nf_numero ?? "—"}${dev.nf_serie ? ` · Série ${dev.nf_serie}` : ''}`}/>
                 <DataItem label="Data de emissão" value={
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                     <span>{fmtDate(dev.dt_emissao)}</span>
@@ -776,7 +776,7 @@ export default function DetalheDrawer({ id, user, onClose, onSaved, onNav }) {
                 }
               >
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
-                  <DataItem label="NF / Série" value={`${nfV.nf_numero} · Série ${nfV.nf_serie}`}/>
+                  <DataItem label="NF / Série" value={`${nfV.nf_numero ?? "—"}${nfV.nf_serie ? ` · Série ${nfV.nf_serie}` : ''}`}/>
                   <DataItem label="Data emissão" value={fmtDate(nfV.dt_emissao)}/>
                   <DataItem label="Data entrega" value={fmtDate(nfV.dt_entrega)} accent={nfV.dt_entrega ? 'var(--green)' : undefined}/>
                   <DataItem label="Valor da venda" value={fmtBRL(nfV.valor_produtos)} accent="var(--blue)"/>
