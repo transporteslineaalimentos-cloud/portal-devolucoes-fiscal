@@ -492,10 +492,11 @@ select.input { cursor: pointer; }
   background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--radius-lg); width: 100%; max-width: 460px;
   box-shadow: var(--shadow-lg);
+  display: flex; flex-direction: column; max-height: calc(100vh - 48px);
 }
-.modal-header { padding: 20px 22px 0; }
-.modal-body   { padding: 16px 22px; }
-.modal-footer { padding: 12px 22px 20px; display: flex; justify-content: flex-end; gap: 8px; }
+.modal-header { padding: 20px 22px 0; flex-shrink: 0; }
+.modal-body   { padding: 16px 22px; overflow-y: auto; flex: 1 1 auto; min-height: 0; }
+.modal-footer { padding: 12px 22px 20px; display: flex; justify-content: flex-end; gap: 8px; flex-shrink: 0; }
 
 /* ─── LOGIN ───────────────────────────────────────────── */
 .login-wrap {
