@@ -70,6 +70,15 @@ export async function dbGetUser(email) {
 
 const PAGE_SIZE = 40;
 
+// Regra de data: NFD pela emissão; lançamento manual pela data da devolução
+// (se a devolução manual não tiver data preenchida, cai na emissão)
+function periodoOr(ini, fim) {
+  return `and(lancamento_manual.is.null,dt_emissao.gte.${ini},dt_emissao.lte.${fim}),` +
+         `and(lancamento_manual.eq.false,dt_emissao.gte.${ini},dt_emissao.lte.${fim}),` +
+         `and(lancamento_manual.eq.true,dt_devolucao.gte.${ini},dt_devolucao.lte.${fim}),` +
+         `and(lancamento_manual.eq.true,dt_devolucao.is.null,dt_emissao.gte.${ini},dt_emissao.lte.${fim})`;
+}
+
 function applyDevolucoesFilters(q, filters = {}) {
   if (filters.status)         q = q.eq('status_portal', filters.status);
   if (filters.cnpj_dest)      q = q.eq('cnpj_destinatario', filters.cnpj_dest);
@@ -79,11 +88,7 @@ function applyDevolucoesFilters(q, filters = {}) {
   if (filters.dt_inicio || filters.dt_fim) {
     const ini = filters.dt_inicio || '2000-01-01';
     const fim = filters.dt_fim    || '2099-12-31';
-    q = q.or(
-      `and(lancamento_manual.is.null,dt_emissao.gte.${ini},dt_emissao.lte.${fim}),` +
-      `and(lancamento_manual.eq.false,dt_emissao.gte.${ini},dt_emissao.lte.${fim}),` +
-      `and(lancamento_manual.eq.true,dt_devolucao.gte.${ini},dt_devolucao.lte.${fim})`
-    );
+    q = q.or(periodoOr(ini, fim));
   }
   if (filters.mes) {
     // mes no formato 'YYYY-MM' → intervalo do mês
@@ -91,11 +96,7 @@ function applyDevolucoesFilters(q, filters = {}) {
     const ini = `${filters.mes}-01`;
     const fimDate = new Date(y, m, 0); // último dia do mês
     const fim = `${y}-${String(m).padStart(2,'0')}-${String(fimDate.getDate()).padStart(2,'0')}`;
-    q = q.or(
-      `and(lancamento_manual.is.null,dt_emissao.gte.${ini},dt_emissao.lte.${fim}),` +
-      `and(lancamento_manual.eq.false,dt_emissao.gte.${ini},dt_emissao.lte.${fim}),` +
-      `and(lancamento_manual.eq.true,dt_devolucao.gte.${ini},dt_devolucao.lte.${fim})`
-    );
+    q = q.or(periodoOr(ini, fim));
   }
   if (filters.area) {
     if (filters.area === 'SEM CLASSIFICAÇÃO') q = q.is('area_responsavel', null);
@@ -235,7 +236,7 @@ export async function dbExportDevolucoes({ filters = {} } = {}) {
       .select(`
         chave_nfe, nf_numero, nf_serie, nome_emitente, cnpj_emitente,
         municipio_emitente, uf_emitente, cnpj_destinatario,
-        nat_operacao, dt_emissao, valor, valor_produtos, valor_icms, valor_st,
+        nat_operacao, dt_emissao, dt_devolucao, valor, valor_produtos, valor_icms, valor_st,
         cfops, status_portal, chave_nfe_referenciada, itens,
         inf_complementar, motivo_devolucao, devolucao_total, lancamento_manual,
         nf_venda_localizada, area_responsavel, flag_emissao_entrega,
@@ -245,11 +246,11 @@ export async function dbExportDevolucoes({ filters = {} } = {}) {
         retornou_cd, tem_itens_cobrar, valor_cobrar_transp, linha_produto, validacao_fiscal, status_operacional
       `)
       .eq('tipo', 'devolucao')
-      .gte('dt_emissao', '2026-01-01')
       .or('status_sefaz.neq.CANCELADA,status_sefaz.is.null')
       .not('cfops', 'cs', '{"6201"}')          // excluir dev. de industrialização
       .order('dt_emissao', { ascending: false })
       .range(from, from + BATCH - 1);
+    if (!filters.dt_inicio && !filters.dt_fim && !filters.mes) q = q.gte('dt_emissao', '2026-01-01');
 
     q = applyDevolucoesFilters(q, filters);
 
@@ -859,9 +860,9 @@ export async function dbImportRetornoCD(registros) {
 }
 
 // ─── Painel Gerencial ─────────────────────────────────────────
-export async function dbGetPainelGerencial(ano) {
+export async function dbGetPainelGerencial(ano, mesIni = 1, mesFim = 12) {
   syncAuthToken();
-  const { data, error } = await supabase.rpc('get_painel_gerencial', { p_ano: ano });
+  const { data, error } = await supabase.rpc('get_painel_gerencial_periodo', { p_ano: ano, p_mes_ini: mesIni, p_mes_fim: mesFim });
   if (error) throw new Error(error.message);
   return data;
 }

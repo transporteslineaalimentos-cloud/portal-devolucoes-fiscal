@@ -586,3 +586,18 @@ select.input { cursor: pointer; }
 tr.drill-row:hover td { background: var(--blue-dim); }
 .kpi-clickable { transition: border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease; }
 .kpi-clickable:hover { border-color: var(--blue-mid); box-shadow: 0 2px 10px rgba(30,77,183,0.10); transform: translateY(-1px); }
+
+/* ─── Impressão / PDF (Painel Gerencial) ─────────────────── */
+.print-only { display: none; }
+@media print {
+  @page { size: A4 landscape; margin: 10mm; }
+  html, body { background: #fff !important; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .sidebar, .topbar, .no-print { display: none !important; }
+  .print-only { display: block !important; }
+  .app-layout, .app-main { display: block !important; margin: 0 !important; padding: 0 !important; height: auto !important; overflow: visible !important; }
+  .app-main * { overflow: visible !important; }
+  .painel-root { width: 1400px !important; max-width: none !important; zoom: 0.69; padding: 0 !important; gap: 12px !important; }
+  tr, .painel-kpis, .painel-bloco { break-inside: avoid; page-break-inside: avoid; }
+  section { box-shadow: none !important; }
+}
