@@ -5,6 +5,7 @@ import DetalheDrawer from '../components/DetalheDrawer.jsx';
 import ModalLancamentoManual from '../components/ModalLancamentoManual.jsx';
 import ModalImportProtheus from '../components/ModalImportProtheus.jsx';
 import { exportDevolucoesToExcel } from '../utils/exportExcel.js';
+import { baixarPlanilhaConsulta } from '../utils/planilhaConsulta.js';
 
 const Ic = ({ d, size = 14, color = 'currentColor' }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
@@ -272,6 +273,19 @@ export default function Devolucoes({ user, initialFilters = {} }) {
     }
   };
 
+  const [gerandoConsulta, setGerandoConsulta] = useState(false);
+  const handleConsulta = async () => {
+    setGerandoConsulta(true);
+    try {
+      const allRows = await dbExportDevolucoes({ filters });
+      await baixarPlanilhaConsulta(allRows, { periodoTxt: hasFilters ? 'filtrado' : '' });
+    } catch (e) {
+      alert('Erro ao gerar a planilha: ' + e.message);
+    } finally {
+      setGerandoConsulta(false);
+    }
+  };
+
   // Rótulo amigável do filtro de drill-down ativo
   const MES_NOMES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
   const activeChips = [];
@@ -358,6 +372,11 @@ export default function Devolucoes({ user, initialFilters = {} }) {
               : <Ic d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" size={13}/>
             }
             {exporting ? 'Exportando...' : 'Exportar Excel'}
+          </button>
+          <button onClick={handleConsulta} disabled={gerandoConsulta} className="btn btn-outline btn-sm"
+            title="Planilha formatada para enviar a quem não tem acesso ao portal (respeita os filtros aplicados)">
+            <Ic d="M9 17v-6h13M9 7h13M3 7h.01M3 12h.01M3 17h.01" size={13}/>
+            {gerandoConsulta ? 'Gerando...' : 'Planilha de consulta'}
           </button>
           <button onClick={() => setShowFilters(v => !v)}
             className={`btn btn-sm ${showFilters ? 'btn-primary' : 'btn-outline'}`}>

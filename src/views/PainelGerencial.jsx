@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { dbGetPainelGerencial, dbExportDevolucoes } from '../config/supabase';
 import { exportPainelGerencialExcel } from '../utils/exportExcel.js';
+import { baixarPlanilhaConsulta } from '../utils/planilhaConsulta.js';
 
 /* ─────────────────────────────────────────────────────────────
    Painel Gerencial — substitui o dash montado no Excel
@@ -329,6 +330,18 @@ export default function PainelGerencial({ onGoTo }) {
     } catch (e) { alert('Erro ao gerar o Excel: ' + e.message); }
     setBaixando('');
   };
+  const baixarConsulta = async () => {
+    setBaixando('consulta');
+    try {
+      const ult = new Date(ano, fim, 0).getDate();
+      const notas = await dbExportDevolucoes({ filters: {
+        dt_inicio: `${ano}-${String(ini).padStart(2, '0')}-01`,
+        dt_fim:    `${ano}-${String(fim).padStart(2, '0')}-${String(ult).padStart(2, '0')}`,
+      } });
+      await baixarPlanilhaConsulta(notas, { periodoTxt });
+    } catch (e) { alert('Erro ao gerar a planilha: ' + e.message); }
+    setBaixando('');
+  };
   const baixarPdf = () => {
     const t = document.title;
     document.title = `Painel devolucoes ${periodoTxt.replace('/', '-')}`;
@@ -367,6 +380,10 @@ export default function PainelGerencial({ onGoTo }) {
         <button className="btn btn-outline btn-sm" onClick={carregar} disabled={loading}>{loading ? 'Atualizando…' : 'Atualizar'}</button>
         <div style={{ flex: 1 }}/>
         <button className="btn btn-outline btn-sm" onClick={baixarPdf} disabled={!data}>Baixar PDF do painel</button>
+        <button className="btn btn-outline btn-sm" onClick={baixarConsulta} disabled={!data || !!baixando}
+          title="Planilha formatada para enviar a quem não tem acesso ao portal: busca por número da NF, base de notas com filtros, itens e resumo">
+          {baixando === 'consulta' ? 'Gerando planilha…' : 'Planilha de consulta de notas'}
+        </button>
         <button className="btn btn-primary btn-sm" onClick={baixarExcel} disabled={!data || !!baixando}>
           {baixando === 'excel' ? 'Gerando Excel…' : 'Baixar Excel (painel + notas)'}
         </button>

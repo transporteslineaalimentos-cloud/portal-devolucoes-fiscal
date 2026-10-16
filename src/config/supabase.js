@@ -243,7 +243,7 @@ export async function dbExportDevolucoes({ filters = {} } = {}) {
         lancado_protheus, dt_lancamento_protheus,
         status_cobranca, nf_debito, data_cobranca, cobrado_por, obs_cobranca,
         transportador_cobranca, transportador_cnpj_cobranca, centro_custo,
-        retornou_cd, tem_itens_cobrar, valor_cobrar_transp, linha_produto, validacao_fiscal, status_operacional
+        retornou_cd, tem_itens_cobrar, valor_cobrar_transp, linha_produto, validacao_fiscal, status_operacional, dt_recebimento_cd, itens_protheus
       `)
       .eq('tipo', 'devolucao')
       .or('status_sefaz.neq.CANCELADA,status_sefaz.is.null')
