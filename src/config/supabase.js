@@ -242,7 +242,7 @@ export async function dbExportDevolucoes({ filters = {} } = {}) {
         lancado_protheus, dt_lancamento_protheus,
         status_cobranca, nf_debito, data_cobranca, cobrado_por, obs_cobranca,
         transportador_cobranca, transportador_cnpj_cobranca, centro_custo,
-        retornou_cd, tem_itens_cobrar, valor_cobrar_transp, linha_produto, validacao_fiscal
+        retornou_cd, tem_itens_cobrar, valor_cobrar_transp, linha_produto, validacao_fiscal, status_operacional
       `)
       .eq('tipo', 'devolucao')
       .gte('dt_emissao', '2026-01-01')
@@ -856,4 +856,26 @@ export async function dbImportRetornoCD(registros) {
     else nao_encontradas.push(reg.nf_numero);
   }
   return { atualizadas, nao_encontradas };
+}
+
+// ─── Painel Gerencial ─────────────────────────────────────────
+export async function dbGetPainelGerencial(ano) {
+  syncAuthToken();
+  const { data, error } = await supabase.rpc('get_painel_gerencial', { p_ano: ano });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function dbSetStatusOperacional(id, status, usuario) {
+  syncAuthToken();
+  const { error } = await supabase
+    .from('oobj_nfe_recebidas')
+    .update({
+      status_operacional: status,
+      status_operacional_por: usuario || null,
+      status_operacional_em: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id);
+  if (error) throw new Error(error.message);
 }

@@ -95,3 +95,20 @@ export function Badge({ status }) {
     </span>
   );
 }
+
+// ─── Status operacional (mesma regra da função SQL fn_status_operacional) ───
+export const STATUS_OP_MANUAIS = [
+  'AGENDAR REVERSA',
+  'REVERSA AGENDADA',
+  'RECUSADA SEFAZ',
+  'ENVIAR PARA LANÇAMENTO - SEM FÍSICO',
+];
+export function calcStatusOperacional(dev) {
+  if (!dev) return null;
+  const lp = !!dev.lancado_protheus, cd = !!dev.retornou_cd, tot = !!dev.devolucao_total;
+  if (lp && cd) return 'LANÇADA';
+  if (lp && tot) return 'TROCA DE NOTA';
+  if (lp) return 'LANÇADA SEM FÍSICO';
+  if (cd) return 'ENVIAR PARA LANÇAMENTO';
+  return STATUS_OP_MANUAIS.includes(dev.status_operacional) ? dev.status_operacional : 'AGENDAR REVERSA';
+}

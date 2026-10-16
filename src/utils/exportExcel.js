@@ -1,3 +1,6 @@
+import { calcStatusOperacional } from '../utils.jsx';
+const CANAIS = { 'CANAL INDIRETO':'CNI - CANAL INDIRETO','CANAL DIRETO':'CND - CANAL DIRETO','FARMA KEY ACCOUNT':'FKA - FARMA KEY ACCOUNT','CASH & CARRY':'CRY - CASH & CARRY','KEY ACCOUNT':'KEY - KEY ACCOUNT','ECOMMERCE':'ECO - ECOMMERCE','NOVOS NEGÓCIOS':'NNG - NOVOS NEGÓCIOS','CANAL VERDE':'CNV - CANAL VERDE' };
+const canalDe = (cc) => cc ? (CANAIS[String(cc).toUpperCase()] || String(cc).toUpperCase()) : '';
 import * as XLSX from 'xlsx';
 import { CNPJ_MAP } from '../utils.jsx';
 
@@ -69,6 +72,9 @@ export function exportDevolucoesToExcel(rows, { filename = 'devolucoes_fiscais' 
     'Transportador (NFD)':       r.transportador_cobranca ?? '',
     'CNPJ Transportador (NFD)':   r.transportador_cnpj_cobranca ?? '',
     'Centro de custo':            r.centro_custo ?? '',
+    'Canal':                      canalDe(r.centro_custo),
+    'Status Operacional':         calcStatusOperacional(r) ?? '',
+    'Chegou CD':                  r.retornou_cd ? 'SIM' : 'NÃO',
     'Qtd Itens':                  Array.isArray(r.itens) ? r.itens.length : 0,
   }));
 

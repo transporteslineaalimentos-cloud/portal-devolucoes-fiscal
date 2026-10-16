@@ -4,6 +4,7 @@ import { fmtBRL, fmtDate, fmtDateTime, fmtCNPJ, CNPJ_MAP, STATUS_CFG, STATUS_OPT
 import AnexosSection from './AnexosSection.jsx';
 import HistoricoSection from './HistoricoSection.jsx';
 import RetornoCDSection from './RetornoCDSection.jsx';
+import StatusOperacionalCard from './StatusOperacionalCard.jsx';
 
 const AREA_CORES = {
   'COMERCIAL':         { color: 'var(--blue)',   bg: 'var(--blue-dim)' },
@@ -665,6 +666,8 @@ export default function DetalheDrawer({ id, user, onClose, onSaved, onNav }) {
             )}
 
             <div className="drawer-body" style={{ padding: '18px 22px 28px', overflowY: 'auto', flex: 1 }}>
+            <StatusOperacionalCard key={dev.id + (dev.status_operacional || '')} dev={dev} user={user}
+              onChanged={(v) => { setData(d => ({ ...d, dev: { ...d.dev, status_operacional: v, status_operacional_por: user?.name || user?.email, status_operacional_em: new Date().toISOString() } })); onSaved?.(); }}/>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
 
               {/* Devolução */}
