@@ -30,6 +30,44 @@ export default function ModalLancamentoManual({ onClose, onSaved, user }) {
   const [lookupErr, setLookupErr] = useState('');
   const [buscando, setBuscando] = useState(false);
 
+  // Busca alternativa por número + série da NF de venda
+  const [numBusca, setNumBusca]     = useState('');
+  const [serieBusca, setSerieBusca] = useState('');
+  const [opcoes, setOpcoes]         = useState([]);
+  const [buscaMsg, setBuscaMsg]     = useState('');
+  const [buscandoNum, setBuscandoNum] = useState(false);
+
+  const buscarPorNumero = async () => {
+    const n = numBusca.replace(/\D/g, '').replace(/^0+/, '');
+    const sr = serieBusca.replace(/\D/g, '');
+    setOpcoes([]); setBuscaMsg('');
+    if (!n) { setBuscaMsg('Informe o número da NF.'); return; }
+    setBuscandoNum(true);
+    try {
+      const achados = new Map();
+      const { data: aw } = await supabase.from('active_webhooks')
+        .select('chave_nfe,numero,serie,data_emissao,destinatario_nome,remetente_cnpj')
+        .eq('tipo', 'nota_fiscal').eq('numero', n).limit(20);
+      (aw || []).forEach(r => achados.set(r.chave_nfe, {
+        chave: r.chave_nfe, numero: r.numero, serie: r.serie || String(parseInt(r.chave_nfe.slice(22, 25), 10)),
+        dt: r.data_emissao, cliente: r.destinatario_nome, rem: r.remetente_cnpj,
+      }));
+      const { data: hist } = await supabase.from('historico_nfs')
+        .select('nf_chave,nf_numero,nf_serie,dt_emissao,destinatario_nome,remetente_cnpj')
+        .eq('nf_numero', n).limit(20);
+      (hist || []).forEach(r => r.nf_chave && !achados.has(r.nf_chave) && achados.set(r.nf_chave, {
+        chave: r.nf_chave, numero: r.nf_numero, serie: r.nf_serie || String(parseInt(r.nf_chave.slice(22, 25), 10)),
+        dt: r.dt_emissao, cliente: r.destinatario_nome, rem: r.remetente_cnpj,
+      }));
+      let lista = [...achados.values()];
+      if (sr) lista = lista.filter(x => String(parseInt(x.serie, 10)) === String(parseInt(sr, 10)));
+      if (lista.length === 0) setBuscaMsg('Nenhuma NF de venda encontrada com esse número' + (sr ? ' e série.' : '.'));
+      else if (lista.length === 1) setChave(lista[0].chave);
+      else setOpcoes(lista);
+    } catch (e) { setBuscaMsg('Erro na busca: ' + e.message); }
+    setBuscandoNum(false);
+  };
+
   const [motivo, setMotivo]     = useState('');
   const [motivosDB, setMotivosDB] = useState([]);
   const [dtDev, setDtDev]       = useState(new Date().toISOString().slice(0, 10));
@@ -213,7 +251,7 @@ export default function ModalLancamentoManual({ onClose, onSaved, user }) {
             <label className="input-label">Chave de acesso da NF de venda *</label>
             <div style={{ position: 'relative' }}>
               <input type="text" value={chave}
-                onChange={e => setChave(e.target.value.replace(/\D/g, ''))}
+                onChange={e => { setChave(e.target.value.replace(/\D/g, '')); setOpcoes([]); setBuscaMsg(''); }}
                 placeholder="Cole aqui os 44 dígitos da chave de acesso"
                 maxLength={44}
                 className="input"
@@ -245,6 +283,37 @@ export default function ModalLancamentoManual({ onClose, onSaved, user }) {
                 <span style={{ color: 'var(--red)', marginLeft: 8 }}>{lookupErr}</span>
               )}
             </div>
+          </div>
+
+          {/* Busca por número + série */}
+          <div>
+            <label className="input-label">Ou busque pelo número e série da NF de venda</label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input className="input" style={{ flex: 2 }} inputMode="numeric" placeholder="Número da NF (ex.: 238657)"
+                value={numBusca} onChange={e => setNumBusca(e.target.value.replace(/\D/g, ''))}
+                onKeyDown={e => e.key === 'Enter' && buscarPorNumero()}/>
+              <input className="input" style={{ flex: 1 }} inputMode="numeric" placeholder="Série" maxLength={3}
+                value={serieBusca} onChange={e => setSerieBusca(e.target.value.replace(/\D/g, ''))}
+                onKeyDown={e => e.key === 'Enter' && buscarPorNumero()}/>
+              <button type="button" className="btn btn-primary btn-sm" onClick={buscarPorNumero} disabled={buscandoNum}>
+                {buscandoNum ? 'Buscando…' : 'Buscar'}
+              </button>
+            </div>
+            {buscaMsg && <div style={{ fontSize: 11, color: 'var(--red)', marginTop: 4 }}>{buscaMsg}</div>}
+            {opcoes.length > 0 && (
+              <div style={{ marginTop: 6, border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+                <div style={{ fontSize: 11, padding: '6px 10px', background: 'var(--surface-2)', color: 'var(--text-3)' }}>
+                  Mais de uma NF encontrada — escolha:
+                </div>
+                {opcoes.map(o => (
+                  <button key={o.chave} type="button" onClick={() => { setChave(o.chave); setOpcoes([]); }}
+                    style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 10px', border: 0, borderTop: '1px solid var(--border)', background: 'transparent', cursor: 'pointer', fontSize: 12, color: 'var(--text-2)' }}>
+                    NF {o.numero} · Série {o.serie} · {o.dt ? String(o.dt).slice(0, 10).split('-').reverse().join('/') : '—'} · {o.cliente || '—'}
+                    {o.rem === '05207076000459' ? ' · CHOCOLATE' : ' · MIX'}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Dados preenchidos automaticamente */}
