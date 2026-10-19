@@ -419,6 +419,7 @@ export async function gerarPlanilhaConsulta(ExcelJS, rows, { periodoTxt = '', ge
     });
   });
   if (ri > 2) wi.autoFilter = { from: 'A1', to: `K${ri - 1}` };
+  else wb.removeWorksheet(wi.id);
 
   /* ── 4. Resumo ───────────────────────────────────────────── */
   const wr = wb.addWorksheet('Resumo', { properties: { tabColor: { argb: 'FF' + AZUL } }, views: [{ showGridLines: false }] });

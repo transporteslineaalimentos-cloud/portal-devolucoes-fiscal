@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { dbGetPainelGerencial, dbExportDevolucoes } from '../config/supabase';
 import { exportPainelGerencialExcel } from '../utils/exportExcel.js';
 import { baixarPlanilhaConsulta } from '../utils/planilhaConsulta.js';
+import ModalNotasPainel from '../components/ModalNotasPainel.jsx';
 
 /* ─────────────────────────────────────────────────────────────
    Painel Gerencial — substitui o dash montado no Excel
@@ -39,9 +40,12 @@ function Card({ title, sub, children, right, style }) {
   );
 }
 
-function Kpi({ label, value, note, accent }) {
+function Kpi({ label, value, note, accent, onClick }) {
   return (
-    <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '14px 16px', boxShadow: 'var(--shadow-xs)', minWidth: 0 }}>
+    <div className={onClick ? 'drill-card' : undefined} role={onClick ? 'button' : undefined} tabIndex={onClick ? 0 : undefined}
+      onClick={onClick} onKeyDown={onClick ? (e => (e.key === 'Enter' || e.key === ' ') && onClick()) : undefined}
+      title={onClick ? 'Clique para ver as notas' : undefined}
+      style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '14px 16px', boxShadow: 'var(--shadow-xs)', minWidth: 0 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: 'var(--text-2)', fontWeight: 500 }}>
         {accent && <span style={{ width: 8, height: 8, borderRadius: 99, background: accent, flexShrink: 0 }}/>}
         {label}
@@ -65,7 +69,7 @@ function Legend({ items }) {
 }
 
 /* ─── Gráfico de linhas mensal (Parcial x Total) ───────────── */
-function LinhaMensal({ meses, ini, fim }) {
+function LinhaMensal({ meses, ini, fim, onDrill }) {
   const wrapRef = useRef(null);
   const [w, setW] = useState(900);
   const [hover, setHover] = useState(null);
@@ -87,8 +91,9 @@ function LinhaMensal({ meses, ini, fim }) {
 
   return (
     <div ref={wrapRef} style={{ position: 'relative' }}>
-      <svg width={w} height={H} role="img" aria-label="Devoluções por mês, parcial e total" style={{ display: 'block' }}
+      <svg width={w} height={H} role="img" aria-label="Devoluções por mês, parcial e total" style={{ display: 'block', cursor: onDrill ? 'pointer' : 'default' }}
         onMouseLeave={() => setHover(null)}
+        onClick={() => { if (onDrill && hover != null) { const m = dados[hover].mes; onDrill({ titulo: `Todas as devoluções · ${MESES[m - 1]}`, mesIni: m, mesFim: m }); } }}
         onMouseMove={e => {
           const r = e.currentTarget.getBoundingClientRect();
           const mx = e.clientX - r.left;
@@ -137,6 +142,7 @@ function LinhaMensal({ meses, ini, fim }) {
             <div style={{ borderTop: '1px solid var(--border)', marginTop: 4, paddingTop: 4, display: 'flex', justifyContent: 'space-between', color: 'var(--text-2)' }}>
               <span>% sobre faturamento</span><b style={{ color: 'var(--text)' }}>{pctFmt(d.faturamento ? (d.parcial + d.total) / d.faturamento : null)}</b>
             </div>
+            {onDrill && <div style={{ marginTop: 5, fontSize: 10.5, color: 'var(--text-3)' }}>Clique para ver as notas do mês</div>}
           </div>
         );
       })()}
@@ -151,15 +157,15 @@ const Row = ({ cor, label, valor }) => (
 );
 
 /* ─── Tabela mensal (visão em tabela do gráfico) ───────────── */
-function TabelaMensal({ meses, ini, fim }) {
+function TabelaMensal({ meses, ini, fim, onDrill }) {
   const dados = meses.slice(ini - 1, fim);
   const tot = dados.reduce((a, d) => ({ parcial: a.parcial + d.parcial, total: a.total + d.total, fat: a.fat + (Number(d.faturamento) || 0) }), { parcial: 0, total: 0, fat: 0 });
   const th = { padding: '6px 8px', fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textAlign: 'right', whiteSpace: 'nowrap' };
   const td = { padding: '6px 8px', fontSize: 11.5, color: 'var(--text-2)', textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', borderTop: '1px solid var(--border)' };
   const linhas = [
-    { k: 'Parcial', cor: COR_PARCIAL, f: d => brl0(d.parcial), t: brl0(tot.parcial) },
-    { k: 'Total',   cor: COR_TOTAL,   f: d => brl0(d.total),   t: brl0(tot.total) },
-    { k: 'Soma',    f: d => brl0(d.parcial + d.total), t: brl0(tot.parcial + tot.total), bold: true },
+    { k: 'Parcial', cor: COR_PARCIAL, f: d => brl0(d.parcial), t: brl0(tot.parcial), drill: { dim: 'tipo', valor: 'parcial', rot: 'Devolução parcial' } },
+    { k: 'Total',   cor: COR_TOTAL,   f: d => brl0(d.total),   t: brl0(tot.total),   drill: { dim: 'tipo', valor: 'total', rot: 'Devolução total' } },
+    { k: 'Soma',    f: d => brl0(d.parcial + d.total), t: brl0(tot.parcial + tot.total), bold: true, drill: { rot: 'Todas as devoluções' } },
     { k: '% sobre faturamento', f: d => pctFmt(d.faturamento ? (d.parcial + d.total) / d.faturamento : null), t: pctFmt(tot.fat ? (tot.parcial + tot.total) / tot.fat : null), bold: true },
     { k: 'Faturamento', f: d => d.faturamento ? brlK(d.faturamento) : '—', t: brlK(tot.fat), muted: true },
   ];
@@ -179,8 +185,12 @@ function TabelaMensal({ meses, ini, fim }) {
                   {l.cor && <span style={{ width: 8, height: 8, borderRadius: 99, background: l.cor }}/>}{l.k}
                 </span>
               </td>
-              {dados.map(d => <td key={d.mes} style={{ ...td, fontWeight: l.bold ? 600 : 400, color: l.muted ? 'var(--text-3)' : l.bold ? 'var(--text)' : 'var(--text-2)' }}>{l.f(d)}</td>)}
-              <td style={{ ...td, fontWeight: 700, color: l.muted ? 'var(--text-3)' : 'var(--text)' }}>{l.t}</td>
+              {dados.map(d => <td key={d.mes} className={l.drill && onDrill ? 'drill' : undefined}
+                onClick={l.drill && onDrill ? () => onDrill({ titulo: `${l.drill.rot} · ${MESES[d.mes - 1]}`, dim: l.drill.dim, valor: l.drill.valor, mesIni: d.mes, mesFim: d.mes }) : undefined}
+                style={{ ...td, fontWeight: l.bold ? 600 : 400, color: l.muted ? 'var(--text-3)' : l.bold ? 'var(--text)' : 'var(--text-2)' }}>{l.f(d)}</td>)}
+              <td className={l.drill && onDrill ? 'drill' : undefined}
+                onClick={l.drill && onDrill ? () => onDrill({ titulo: l.drill.rot, dim: l.drill.dim, valor: l.drill.valor }) : undefined}
+                style={{ ...td, fontWeight: 700, color: l.muted ? 'var(--text-3)' : 'var(--text)' }}>{l.t}</td>
             </tr>
           ))}
         </tbody>
@@ -190,7 +200,9 @@ function TabelaMensal({ meses, ini, fim }) {
 }
 
 /* ─── Tabela de calor (Área / Motivo / Canal × mês) ────────── */
-function TabelaCalor({ linhas, ini, fim, fatMesVig, fatPeriodo, limite, rotuloDim }) {
+function TabelaCalor({ linhas, ini, fim, fatMesVig, fatPeriodo, limite, rotuloDim, dimKey, onDrill }) {
+  const dr = (valor, mi, mf, rot) => onDrill ? () => onDrill({ titulo: `${rotuloDim}: ${valor}${rot ? ' · ' + rot : ''}`, dim: dimKey, valor, mesIni: mi, mesFim: mf }) : undefined;
+  const dc = onDrill ? 'drill' : undefined;
   const mesVig = fim;
   const [aberto, setAberto] = useState(false);
   const pivot = useMemo(() => {
@@ -234,17 +246,18 @@ function TabelaCalor({ linhas, ini, fim, fatMesVig, fatPeriodo, limite, rotuloDi
               const vig = p.meses[mesVig - 1] || 0;
               return (
                 <tr key={p.dim}>
-                  <td style={{ ...td, textAlign: 'left', color: 'var(--text-2)', fontWeight: 500, maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis' }} title={p.dim}>{p.dim}</td>
+                  <td className={dc} onClick={dr(p.dim)} style={{ ...td, textAlign: 'left', color: 'var(--text-2)', fontWeight: 500, maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis' }} title={`${p.dim} — clique para ver as notas do período`}>{p.dim}</td>
                   {cols.map(i => (
-                    <td key={i} style={{ ...td, background: heat(p.meses[i], maxCel), color: p.meses[i] ? 'var(--text)' : 'var(--text-3)' }}
+                    <td key={i} className={p.meses[i] ? dc : undefined} onClick={p.meses[i] ? dr(p.dim, i + 1, i + 1, MESES[i]) : undefined}
+                      style={{ ...td, background: heat(p.meses[i], maxCel), color: p.meses[i] ? 'var(--text)' : 'var(--text-3)' }}
                       title={`${p.dim} · ${MESES[i]}: ${brl0(p.meses[i])} (${p.qtd[i]} NFs)`}>
                       {p.meses[i] ? brl0(p.meses[i]) : '–'}
                     </td>
                   ))}
-                  <td style={{ ...td, fontWeight: 700, background: heat(p.tt, maxTT) }}>{brl0(p.tt)}</td>
+                  <td className={dc} onClick={dr(p.dim)} style={{ ...td, fontWeight: 700, background: heat(p.tt, maxTT) }}>{brl0(p.tt)}</td>
                   <td style={td}>{fatPeriodo ? pctFmt(p.tt / fatPeriodo) : '—'}</td>
                   {ini !== fim && <>
-                    <td style={{ ...td, borderLeft: '1px solid var(--border)', color: vig ? 'var(--text)' : 'var(--text-3)' }}>{vig ? brl0(vig) : '–'}</td>
+                    <td className={vig ? dc : undefined} onClick={vig ? dr(p.dim, mesVig, mesVig, MESES[mesVig - 1]) : undefined} style={{ ...td, borderLeft: '1px solid var(--border)', color: vig ? 'var(--text)' : 'var(--text-3)' }}>{vig ? brl0(vig) : '–'}</td>
                     <td style={{ ...td, color: vig ? 'var(--text)' : 'var(--text-3)' }}>{fatMesVig ? pctFmt(vig / fatMesVig) : '—'}</td>
                   </>}
                 </tr>
@@ -288,13 +301,17 @@ function BarrasH({ itens, labelKey, cor = COR_PARCIAL, onClick }) {
 }
 
 /* ─── Página ───────────────────────────────────────────────── */
-export default function PainelGerencial({ onGoTo }) {
+export default function PainelGerencial({ onGoTo, user }) {
   const anoAtual = new Date().getFullYear();
   const mesAtual = new Date().getMonth() + 1;
   const [ano, setAno] = useState(anoAtual);
   const [ini, setIni] = useState(1);
   const [fim, setFim] = useState(mesAtual);
   const [baixando, setBaixando] = useState('');
+  const [drill, setDrill] = useState(null);
+  const abrir = useCallback(({ titulo, dim = null, valor = null, mesIni, mesFim }) => {
+    setDrill({ titulo, filtro: { ano, mesIni: mesIni ?? ini, mesFim: mesFim ?? fim, dim, valor } });
+  }, [ano, ini, fim]);
   const [data, setData] = useState(null);
   const [erro, setErro] = useState('');
   const [loading, setLoading] = useState(true);
@@ -397,45 +414,53 @@ export default function PainelGerencial({ onGoTo }) {
 
       {data && (
         <>
+          <div className="no-print" style={{ fontSize: 11.5, color: 'var(--text-3)', marginTop: -6 }}>
+            Clique em qualquer valor (destaques, gráfico, tabelas e barras) para abrir a lista completa das notas.
+          </div>
           {/* KPIs */}
           <div className="painel-kpis" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
-            <Kpi label={`Retorno e devolução · ${periodoTxt}`} value={brl0(tot.p + tot.t)} note={`${tot.qp + tot.qt} notas`}/>
-            <Kpi label="Devolução parcial" accent={COR_PARCIAL} value={brl0(tot.p)} note={`${tot.qp} NFDs`}/>
-            <Kpi label="Devolução total" accent={COR_TOTAL} value={brl0(tot.t)} note={`${tot.qt} lançamentos manuais`}/>
+            <Kpi label={`Retorno e devolução · ${periodoTxt}`} value={brl0(tot.p + tot.t)} note={`${tot.qp + tot.qt} notas`} onClick={() => abrir({ titulo: 'Todas as devoluções' })}/>
+            <Kpi label="Devolução parcial" accent={COR_PARCIAL} value={brl0(tot.p)} note={`${tot.qp} NFDs`} onClick={() => abrir({ titulo: 'Devolução parcial', dim: 'tipo', valor: 'parcial' })}/>
+            <Kpi label="Devolução total" accent={COR_TOTAL} value={brl0(tot.t)} note={`${tot.qt} lançamentos manuais`} onClick={() => abrir({ titulo: 'Devolução total', dim: 'tipo', valor: 'total' })}/>
             <Kpi label="% sobre o faturamento" value={pctFmt(tot.f ? (tot.p + tot.t) / tot.f : null)} note={`Faturamento ${brlK(tot.f)}`}/>
-            <Kpi label={`Último mês do período (${MESES[mesVig - 1]})`} value={brl0(vig.parcial + vig.total)} note={`${pctFmt(fatMesVig ? (vig.parcial + vig.total) / fatMesVig : null)} do faturamento do mês`}/>
+            <Kpi label={`Último mês do período (${MESES[mesVig - 1]})`} value={brl0(vig.parcial + vig.total)} note={`${pctFmt(fatMesVig ? (vig.parcial + vig.total) / fatMesVig : null)} do faturamento do mês`} onClick={() => abrir({ titulo: `Todas as devoluções · ${MESES[mesVig - 1]}`, mesIni: mesVig, mesFim: mesVig })}/>
           </div>
 
           {/* Gráfico mensal */}
           <Card title={`Geração de retorno e devoluções · ${periodoTxt}`}
             sub="Parcial pela data de emissão da NFD; total pela data da devolução"
             right={<Legend items={[{ label: 'Devolução parcial', color: COR_PARCIAL }, { label: 'Devolução total', color: COR_TOTAL }]}/>}>
-            <LinhaMensal meses={meses} ini={ini} fim={fim}/>
-            <TabelaMensal meses={meses} ini={ini} fim={fim}/>
+            <LinhaMensal meses={meses} ini={ini} fim={fim} onDrill={abrir}/>
+            <TabelaMensal meses={meses} ini={ini} fim={fim} onDrill={abrir}/>
           </Card>
 
           <Card title="Abertura por área de responsabilidade" sub="Quanto mais forte a cor, maior o valor no mês">
-            <TabelaCalor linhas={data.area} ini={ini} fim={fim} fatMesVig={fatMesVig} fatPeriodo={tot.f} rotuloDim="Área"/>
+            <TabelaCalor linhas={data.area} ini={ini} fim={fim} fatMesVig={fatMesVig} fatPeriodo={tot.f} rotuloDim="Área" dimKey="area" onDrill={abrir}/>
           </Card>
 
           <Card title="Abertura por motivo" sub="Os 15 maiores motivos do período">
-            <TabelaCalor linhas={data.motivo} ini={ini} fim={fim} fatMesVig={fatMesVig} fatPeriodo={tot.f} limite={15} rotuloDim="Motivo"/>
+            <TabelaCalor linhas={data.motivo} ini={ini} fim={fim} fatMesVig={fatMesVig} fatPeriodo={tot.f} limite={15} rotuloDim="Motivo" dimKey="motivo" onDrill={abrir}/>
           </Card>
 
           <Card title="Abertura por canal">
-            <TabelaCalor linhas={data.canal} ini={ini} fim={fim} fatMesVig={fatMesVig} fatPeriodo={tot.f} rotuloDim="Canal"/>
+            <TabelaCalor linhas={data.canal} ini={ini} fim={fim} fatMesVig={fatMesVig} fatPeriodo={tot.f} rotuloDim="Canal" dimKey="canal" onDrill={abrir}/>
           </Card>
 
           {/* Status operacional */}
           <div className="painel-bloco" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: 16 }}>
             <Card title="Status operacional" sub={`Notas do período (${periodoTxt}) em cada situação`}>
-              <BarrasH itens={status} labelKey="status"/>
+              <BarrasH itens={status} labelKey="status" onClick={i => abrir({ titulo: `Status: ${i.status}`, dim: 'status', valor: i.status })}/>
             </Card>
             <Card title="Pendente de retorno por transportador" sub="Notas em AGENDAR REVERSA">
-              <BarrasH itens={pend} labelKey="transportador" cor={COR_TOTAL}/>
+              <BarrasH itens={pend} labelKey="transportador" cor={COR_TOTAL} onClick={i => abrir({ titulo: `Pendente de retorno: ${i.transportador}`, dim: 'transp', valor: i.key })}/>
             </Card>
           </div>
         </>
+      )}
+
+      {drill && (
+        <ModalNotasPainel filtro={drill.filtro} titulo={drill.titulo} user={user}
+          onClose={() => setDrill(null)} onChanged={carregar}/>
       )}
     </div>
   );

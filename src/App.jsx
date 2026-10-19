@@ -243,7 +243,7 @@ function Portal() {
           {tab === 'dashboard' && <Dashboard onGoTo={changeTab} />}
           {tab === 'painel' && (
             <Suspense fallback={<Fallback />}>
-              <PainelGerencial onGoTo={changeTab} />
+              <PainelGerencial onGoTo={changeTab} user={user} />
             </Suspense>
           )}
           {tab === 'devolucoes' && (
