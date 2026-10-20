@@ -279,7 +279,7 @@ export async function dbGetDevolucaoDetail(id) {
         .from('active_webhooks')
         .select('numero,serie,chave_nfe,destinatario_nome,destinatario_cnpj,remetente_cnpj,remetente_nome,natureza_operacao,cfop,data_emissao,data_entrega,valor_mercadoria,transportador_nome,transportador_cnpj,pedido,observacao,payload_raw')
         .eq('chave_nfe', dev.chave_nfe_referenciada)
-        .eq('tipo', 'nota_fiscal')        .limit(1)
+        .eq('tipo', 'nota_fiscal').order('created_at', { ascending: false }).limit(1)
         .single(),
       null
     );
@@ -475,6 +475,7 @@ export async function dbLancarDevolucaoManual(dados) {
       .select('numero,serie,chave_nfe,destinatario_nome,destinatario_cnpj,remetente_cnpj,data_emissao,valor_mercadoria,transportador_nome,pedido')
       .eq('chave_nfe', dados.chave_nfe_referenciada)
       .eq('tipo', 'nota_fiscal')
+      .order('created_at', { ascending: false })
       .limit(1)
       .single();
     nfVenda = data;

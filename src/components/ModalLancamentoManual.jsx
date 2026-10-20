@@ -47,7 +47,7 @@ export default function ModalLancamentoManual({ onClose, onSaved, user }) {
       const achados = new Map();
       const { data: aw } = await supabase.from('active_webhooks')
         .select('chave_nfe,numero,serie,data_emissao,destinatario_nome,remetente_cnpj')
-        .eq('tipo', 'nota_fiscal').eq('numero', n).limit(20);
+        .eq('tipo', 'nota_fiscal').eq('numero', n).order('created_at', { ascending: false }).limit(50);
       (aw || []).forEach(r => achados.set(r.chave_nfe, {
         chave: r.chave_nfe, numero: r.numero, serie: r.serie || String(parseInt(r.chave_nfe.slice(22, 25), 10)),
         dt: r.data_emissao, cliente: r.destinatario_nome, rem: r.remetente_cnpj,
@@ -92,6 +92,7 @@ export default function ModalLancamentoManual({ onClose, onSaved, user }) {
         .select('*')
         .eq('chave_nfe', raw)
         .eq('tipo', 'nota_fiscal')
+        .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
 
