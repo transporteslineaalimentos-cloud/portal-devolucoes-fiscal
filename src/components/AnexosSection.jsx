@@ -32,7 +32,7 @@ const ICON_BY_MIME = (mime) => {
 const ACCEPT = '.jpg,.jpeg,.png,.gif,.webp,.pdf,.xlsx,.xls,.txt';
 const MAX_SIZE = 20 * 1024 * 1024; // 20MB
 
-export default function AnexosSection({ devolucaoId, user }) {
+export default function AnexosSection({ devolucaoId, user, onCount }) {
   const [anexos, setAnexos]     = useState([]);
   const [loading, setLoading]   = useState(true);
   const [preview, setPreview]   = useState(null);
@@ -47,7 +47,9 @@ export default function AnexosSection({ devolucaoId, user }) {
 
   const reload = () => {
     setLoading(true);
-    dbListAnexos(devolucaoId).then(setAnexos).finally(() => setLoading(false));
+    dbListAnexos(devolucaoId)
+      .then(lista => { setAnexos(lista); onCount?.(lista.length); })
+      .finally(() => setLoading(false));
   };
   useEffect(() => { reload(); }, [devolucaoId]); // eslint-disable-line
 
