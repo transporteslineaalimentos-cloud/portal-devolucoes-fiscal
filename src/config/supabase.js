@@ -204,7 +204,8 @@ export async function dbListDevolucoes({ page = 0, filters = {} }) {
       chave_nfe_referenciada, itens, created_at,
       inf_complementar, motivo_devolucao, devolucao_total, lancamento_manual,
       nf_venda_localizada, area_responsavel, flag_emissao_entrega,
-      lancado_protheus, dt_lancamento_protheus, linha_produto, validacao_fiscal
+      lancado_protheus, dt_lancamento_protheus, linha_produto, validacao_fiscal,
+      retornou_cd, tem_itens_cobrar, status_operacional, transportador_cobranca, centro_custo
     `, { count: 'exact' })
     .eq('tipo', 'devolucao')
     .or('status_sefaz.neq.CANCELADA,status_sefaz.is.null')   // ocultar canceladas
@@ -880,4 +881,57 @@ export async function dbSetStatusOperacional(id, status, usuario) {
     })
     .eq('id', id);
   if (error) throw new Error(error.message);
+}
+
+
+// ─── Resumo do conjunto filtrado (somente leitura) ──────────────
+// Usado pela faixa de resumo da aba Devoluções. Lê as mesmas linhas da lista,
+// com os mesmos filtros, trazendo só as colunas necessárias para somar e contar.
+export async function dbGetDevolucoesResumo({ filters = {} } = {}) {
+  syncAuthToken();
+  const BATCH = 1000;
+  const MAX_LINHAS = 6000;
+  let from = 0, rows = [], truncado = false;
+
+  while (true) {
+    let q = supabase
+      .from('oobj_nfe_recebidas')
+      .select('valor, motivo_devolucao, transportador_cobranca, centro_custo, area_responsavel, lancado_protheus, lancamento_manual, dt_emissao, dt_devolucao')
+      .eq('tipo', 'devolucao')
+      .or('status_sefaz.neq.CANCELADA,status_sefaz.is.null')
+      .not('cfops', 'cs', '{"6201"}')
+      .range(from, from + BATCH - 1);
+
+    const termo = (filters.search || '').trim().replace(/[./-]/g, '');
+    const buscaNumerica = /^\d+$/.test(termo) && termo.length < 14;
+    if (!buscaNumerica && !filters.dt_inicio && !filters.dt_fim && !filters.mes) {
+      q = q.gte('dt_emissao', '2026-01-01');
+    }
+    q = applyDevolucoesFilters(q, filters);
+
+    const { data, error } = await q;
+    if (error) throw new Error(error.message);
+    rows = rows.concat(data || []);
+    if (!data || data.length < BATCH) break;
+    from += BATCH;
+    if (from >= MAX_LINHAS) { truncado = true; break; }
+  }
+
+  const hoje = Date.now();
+  const diasRestantes = (r) => {
+    const ref = r.lancamento_manual ? (r.dt_devolucao || r.dt_emissao) : r.dt_emissao;
+    if (!ref) return null;
+    return 90 - Math.floor((hoje - new Date(ref + 'T00:00:00').getTime()) / 86400000);
+  };
+
+  return {
+    truncado,
+    total: rows.length,
+    valor: rows.reduce((a, r) => a + (Number(r.valor) || 0), 0),
+    sem_motivo: rows.filter(r => !r.motivo_devolucao).length,
+    sem_transportador: rows.filter(r => r.area_responsavel === 'TRANSPORTE' && !r.transportador_cobranca).length,
+    sem_centro_custo: rows.filter(r => !r.centro_custo).length,
+    prazo_vencido: rows.filter(r => !r.lancado_protheus && (diasRestantes(r) ?? 99) <= 0).length,
+    prazo_atencao: rows.filter(r => { const d = diasRestantes(r); return !r.lancado_protheus && d !== null && d > 0 && d <= 15; }).length,
+  };
 }
