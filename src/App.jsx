@@ -266,7 +266,7 @@ function Portal() {
           )}
           {tab === 'fretes' && (
             <Suspense fallback={<Fallback />}>
-              <CustosFrete />
+              <CustosFrete user={user} />
             </Suspense>
           )}
           {tab === 'historico' && user?.role === 'admin' && (

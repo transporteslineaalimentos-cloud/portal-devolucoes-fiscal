@@ -954,3 +954,10 @@ export async function dbRefreshCustosFrete() {
   if (error) throw new Error(error.message);
   return data;
 }
+
+export async function dbImportarMovimentacaoCtes(linhas, arquivo) {
+  syncAuthToken();
+  const { data, error } = await supabase.rpc('cf_importar_movimentacao', { p_linhas: linhas, p_arquivo: arquivo });
+  if (error) throw new Error(error.message);
+  return data;
+}

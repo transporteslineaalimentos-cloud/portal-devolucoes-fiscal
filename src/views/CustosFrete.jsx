@@ -1,26 +1,27 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { dbGetCustosFrete, dbRefreshCustosFrete } from '../config/supabase';
+import ModalImportCtes from '../components/ModalImportCtes.jsx';
 
 /* ─────────────────────────────────────────────────────────────
    Custos de Frete — substitui o dash do Power BI.
    Tudo vem da RPC get_custos_frete, que lê os CT-es e as NFs
    recebidos do Active (cópia atualizada a cada 30 min).
    Regras:
-   • Frete venda = CT-e com remetente Linea e tipo ENTREGA NORMAL
-   • Custo extra = todos os demais CT-es, abertos por tipo
-   • Faturamento = só NFs de venda da Linea, sem duplicadas e sem canceladas
+   Só SAÍDA e só VENDA:
+   • Faturamento = NFs de venda da Linea (0297 e 0459), sem duplicadas e sem canceladas
+   • Frete = parte de cada CT-e rateada para essas NFs (frete × valor da NF ÷ soma das NFs do CT-e)
+   • Frete venda = CT-e ENTREGA NORMAL; custo extra = demais tipos, abertos por tipo
 ───────────────────────────────────────────────────────────── */
 
 const COR_VENDA = '#1E4DB7';
 const COR_EXTRA = '#D9822B';
-const INICIO_CONFIAVEL = '2026-08-01';   // Active começou a enviar CT-es em 20/07/2026
+const INICIO_CONFIAVEL = '2026-02-01';   // a base importada do Active começa nos pedidos de 07/01/2026
 const MESES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
 const REMETENTES = [
   { v: '',               l: 'Todos' },
   { v: '05207076000297', l: 'Linea Anápolis/GO' },
   { v: '05207076000459', l: 'Linea Extrema/MG' },
-  { v: 'OUTROS',         l: 'Outros remetentes (entrada)' },
 ];
 
 const brl0 = (v) => 'R$ ' + Math.round(Number(v) || 0).toLocaleString('pt-BR');
@@ -32,8 +33,7 @@ const brlK = (v) => {
 };
 const pctFmt = (v) => v == null || !isFinite(v) ? '—' : (v * 100).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
 const div = (a, b) => (b ? a / b : null);
-const LINEA_RAIZ = '05207076';
-const nomeDest = (i) => i.raiz === LINEA_RAIZ ? 'Linea · fretes de entrada' : titulo(i.nome);
+const nomeDest = (i) => titulo(i.nome);
 const titulo = (s) => !s ? '' : s.toLowerCase().replace(/(^|[\s/(-])([a-zà-ú])/g, (m, p, c) => p + c.toUpperCase())
   .replace(/\b(Ltda|S\/a|S\.a\.?|Eireli|Me|Epp)\b/gi, (m) => m.toUpperCase());
 const mesLabel = (ym) => { const [y, m] = ym.split('-'); return `${MESES[Number(m) - 1]}/${y.slice(2)}`; };
@@ -328,7 +328,7 @@ function ColunasUF({ itens, total, ativo, onClick }) {
 /* ─── Página ───────────────────────────────────────────────── */
 const FILTROS_VAZIOS = { remetente: '', tipo: '', canal: '', uf: '', transportador: '' };
 
-export default function CustosFrete() {
+export default function CustosFrete({ user }) {
   const anoIni = `${new Date().getFullYear()}-01-01`;
   const [de, setDe] = useState(anoIni > INICIO_CONFIAVEL ? anoIni : INICIO_CONFIAVEL);
   const [ate, setAte] = useState(hojeISO());
@@ -337,6 +337,7 @@ export default function CustosFrete() {
   const [erro, setErro] = useState('');
   const [loading, setLoading] = useState(true);
   const [atualizando, setAtualizando] = useState(false);
+  const [importando, setImportando] = useState(false);
   const req = useRef(0);
 
   const set = (k, v) => setF(prev => ({ ...prev, [k]: prev[k] === v ? '' : v }));
@@ -437,6 +438,9 @@ export default function CustosFrete() {
           <button className="btn btn-ghost btn-sm" style={{ height: 32 }} onClick={() => setF(FILTROS_VAZIOS)}>Limpar filtros</button>
         )}
         <div style={{ flex: 1 }}/>
+        {user?.role === 'admin' && (
+          <button className="btn btn-outline btn-sm" style={{ height: 32 }} onClick={() => setImportando(true)}>Importar CT-es</button>
+        )}
         <button className="btn btn-outline btn-sm" style={{ height: 32 }} onClick={atualizarAgora} disabled={atualizando}>
           {atualizando ? 'Atualizando…' : 'Atualizar agora'}
         </button>
@@ -458,8 +462,8 @@ export default function CustosFrete() {
       {de < INICIO_CONFIAVEL && (
         <div className="no-print" style={{ background: 'var(--yellow-dim)', border: '1px solid rgba(217,119,6,0.3)', borderRadius: 10,
           padding: '10px 14px', fontSize: 12.5, color: 'var(--text)', lineHeight: 1.5 }}>
-          <b>Período com CT-es incompletos.</b> O Active começou a enviar os CT-es em 20/07/2026; antes de agosto o frete aparece menor do que foi,
-          e o percentual sobre o faturamento sai subestimado.
+          <b>Janeiro está incompleto.</b> A base de CT-es importada do Active começa nos pedidos de 07/01/2026, então o frete de janeiro
+          aparece menor do que foi e o percentual sobre o faturamento sai subestimado.
         </div>
       )}
 
@@ -471,10 +475,9 @@ export default function CustosFrete() {
           {/* KPIs */}
           <div className="cf-kpis">
             <Kpi label="Faturamento" value={brlK(fat)} note={`${(k.qtd_nfs || 0).toLocaleString('pt-BR')} NFs de venda`}/>
-            <Kpi label="Frete venda" accent={COR_VENDA} value={brlK(fv)} note="Entrega normal · remetente Linea"/>
-            <Kpi label="Custo extra" accent={COR_EXTRA} value={brlK(ce)}
-              note={Number(k.extra_entrada) > 0 ? `inclui ${brlK(k.extra_entrada)} de fretes de entrada` : 'Todos os demais tipos de CT-e'}/>
-            <Kpi destaque label="% Frete total × faturamento" value={pctFmt(div(ft, fat))} note={`${brlK(ft)} em ${(k.qtd_ctes || 0).toLocaleString('pt-BR')} CT-es`}/>
+            <Kpi label="Frete venda" accent={COR_VENDA} value={brlK(fv)} note="CT-es de entrega normal"/>
+            <Kpi label="Custo extra" accent={COR_EXTRA} value={brlK(ce)} note="Dedicado, descarga, pallet, complementar e demais"/>
+            <Kpi destaque label="% Frete total × faturamento" value={pctFmt(div(ft, fat))} note={`${brlK(ft)} · ${(k.qtd_ctes || 0).toLocaleString('pt-BR')} CT-es` + (k.qtd_nfs_frete ? ` de ${k.qtd_nfs_frete.toLocaleString('pt-BR')} NFs` : '')}/>
             <Kpi label="% Frete venda × faturamento" accent={COR_VENDA} value={pctFmt(div(fv, fat))}/>
             <Kpi label="% Custo extra × faturamento" accent={COR_EXTRA} value={pctFmt(div(ce, fat))}/>
           </div>
@@ -506,7 +509,8 @@ export default function CustosFrete() {
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(440px, 1fr))', gap: 16 }}>
-            <Card title="Custo total de frete por destinatário" sub="Clientes agrupados pela raiz do CNPJ (todas as lojas juntas)">
+            <Card title="Custo total de frete por destinatário" sub="Clientes agrupados pela raiz do CNPJ (todas as lojas juntas)"
+              right={<Legend items={[{ label: 'Venda', color: COR_VENDA }, { label: 'Extra', color: COR_EXTRA }]}/>}>
               <Barras itens={(data.por_destinatario || []).map(i => ({ ...i, frete_venda: Number(i.valor) - Number(i.custo_extra) }))}
                 rotulo={nomeDest} empilhado total={ft}/>
             </Card>
@@ -521,6 +525,8 @@ export default function CustosFrete() {
           </Card>
         </div>
       )}
+
+      {importando && <ModalImportCtes onClose={() => setImportando(false)} onImported={carregar}/>}
     </div>
   );
 }
