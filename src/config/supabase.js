@@ -935,3 +935,22 @@ export async function dbGetDevolucoesResumo({ filters = {} } = {}) {
     prazo_atencao: rows.filter(r => { const d = diasRestantes(r); return !r.lancado_protheus && d !== null && d > 0 && d <= 15; }).length,
   };
 }
+
+// ─── Custos de Frete (aba nova; só leitura) ──────────────────────────────
+export async function dbGetCustosFrete({ de, ate, remetente = null, tipo = null, canal = null, uf = null, transportador = null }) {
+  syncAuthToken();
+  const { data, error } = await supabase.rpc('get_custos_frete', {
+    p_de: de, p_ate: ate,
+    p_remetente: remetente || null, p_tipo: tipo || null, p_canal: canal || null,
+    p_uf: uf || null, p_transportador: transportador || null,
+  });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function dbRefreshCustosFrete() {
+  syncAuthToken();
+  const { data, error } = await supabase.rpc('refresh_custos_frete');
+  if (error) throw new Error(error.message);
+  return data;
+}

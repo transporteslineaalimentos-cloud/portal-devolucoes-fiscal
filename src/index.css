@@ -901,3 +901,11 @@ tr.drill-row:hover td { background: var(--blue-dim); }
   display: flex; align-items: center; gap: 7px;
   text-transform: uppercase; letter-spacing: .06em;
 }
+
+/* ═══ CUSTOS DE FRETE ═══ */
+.cf-barra { transition: background 120ms; }
+.cf-barra:hover { background: var(--surface-2); }
+.cf-kpis { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 1360px) { .cf-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 640px)  { .cf-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media print { .cf-kpis { grid-template-columns: repeat(6, minmax(0, 1fr)) !important; } }

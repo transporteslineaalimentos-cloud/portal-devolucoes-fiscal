@@ -14,6 +14,7 @@ const ICONS = {
   protheus:   'M5 12h14M12 5l7 7-7 7',
   painel:     'M4 19h16M7 16V9m5 7V5m5 11v-4',
   historico:  'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z',
+  fretes:     'M3 6h11v10H3zM14 9h4l3 3v4h-7M7.5 18.5a1.5 1.5 0 100-3 1.5 1.5 0 000 3zm10 0a1.5 1.5 0 100-3 1.5 1.5 0 000 3z',
   exit:       'M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1',
   chevronL:   'M15 18l-6-6 6-6',
   chevronR:   'M9 18l6-6-6-6',
@@ -25,6 +26,7 @@ const NAV = [
   { id: 'devolucoes', label: 'Devoluções',  icon: ICONS.devolucoes, badge: true },
   { id: 'cobrancas',  label: 'Cobranças',   icon: ICONS.cobrancas,  badge: true },
   { id: 'protheus',   label: 'Protheus',    icon: ICONS.protheus },
+  { id: 'fretes',     label: 'Custos de Frete', icon: ICONS.fretes },
   { id: 'historico',  label: 'Histórico',   icon: ICONS.historico, adminOnly: true },
 ];
 
