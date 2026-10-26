@@ -50,14 +50,14 @@ export default function ModalCtesFrete({ titulo: tit, sub, params, filtrar, onFi
   const truncado = res && res.qtd > (res.linhas || []).length;
 
   const baixar = () => {
-    const cab = ['CT-e', 'Emissão', 'Transportador', 'CNPJ transportador', 'Tipo', 'Operação', 'Destinatário', 'Cidade', 'UF',
-      'NF', 'Chave da NF', 'Valor da NF', 'Frete rateado para a NF', 'Valor total do CT-e', 'Origem'];
+    const cab = ['CT-e', 'Emissão do CT-e', 'Transportador', 'CNPJ transportador', 'Tipo', 'Operação', 'Destinatário', 'Cidade', 'UF',
+      'NF', 'Emissão da NF', 'Chave da NF', 'Valor da NF', 'Frete rateado para a NF', 'Valor total do CT-e', 'Origem'];
     const num = (v) => (Number(v) || 0).toFixed(2).replace('.', ',');
     const esc = (v) => { const s = String(v ?? ''); return /[;"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
     const out = [cab.join(';')];
     for (const l of linhas) for (const n of (l.nfs || [])) {
       out.push([l.cte_numero, dataBR(l.dt), l.transp_nome, fmtCnpj(l.transp_cnpj), l.tipo, OPERACAO[n.operacao] || n.operacao,
-        l.dest_nome, l.cidade, l.uf, n.nf, n.chave, num(n.valor_nf), num(n.rateio), num(l.valor_cte),
+        l.dest_nome, l.cidade, l.uf, n.nf, dataBR(n.dt), n.chave, num(n.valor_nf), num(n.rateio), num(l.valor_cte),
         l.origem === 'planilha' ? 'Planilha importada' : 'Recebimento automático'].map(esc).join(';'));
     }
     const blob = new Blob(['﻿' + out.join('\r\n')], { type: 'text/csv;charset=utf-8' });
@@ -112,7 +112,7 @@ export default function ModalCtesFrete({ titulo: tit, sub, params, filtrar, onFi
             <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 900 }}>
               <thead>
                 <tr>
-                  <th style={th}>CT-e</th><th style={th}>Emissão</th><th style={th}>Transportador</th><th style={th}>Tipo</th>
+                  <th style={th}>CT-e</th><th style={th} title="Data em que o CT-e foi emitido; o custo entra no mês da NF">Emissão CT-e</th><th style={th}>Transportador</th><th style={th}>Tipo</th>
                   <th style={th}>Destino</th><th style={th}>NFs</th>
                   <th style={{ ...th, textAlign: 'right' }} title="Parte do CT-e rateada para as NFs consideradas no painel">Frete considerado</th>
                   <th style={{ ...th, textAlign: 'right' }}>Valor do CT-e</th>
@@ -150,8 +150,8 @@ export default function ModalCtesFrete({ titulo: tit, sub, params, filtrar, onFi
                             <table style={{ borderCollapse: 'collapse', width: '100%', maxWidth: 760 }}>
                               <thead>
                                 <tr>
-                                  {['NF', 'Operação', 'Chave de acesso', 'Valor da NF', 'Frete rateado'].map((h, j) => (
-                                    <th key={h} style={{ padding: '6px 8px', fontSize: 10.5, color: 'var(--text-3)', fontWeight: 700, textAlign: j >= 3 ? 'right' : 'left' }}>{h}</th>
+                                  {['NF', 'Emissão', 'Operação', 'Chave de acesso', 'Valor da NF', 'Frete rateado'].map((h, j) => (
+                                    <th key={h} style={{ padding: '6px 8px', fontSize: 10.5, color: 'var(--text-3)', fontWeight: 700, textAlign: j >= 4 ? 'right' : 'left' }}>{h}</th>
                                   ))}
                                 </tr>
                               </thead>
@@ -159,6 +159,7 @@ export default function ModalCtesFrete({ titulo: tit, sub, params, filtrar, onFi
                                 {nfs.map(n => (
                                   <tr key={n.chave}>
                                     <td style={{ padding: '4px 8px', fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{n.nf}</td>
+                                    <td style={{ padding: '4px 8px', fontSize: 12, color: 'var(--text-2)', whiteSpace: 'nowrap' }}>{dataBR(n.dt)}</td>
                                     <td style={{ padding: '4px 8px', fontSize: 12, color: 'var(--text-2)' }}>{OPERACAO[n.operacao] || n.operacao}</td>
                                     <td style={{ padding: '4px 8px', fontSize: 11, color: 'var(--text-3)', fontFamily: 'ui-monospace, monospace', wordBreak: 'break-all' }}>{n.chave}</td>
                                     <td style={{ padding: '4px 8px', fontSize: 12, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{brl(n.valor_nf)}</td>
@@ -190,7 +191,7 @@ export default function ModalCtesFrete({ titulo: tit, sub, params, filtrar, onFi
           <div style={{ padding: '10px 22px', borderTop: '1px solid var(--border)', fontSize: 11.5, color: 'var(--text-3)', display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
             <span>{linhas.length.toLocaleString('pt-BR')} CT-e{linhas.length === 1 ? '' : 's'} na lista · {brl(totalVisivel)}{busca ? ' (busca aplicada)' : ''}</span>
             {truncado && <span>Mostrando os {res.linhas.length.toLocaleString('pt-BR')} de maior valor; use um período menor para ver todos.</span>}
-            <span>Clique em um CT-e para ver as NFs e o rateio.</span>
+            <span>O período segue a emissão da NF · clique em um CT-e para ver as NFs e o rateio.</span>
           </div>
         )}
       </div>

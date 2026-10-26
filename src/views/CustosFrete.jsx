@@ -13,6 +13,7 @@ import ModalCtesFrete from '../components/ModalCtesFrete.jsx';
      (transferência para Linea 0297, 0459 ou 0106 não é faturamento; 0530 e 0610 seguem a regra normal)
    • Frete = parte de cada CT-e rateada para as NFs de venda e de transferência
      (frete × valor da NF ÷ soma das NFs do CT-e)
+   • O custo entra no mês de emissão da NF, mesmo que o CT-e seja emitido depois
    • Frete venda = CT-e ENTREGA NORMAL; custo extra = demais tipos, abertos por tipo
    • Todo número de frete é clicável e abre a lista de CT-es por trás dele
 ───────────────────────────────────────────────────────────── */
@@ -509,7 +510,7 @@ export default function CustosFrete({ user }) {
           </button>
         ))}
         <span>
-          {data?.cobertura?.atualizado_em ? `Dados do Active até ${dataBR(data.cobertura.ultimo_cte)} · cópia atualizada em ${new Date(data.cobertura.atualizado_em).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })} (a cada 30 min)` : ''}
+          {data?.cobertura?.atualizado_em ? `CT-es recebidos até ${dataBR(data.cobertura.ultimo_cte)} · cópia atualizada em ${new Date(data.cobertura.atualizado_em).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })} (a cada 30 min)` : ''}
           {loading && data ? ' · carregando…' : ''}
         </span>
       </div>
@@ -517,8 +518,8 @@ export default function CustosFrete({ user }) {
       {de < INICIO_CONFIAVEL && (
         <div className="no-print" style={{ background: 'var(--yellow-dim)', border: '1px solid rgba(217,119,6,0.3)', borderRadius: 10,
           padding: '10px 14px', fontSize: 12.5, color: 'var(--text)', lineHeight: 1.5 }}>
-          <b>Janeiro está incompleto.</b> A base de CT-es importada do Active começa nos pedidos de 07/01/2026, então o frete de janeiro
-          aparece menor do que foi e o percentual sobre o faturamento sai subestimado.
+          <b>Janeiro está incompleto.</b> A base de CT-es importada do Active começa nos pedidos de 07/01/2026, então as notas da
+          primeira semana de janeiro aparecem sem frete e o percentual sobre o faturamento sai subestimado.
         </div>
       )}
 
@@ -550,7 +551,7 @@ export default function CustosFrete({ user }) {
 
           {/* Evolução mensal */}
           <Card title="Custo de frete por mês e % sobre o faturamento"
-            sub="O número acima de cada coluna é o frete total dividido pelo faturamento do mês. Clique em um mês ou valor para ver os CT-es"
+            sub="Cada mês traz o frete das notas emitidas nele, mesmo que o CT-e tenha vindo depois. O número acima da coluna é o frete sobre o faturamento. Clique para ver os CT-es"
             right={<Legend items={[{ label: 'Frete venda', color: COR_VENDA }, { label: 'Custo extra', color: COR_EXTRA }]}/>}>
             <GraficoMensal meses={meses} onMes={m => abrirMes(m.mes)}/>
             <TabelaMensal meses={meses} onAbrir={abrirMes}/>
