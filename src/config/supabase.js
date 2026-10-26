@@ -965,7 +965,8 @@ export async function dbGetCustosFreteCtes({ de, ate, remetente = null, tipo = n
 
 export async function dbRefreshCustosFrete() {
   syncAuthToken();
-  const { data, error } = await supabase.rpc('refresh_custos_frete');
+  // pede o recálculo; uma rotina no banco executa em até 1 minuto
+  const { data, error } = await supabase.rpc('solicitar_refresh_custos_frete');
   if (error) throw new Error(error.message);
   return data;
 }

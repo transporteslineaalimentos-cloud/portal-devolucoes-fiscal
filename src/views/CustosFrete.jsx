@@ -10,7 +10,7 @@ import ModalCtesFrete from '../components/ModalCtesFrete.jsx';
    Regras:
    Só SAÍDA:
    • Faturamento = NFs de venda da Linea (0297 e 0459) para clientes, sem duplicadas e sem canceladas
-     (transferência Linea → Linea não é faturamento)
+     (transferência para Linea 0297, 0459 ou 0106 não é faturamento; 0530 e 0610 seguem a regra normal)
    • Frete = parte de cada CT-e rateada para as NFs de venda e de transferência
      (frete × valor da NF ÷ soma das NFs do CT-e)
    • Frete venda = CT-e ENTREGA NORMAL; custo extra = demais tipos, abertos por tipo
@@ -378,12 +378,22 @@ export default function CustosFrete({ user }) {
 
   useEffect(() => { const t = setTimeout(carregar, 200); return () => clearTimeout(t); }, [carregar]);
 
-  const atualizarAgora = async () => {
+  /* O recálculo roda no banco (leva ~30 s) e é feito por uma rotina que confere
+     o pedido a cada minuto; aqui só pedimos e esperamos a data de atualização mudar. */
+  const aguardarRecalculo = async (pedir = true) => {
     setAtualizando(true);
-    try { await dbRefreshCustosFrete(); await carregar(); }
-    catch (e) { alert('Não foi possível atualizar: ' + e.message); }
+    try {
+      const antes = data?.cobertura?.atualizado_em || null;
+      if (pedir) await dbRefreshCustosFrete();
+      for (let i = 0; i < 24; i++) {
+        await new Promise(r => setTimeout(r, 10000));
+        const r = await dbGetCustosFrete({ de, ate, ...f });
+        if (r?.cobertura?.atualizado_em !== antes) { setData(r); break; }
+      }
+    } catch (e) { alert('Não foi possível atualizar: ' + e.message); }
     setAtualizando(false);
   };
+  const atualizarAgora = () => aguardarRecalculo(true);
 
   const k = data?.kpis || {};
   const fat = Number(k.faturamento) || 0;
@@ -487,7 +497,7 @@ export default function CustosFrete({ user }) {
           <button className="btn btn-outline btn-sm" style={{ height: 32 }} onClick={() => setImportando(true)}>Importar CT-es</button>
         )}
         <button className="btn btn-outline btn-sm" style={{ height: 32 }} onClick={atualizarAgora} disabled={atualizando}>
-          {atualizando ? 'Atualizando…' : 'Atualizar agora'}
+          {atualizando ? 'Recalculando… (até 2 min)' : 'Atualizar agora'}
         </button>
         <button className="btn btn-primary btn-sm" style={{ height: 32 }} onClick={baixarPdf} disabled={!data}>Baixar PDF</button>
       </div>
@@ -588,7 +598,7 @@ export default function CustosFrete({ user }) {
         <ModalCtesFrete titulo={detalhe.titulo} sub={detalhe.sub} params={detalhe.params}
           filtrar={detalhe.filtrar?.label} onFiltrar={detalhe.filtrar?.run} onClose={() => setDetalhe(null)}/>
       )}
-      {importando && <ModalImportCtes onClose={() => setImportando(false)} onImported={carregar}/>}
+      {importando && <ModalImportCtes onClose={() => setImportando(false)} onImported={() => aguardarRecalculo(false)}/>}
     </div>
   );
 }

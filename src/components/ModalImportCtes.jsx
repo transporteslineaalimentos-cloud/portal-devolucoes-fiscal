@@ -110,7 +110,7 @@ export default function ModalImportCtes({ onClose, onImported }) {
         inseridas += r.inseridas; existentes += r.ja_existentes;
       }
       setProgresso({ feitas: linhas.length, total: linhas.length, atualizando: true });
-      await dbRefreshCustosFrete();
+      await dbRefreshCustosFrete();   // só pede; o recálculo roda no banco em até 1–2 min
       setResultado({ inseridas, existentes });
       onImported?.();
     } catch (e) { setErro(e.message); }
@@ -147,7 +147,7 @@ export default function ModalImportCtes({ onClose, onImported }) {
 
           {progresso && (
             <div style={{ fontSize: 12.5, color: 'var(--text-2)' }}>
-              {progresso.atualizando ? 'Recalculando o painel…' : `Enviando ${progresso.feitas.toLocaleString('pt-BR')} de ${progresso.total.toLocaleString('pt-BR')} linhas…`}
+              {progresso.atualizando ? 'Pedindo o recálculo do painel…' : `Enviando ${progresso.feitas.toLocaleString('pt-BR')} de ${progresso.total.toLocaleString('pt-BR')} linhas…`}
               <div style={{ height: 6, background: 'var(--surface-3)', borderRadius: 3, marginTop: 6, overflow: 'hidden' }}>
                 <div style={{ height: '100%', width: `${(progresso.feitas / Math.max(1, progresso.total)) * 100}%`, background: 'var(--blue)', transition: 'width 200ms' }}/>
               </div>
@@ -157,7 +157,7 @@ export default function ModalImportCtes({ onClose, onImported }) {
           {resultado && (
             <div style={{ background: 'var(--green-dim)', borderRadius: 8, padding: '10px 12px', fontSize: 12.5, color: 'var(--text)', lineHeight: 1.6 }}>
               <b>{resultado.inseridas.toLocaleString('pt-BR')}</b> linhas novas gravadas ·{' '}
-              {resultado.existentes.toLocaleString('pt-BR')} já estavam na base e foram ignoradas. O painel já foi atualizado.
+              {resultado.existentes.toLocaleString('pt-BR')} já estavam na base e foram ignoradas. O painel é recalculado em até 2 minutos e se atualiza sozinho.
             </div>
           )}
 
