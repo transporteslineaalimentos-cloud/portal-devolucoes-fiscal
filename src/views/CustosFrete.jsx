@@ -1,16 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { dbGetCustosFrete, dbRefreshCustosFrete } from '../config/supabase';
 import ModalImportCtes from '../components/ModalImportCtes.jsx';
+import ModalCtesFrete from '../components/ModalCtesFrete.jsx';
 
 /* ─────────────────────────────────────────────────────────────
    Custos de Frete — substitui o dash do Power BI.
    Tudo vem da RPC get_custos_frete, que lê os CT-es e as NFs
    recebidos do Active (cópia atualizada a cada 30 min).
    Regras:
-   Só SAÍDA e só VENDA:
-   • Faturamento = NFs de venda da Linea (0297 e 0459), sem duplicadas e sem canceladas
-   • Frete = parte de cada CT-e rateada para essas NFs (frete × valor da NF ÷ soma das NFs do CT-e)
+   Só SAÍDA:
+   • Faturamento = NFs de venda da Linea (0297 e 0459) para clientes, sem duplicadas e sem canceladas
+     (transferência Linea → Linea não é faturamento)
+   • Frete = parte de cada CT-e rateada para as NFs de venda e de transferência
+     (frete × valor da NF ÷ soma das NFs do CT-e)
    • Frete venda = CT-e ENTREGA NORMAL; custo extra = demais tipos, abertos por tipo
+   • Todo número de frete é clicável e abre a lista de CT-es por trás dele
 ───────────────────────────────────────────────────────────── */
 
 const COR_VENDA = '#1E4DB7';
@@ -56,9 +60,13 @@ function Card({ title, sub, right, children, style }) {
   );
 }
 
-function Kpi({ label, value, note, accent, destaque }) {
+function Kpi({ label, value, note, accent, destaque, onClick }) {
+  const clic = onClick ? {
+    role: 'button', tabIndex: 0, className: 'cf-clicavel', onClick, title: 'Ver os CT-es',
+    onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } },
+  } : {};
   return (
-    <div style={{ background: destaque ? 'linear-gradient(145deg, #1C2130 0%, #272F44 100%)' : 'var(--surface)',
+    <div {...clic} style={{ background: destaque ? 'linear-gradient(145deg, #1C2130 0%, #272F44 100%)' : 'var(--surface)',
       border: '1px solid ' + (destaque ? 'transparent' : 'var(--border)'), borderRadius: 12, padding: '14px 16px',
       boxShadow: 'var(--shadow-xs)', minWidth: 0 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, fontWeight: 500,
@@ -98,7 +106,7 @@ function Filtro({ label, value, onChange, children, width = 170 }) {
 }
 
 /* ─── Colunas mensais empilhadas + % sobre o faturamento ───── */
-function GraficoMensal({ meses }) {
+function GraficoMensal({ meses, onMes }) {
   const wrapRef = useRef(null);
   const [w, setW] = useState(900);
   const [hover, setHover] = useState(null);
@@ -122,6 +130,8 @@ function GraficoMensal({ meses }) {
     <div ref={wrapRef} style={{ position: 'relative' }}>
       <svg width={w} height={H} role="img" aria-label="Custo de frete por mês" style={{ display: 'block' }}
         onMouseLeave={() => setHover(null)}
+        onClick={() => { if (onMes && hover != null && meses[hover]) onMes(meses[hover]); }}
+        cursor={onMes ? 'pointer' : undefined}
         onMouseMove={e => {
           const r = e.currentTarget.getBoundingClientRect();
           const i = Math.floor((e.clientX - r.left - padL) / slot);
@@ -165,6 +175,8 @@ function GraficoMensal({ meses }) {
             <div style={{ borderTop: '1px solid var(--border)', marginTop: 5, paddingTop: 5 }}>
               <Linha label="Frete total" valor={brl0(tot)} pct={pctFmt(div(tot, m.faturamento))} forte/>
               <Linha label="Faturamento" valor={brlK(m.faturamento)}/>
+              {m.transferencia > 0 && <div style={{ color: 'var(--text-3)', marginTop: 3 }}>Inclui {brl0(m.transferencia)} de transferência</div>}
+              {onMes && <div style={{ color: 'var(--blue)', marginTop: 4 }}>Clique para ver os CT-es</div>}
             </div>
           </div>
         );
@@ -182,17 +194,20 @@ const Linha = ({ cor, label, valor, pct, forte }) => (
 );
 
 /* ─── Tabela mensal (os percentuais da 2ª página do BI) ────── */
-function TabelaMensal({ meses }) {
+function TabelaMensal({ meses, onAbrir }) {
   const th = { padding: '7px 10px', fontSize: 10.5, fontWeight: 700, color: 'var(--text-3)', textAlign: 'right', whiteSpace: 'nowrap', borderBottom: '1px solid var(--border)' };
   const td = { padding: '7px 10px', fontSize: 12, textAlign: 'right', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', borderBottom: '1px solid var(--border)' };
   const tot = meses.reduce((a, m) => ({ f: a.f + m.faturamento, v: a.v + m.frete_venda, e: a.e + m.custo_extra }), { f: 0, v: 0, e: 0 });
-  const linha = (k, lab, f, v, e, forte) => (
+  const cel = (mes, cat) => onAbrir ? {
+    className: 'cf-celula', title: 'Ver os CT-es', onClick: (ev) => { ev.stopPropagation(); onAbrir(mes, cat); },
+  } : {};
+  const linha = (k, lab, f, v, e, forte, mes) => (
     <tr key={k} style={forte ? { background: 'var(--surface-2)' } : undefined}>
       <td style={{ ...td, textAlign: 'left', fontWeight: forte ? 700 : 600, color: 'var(--text)' }}>{lab}</td>
       <td style={{ ...td, color: 'var(--text-2)' }}>{brlK(f)}</td>
-      <td style={td}>{brl0(v)}</td>
-      <td style={td}>{brl0(e)}</td>
-      <td style={{ ...td, fontWeight: 700 }}>{brl0(v + e)}</td>
+      <td style={{ ...td, color: COR_VENDA }} {...cel(mes, 'FRETE VENDA')}>{brl0(v)}</td>
+      <td style={{ ...td, color: COR_EXTRA }} {...cel(mes, 'CUSTO EXTRA')}>{brl0(e)}</td>
+      <td style={{ ...td, fontWeight: 700 }} {...cel(mes, null)}>{brl0(v + e)}</td>
       <td style={{ ...td, fontWeight: 700 }}>{pctFmt(div(v + e, f))}</td>
       <td style={{ ...td, color: COR_VENDA, fontWeight: 600 }}>{pctFmt(div(v, f))}</td>
       <td style={{ ...td, color: COR_EXTRA, fontWeight: 600 }}>{pctFmt(div(e, f))}</td>
@@ -209,15 +224,15 @@ function TabelaMensal({ meses }) {
           </tr>
         </thead>
         <tbody>
-          {meses.map(m => linha(m.mes, mesLabel(m.mes), m.faturamento, m.frete_venda, m.custo_extra))}
-          {meses.length > 1 && linha('tot', 'Período', tot.f, tot.v, tot.e, true)}
+          {meses.map(m => linha(m.mes, mesLabel(m.mes), m.faturamento, m.frete_venda, m.custo_extra, false, m.mes))}
+          {meses.length > 1 && linha('tot', 'Período', tot.f, tot.v, tot.e, true, '')}
         </tbody>
       </table>
     </div>
   );
 }
 
-/* ─── Barras horizontais (clicáveis = filtram a aba) ───────── */
+/* ─── Barras horizontais (clique abre os CT-es) ────────────── */
 function Barras({ itens, rotulo, empilhado, cor = COR_VENDA, total, onClick, limite = 12, ativo }) {
   const [todos, setTodos] = useState(false);
   const lista = todos ? itens : itens.slice(0, limite);
@@ -232,7 +247,7 @@ function Barras({ itens, rotulo, empilhado, cor = COR_VENDA, total, onClick, lim
           return (
             <div key={(i.raiz ?? '') + rotulo(i)} className={onClick ? 'cf-barra' : undefined}
               onClick={onClick ? () => onClick(i) : undefined}
-              title={onClick ? 'Clique para filtrar a aba' : undefined}
+              title={onClick ? 'Clique para ver os CT-es' : undefined}
               style={{ display: 'grid', gridTemplateColumns: 'minmax(110px, 34%) minmax(0, 1fr)', gap: 10, alignItems: 'center',
                 cursor: onClick ? 'pointer' : 'default', borderRadius: 6, padding: '2px 4px',
                 background: sel ? 'var(--blue-dim)' : undefined }}>
@@ -317,7 +332,7 @@ function ColunasUF({ itens, total, ativo, onClick }) {
             borderRadius: 8, boxShadow: 'var(--shadow-sm)', padding: '8px 10px', fontSize: 11.5, pointerEvents: 'none', fontVariantNumeric: 'tabular-nums' }}>
             <div style={{ fontWeight: 700, color: 'var(--text)' }}>{i.uf}</div>
             <div style={{ color: 'var(--text-2)' }}>{brl0(i.valor)} · {pctFmt(div(Number(i.valor), total))}</div>
-            <div style={{ color: 'var(--text-3)' }}>{i.qtd} CT-es{onClick ? ' · clique para filtrar' : ''}</div>
+            <div style={{ color: 'var(--text-3)' }}>{i.qtd} CT-es{onClick ? ' · clique para ver' : ''}</div>
           </div>
         );
       })()}
@@ -326,7 +341,13 @@ function ColunasUF({ itens, total, ativo, onClick }) {
 }
 
 /* ─── Página ───────────────────────────────────────────────── */
-const FILTROS_VAZIOS = { remetente: '', tipo: '', canal: '', uf: '', transportador: '' };
+const FILTROS_VAZIOS = { remetente: '', tipo: '', canal: '', uf: '', transportador: '', operacao: '' };
+const OPERACOES = [
+  { v: '',              l: 'Venda + transferência' },
+  { v: 'VENDA',         l: 'Só venda' },
+  { v: 'TRANSFERENCIA', l: 'Só transferência' },
+];
+const fimDoMes = (ym) => { const [y, m] = ym.split('-').map(Number); return new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10); };
 
 export default function CustosFrete({ user }) {
   const anoIni = `${new Date().getFullYear()}-01-01`;
@@ -338,6 +359,7 @@ export default function CustosFrete({ user }) {
   const [loading, setLoading] = useState(true);
   const [atualizando, setAtualizando] = useState(false);
   const [importando, setImportando] = useState(false);
+  const [detalhe, setDetalhe] = useState(null);
   const req = useRef(0);
 
   const set = (k, v) => setF(prev => ({ ...prev, [k]: prev[k] === v ? '' : v }));
@@ -370,7 +392,7 @@ export default function CustosFrete({ user }) {
   const ft = fv + ce;
   const meses = useMemo(() => (data?.mensal || []).map(m => ({
     mes: m.mes, faturamento: Number(m.faturamento) || 0, frete_venda: Number(m.frete_venda) || 0,
-    custo_extra: Number(m.custo_extra) || 0, qtd_ctes: m.qtd_ctes || 0,
+    custo_extra: Number(m.custo_extra) || 0, transferencia: Number(m.transferencia) || 0, qtd_ctes: m.qtd_ctes || 0,
   })), [data]);
   const op = data?.opcoes || {};
   const nomeTransp = (raiz) => (op.transportadores || []).find(t => t.raiz === raiz)?.nome || raiz;
@@ -381,9 +403,29 @@ export default function CustosFrete({ user }) {
     f.canal && { k: 'canal', l: titulo(f.canal) },
     f.uf && { k: 'uf', l: 'UF ' + f.uf },
     f.transportador && { k: 'transportador', l: titulo(nomeTransp(f.transportador)) },
+    f.operacao && { k: 'operacao', l: OPERACOES.find(o => o.v === f.operacao)?.l },
   ].filter(Boolean);
-  const fatNaoFiltra = f.tipo || f.transportador;
+  const fatNaoFiltra = f.tipo || f.transportador || f.operacao;
   const periodoTxt = `${dataBR(de)} a ${dataBR(ate)}`;
+
+  /* Abre a lista de CT-es por trás de um número: filtros da aba + o recorte clicado.
+     `filtrar` (opcional) vira um botão no modal para aplicar o recorte na aba toda. */
+  const abrir = (tit, extra = {}, filtrar = null) => {
+    const params = { de, ate, ...f, ...extra };
+    const rec = [
+      params.de === de && params.ate === ate ? periodoTxt : `${dataBR(params.de)} a ${dataBR(params.ate)}`,
+      ...chips.filter(c => !(c.k in extra)).map(c => c.l),
+    ];
+    setDetalhe({ titulo: tit, sub: rec.join(' · '), params, filtrar });
+  };
+  const abrirMes = (ym, categoria) => {
+    const lab = ym ? mesLabel(ym) : 'Período';
+    const nome = categoria === 'FRETE VENDA' ? 'Frete venda' : categoria === 'CUSTO EXTRA' ? 'Custo extra' : 'Frete total';
+    const extra = ym ? { de: `${ym}-01` < de ? de : `${ym}-01`, ate: fimDoMes(ym) > ate ? ate : fimDoMes(ym) } : {};
+    if (categoria) extra.tipo = categoria;
+    abrir(`${nome} · ${lab}`, extra);
+  };
+  const abrirKpi = (nome, tipo) => abrir(nome, tipo ? { tipo } : {});
 
   const baixarPdf = () => {
     const t = document.title;
@@ -421,6 +463,9 @@ export default function CustosFrete({ user }) {
           <optgroup label="Custo extra por tipo">
             {(op.tipos || []).filter(t => t !== 'ENTREGA NORMAL').sort().map(t => <option key={t} value={t}>{titulo(t)}</option>)}
           </optgroup>
+        </Filtro>
+        <Filtro label="Operação" value={f.operacao} onChange={setSelect('operacao')} width={176}>
+          {OPERACOES.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
         </Filtro>
         <Filtro label="Canal" value={f.canal} onChange={setSelect('canal')} width={150}>
           <option value="">Todos</option>
@@ -475,57 +520,74 @@ export default function CustosFrete({ user }) {
           {/* KPIs */}
           <div className="cf-kpis">
             <Kpi label="Faturamento" value={brlK(fat)} note={`${(k.qtd_nfs || 0).toLocaleString('pt-BR')} NFs de venda`}/>
-            <Kpi label="Frete venda" accent={COR_VENDA} value={brlK(fv)} note="CT-es de entrega normal"/>
-            <Kpi label="Custo extra" accent={COR_EXTRA} value={brlK(ce)} note="Dedicado, descarga, pallet, complementar e demais"/>
-            <Kpi destaque label="% Frete total × faturamento" value={pctFmt(div(ft, fat))} note={`${brlK(ft)} · ${(k.qtd_ctes || 0).toLocaleString('pt-BR')} CT-es` + (k.qtd_nfs_frete ? ` de ${k.qtd_nfs_frete.toLocaleString('pt-BR')} NFs` : '')}/>
-            <Kpi label="% Frete venda × faturamento" accent={COR_VENDA} value={pctFmt(div(fv, fat))}/>
-            <Kpi label="% Custo extra × faturamento" accent={COR_EXTRA} value={pctFmt(div(ce, fat))}/>
+            <Kpi label="Frete venda" accent={COR_VENDA} value={brlK(fv)} note="CT-es de entrega normal"
+              onClick={() => abrirKpi('Frete venda', 'FRETE VENDA')}/>
+            <Kpi label="Custo extra" accent={COR_EXTRA} value={brlK(ce)} note="Dedicado, descarga, pallet, complementar e demais"
+              onClick={() => abrirKpi('Custo extra', 'CUSTO EXTRA')}/>
+            <Kpi destaque label="% Frete total × faturamento" value={pctFmt(div(ft, fat))}
+              note={`${brlK(ft)} · ${(k.qtd_ctes || 0).toLocaleString('pt-BR')} CT-es` + (Number(k.transferencia) > 0 && !f.operacao ? ` · ${brlK(k.transferencia)} de transferência` : '')}
+              onClick={() => abrirKpi('Frete total')}/>
+            <Kpi label="% Frete venda × faturamento" accent={COR_VENDA} value={pctFmt(div(fv, fat))}
+              onClick={() => abrirKpi('Frete venda', 'FRETE VENDA')}/>
+            <Kpi label="% Custo extra × faturamento" accent={COR_EXTRA} value={pctFmt(div(ce, fat))}
+              onClick={() => abrirKpi('Custo extra', 'CUSTO EXTRA')}/>
           </div>
           {fatNaoFiltra && (
             <div style={{ fontSize: 11.5, color: 'var(--text-3)', marginTop: -8 }}>
-              O faturamento não muda com os filtros de tipo de custo e transportador; os percentuais mostram o peso desse recorte no faturamento total.
+              O faturamento não muda com os filtros de tipo de custo, transportador e operação; os percentuais mostram o peso desse recorte no faturamento total.
             </div>
           )}
 
           {/* Evolução mensal */}
           <Card title="Custo de frete por mês e % sobre o faturamento"
-            sub="O número acima de cada coluna é o frete total dividido pelo faturamento do mês"
+            sub="O número acima de cada coluna é o frete total dividido pelo faturamento do mês. Clique em um mês ou valor para ver os CT-es"
             right={<Legend items={[{ label: 'Frete venda', color: COR_VENDA }, { label: 'Custo extra', color: COR_EXTRA }]}/>}>
-            <GraficoMensal meses={meses}/>
-            <TabelaMensal meses={meses}/>
+            <GraficoMensal meses={meses} onMes={m => abrirMes(m.mes)}/>
+            <TabelaMensal meses={meses} onAbrir={abrirMes}/>
           </Card>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(440px, 1fr))', gap: 16 }}>
-            <Card title="Frete pago por transportador" sub="Clique em um transportador para filtrar a aba"
+            <Card title="Frete pago por transportador" sub="Clique em um transportador para ver os CT-es"
               right={<Legend items={[{ label: 'Venda', color: COR_VENDA }, { label: 'Extra', color: COR_EXTRA }]}/>}>
               <Barras itens={data.por_transportador || []} rotulo={i => titulo(i.nome)} empilhado total={ft}
-                ativo={f.transportador} onClick={i => i.raiz && set('transportador', i.raiz)}/>
+                ativo={f.transportador} onClick={i => abrir(titulo(i.nome), { transportador: i.raiz || null },
+                  i.raiz && f.transportador !== i.raiz ? { label: 'Filtrar a aba por este transportador', run: () => set('transportador', i.raiz) } : null)}/>
             </Card>
-            <Card title="Custo por tipo de CT-e" sub="Clique em um tipo para filtrar a aba">
+            <Card title="Custo por tipo de CT-e" sub="Clique em um tipo para ver os CT-es">
               <Barras itens={data.por_tipo || []} rotulo={i => titulo(i.tipo)} total={ft} limite={20}
                 cor={i => i.categoria === 'FRETE VENDA' ? COR_VENDA : COR_EXTRA}
-                ativo={f.tipo} onClick={i => set('tipo', i.tipo === 'ENTREGA NORMAL' ? 'FRETE VENDA' : i.tipo)}/>
+                ativo={f.tipo} onClick={i => {
+                  const t = i.tipo === 'ENTREGA NORMAL' ? 'FRETE VENDA' : i.tipo;
+                  abrir(titulo(i.tipo), { tipo: i.tipo }, f.tipo !== t ? { label: 'Filtrar a aba por este tipo', run: () => set('tipo', t) } : null);
+                }}/>
             </Card>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(440px, 1fr))', gap: 16 }}>
-            <Card title="Custo total de frete por destinatário" sub="Clientes agrupados pela raiz do CNPJ (todas as lojas juntas)"
+            <Card title="Custo total de frete por destinatário" sub="Clientes agrupados pela raiz do CNPJ (todas as lojas juntas) · clique para ver os CT-es"
               right={<Legend items={[{ label: 'Venda', color: COR_VENDA }, { label: 'Extra', color: COR_EXTRA }]}/>}>
               <Barras itens={(data.por_destinatario || []).map(i => ({ ...i, frete_venda: Number(i.valor) - Number(i.custo_extra) }))}
-                rotulo={nomeDest} empilhado total={ft}/>
+                rotulo={nomeDest} empilhado total={ft}
+                onClick={i => abrir(nomeDest(i), { destinatario: i.raiz || null })}/>
             </Card>
-            <Card title="Custo extra por destinatário" sub="Descarga, pallet, dedicado, complementar e demais">
-              <Barras itens={data.extra_por_destinatario || []} rotulo={nomeDest} cor={COR_EXTRA} total={ce}/>
+            <Card title="Custo extra por destinatário" sub="Descarga, pallet, dedicado, complementar e demais · clique para ver os CT-es">
+              <Barras itens={data.extra_por_destinatario || []} rotulo={nomeDest} cor={COR_EXTRA} total={ce}
+                onClick={i => abrir(`Custo extra · ${nomeDest(i)}`, { destinatario: i.raiz || null, tipo: f.tipo && f.tipo !== 'FRETE VENDA' ? f.tipo : 'CUSTO EXTRA' })}/>
             </Card>
           </div>
 
-          <Card title="Custo de frete por UF de destino" sub="Clique em uma UF para filtrar a aba">
+          <Card title="Custo de frete por UF de destino" sub="Clique em uma UF para ver os CT-es">
             <ColunasUF itens={(data.por_uf || []).filter(i => i.uf !== '—')} total={ft}
-              ativo={f.uf} onClick={i => set('uf', i.uf)}/>
+              ativo={f.uf} onClick={i => abrir(`UF ${i.uf}`, { uf: i.uf },
+                f.uf !== i.uf ? { label: 'Filtrar a aba por esta UF', run: () => set('uf', i.uf) } : null)}/>
           </Card>
         </div>
       )}
 
+      {detalhe && (
+        <ModalCtesFrete titulo={detalhe.titulo} sub={detalhe.sub} params={detalhe.params}
+          filtrar={detalhe.filtrar?.label} onFiltrar={detalhe.filtrar?.run} onClose={() => setDetalhe(null)}/>
+      )}
       {importando && <ModalImportCtes onClose={() => setImportando(false)} onImported={carregar}/>}
     </div>
   );

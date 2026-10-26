@@ -909,3 +909,14 @@ tr.drill-row:hover td { background: var(--blue-dim); }
 @media (max-width: 1360px) { .cf-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 640px)  { .cf-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media print { .cf-kpis { grid-template-columns: repeat(6, minmax(0, 1fr)) !important; } }
+.cf-clicavel { cursor: pointer; transition: box-shadow 120ms, border-color 120ms, transform 120ms; }
+.cf-clicavel:hover { border-color: var(--blue) !important; box-shadow: var(--shadow-sm); }
+.cf-clicavel:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.cf-celula { cursor: pointer; }
+.cf-celula:hover { background: var(--blue-dim); }
+.cf-modal-ctes.modal { max-width: 1180px; height: calc(100vh - 48px); }
+.cf-cte-linha:hover td { background: var(--blue-dim); }
+@media (max-width: 640px) {
+  .modal-overlay:has(.cf-modal-ctes) { padding: 0; }
+  .cf-modal-ctes.modal { height: 100vh; max-height: 100vh; border-radius: 0; }
+}
