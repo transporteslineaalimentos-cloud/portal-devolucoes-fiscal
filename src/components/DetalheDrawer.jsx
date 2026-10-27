@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { dbGetDevolucaoDetail, dbUpdateStatus, dbGetXmlUrl, dbUpdateMotivo, dbGetMotivos, dbUpdateTransportador, dbSetCentroCustoCliente, dbGetTransportadoras, dbSalvarTransportadora, dbRegistrarHistorico } from '../config/supabase';
 import { fmtBRL, fmtDate, fmtDateTime, fmtCNPJ, CNPJ_MAP, STATUS_CFG, Badge, calcFarolProtheus, calcStatusOperacional } from '../utils.jsx';
 import AnexosSection from './AnexosSection.jsx';
@@ -55,14 +56,42 @@ const titulo = (s) => !s ? '' : s.charAt(0).toUpperCase() + s.slice(1).toLowerCa
 function MotivoAutocomplete({ value, onChange, motivos }) {
   const [query, setQuery] = useState(value || '');
   const [open, setOpen]   = useState(false);
+  const campo = useRef(null);
+  const [caixa, setCaixa] = useState(null);
 
   const filtrados = query.length >= 1
-    ? motivos.filter(m => m.motivo.toLowerCase().includes(query.toLowerCase())).slice(0, 12)
-    : motivos.slice(0, 12);
+    ? motivos.filter(m => m.motivo.toLowerCase().includes(query.toLowerCase())).slice(0, 40)
+    : motivos.slice(0, 40);
+
+  /* A lista é desenhada no body, presa ao campo: dentro do drawer ela ficava
+     cortada pela área que rola. Reposiciona ao rolar e ao redimensionar. */
+  const medir = useCallback(() => {
+    const el = campo.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const espacoAbaixo = window.innerHeight - r.bottom - 12;
+    const espacoAcima = r.top - 12;
+    const paraCima = espacoAbaixo < 180 && espacoAcima > espacoAbaixo;
+    setCaixa({
+      left: r.left, width: r.width,
+      top: paraCima ? undefined : r.bottom + 4,
+      bottom: paraCima ? window.innerHeight - r.top + 4 : undefined,
+      maxHeight: Math.max(140, (paraCima ? espacoAcima : espacoAbaixo) - 8),
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    medir();
+    const h = () => medir();
+    window.addEventListener('scroll', h, true);
+    window.addEventListener('resize', h);
+    return () => { window.removeEventListener('scroll', h, true); window.removeEventListener('resize', h); };
+  }, [open, medir, filtrados.length]);
 
   return (
     <div style={{ position: 'relative' }}>
-      <input type="text" value={query} autoComplete="off" className="input" style={{ paddingRight: 28 }}
+      <input ref={campo} type="text" value={query} autoComplete="off" className="input" style={{ paddingRight: 28 }}
         placeholder="Digite para filtrar os motivos"
         onChange={e => { setQuery(e.target.value); onChange(''); setOpen(true); }}
         onFocus={() => setOpen(true)}
@@ -74,10 +103,10 @@ function MotivoAutocomplete({ value, onChange, motivos }) {
           <Ic d={ICO.x} size={12}/>
         </button>
       )}
-      {open && filtrados.length > 0 && (
-        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 999, marginTop: 3,
-          background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8,
-          boxShadow: 'var(--shadow-md)', maxHeight: 260, overflowY: 'auto' }}>
+      {open && filtrados.length > 0 && caixa && createPortal((
+        <div style={{ position: 'fixed', left: caixa.left, width: caixa.width, top: caixa.top, bottom: caixa.bottom,
+          zIndex: 2000, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8,
+          boxShadow: 'var(--shadow-lg)', maxHeight: caixa.maxHeight, overflowY: 'auto' }}>
           {filtrados.map((m, i) => {
             const cfg = AREA_CORES[m.area] || { color: 'var(--text-2)', bg: 'var(--surface-3)' };
             return (
@@ -95,7 +124,7 @@ function MotivoAutocomplete({ value, onChange, motivos }) {
             );
           })}
         </div>
-      )}
+      ), document.body)}
     </div>
   );
 }
@@ -612,30 +641,6 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
                   <StatusOperacionalCard key={dev.id + (dev.status_operacional || '')} dev={dev} user={user}
                     onChanged={(v) => { setData(d => ({ ...d, dev: { ...d.dev, status_operacional: v,
                       status_operacional_por: user?.name || user?.email, status_operacional_em: new Date().toISOString() } })); onSaved?.(); }}/>
-
-                  {dev.validacao_fiscal?.status === 'divergente' && (
-                    <section className="dd-bloco" style={{ borderColor: 'rgba(220,38,38,0.35)' }}>
-                      <div className="dd-bloco-topo" style={{ color: 'var(--red)' }}>
-                        <span className="dd-bloco-titulo" style={{ color: 'var(--red)', display: 'flex', alignItems: 'center', gap: 7 }}>
-                          <Ic d={ICO.alerta} size={13} color="var(--red)"/>
-                          {dev.validacao_fiscal.issues?.length === 1 ? 'Divergência fiscal nos valores' : `${dev.validacao_fiscal.issues?.length} divergências fiscais nos valores`}
-                        </span>
-                      </div>
-                      <div className="dd-bloco-corpo">
-                        {dev.validacao_fiscal.issues?.map((iss, i) => (
-                          <div key={i} style={{ padding: '9px 0', borderBottom: i < dev.validacao_fiscal.issues.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                            <div style={{ fontSize: 12.5, color: 'var(--text)' }}>{iss.descricao}</div>
-                            <div style={{ fontSize: 11.5, color: 'var(--text-3)', marginTop: 3, fontVariantNumeric: 'tabular-nums' }}>
-                              Esperado {fmtBRL(iss.esperado)} · encontrado {fmtBRL(iss.encontrado)}
-                            </div>
-                          </div>
-                        ))}
-                        <div style={{ fontSize: 11, color: 'var(--text-3)', paddingTop: 10, lineHeight: 1.5 }}>
-                          Conferência automática da consistência interna do XML. Não substitui a análise do time fiscal.
-                        </div>
-                      </div>
-                    </section>
-                  )}
 
                   <Bloco titulo="Classificação">
                     <dl style={{ margin: 0 }}>

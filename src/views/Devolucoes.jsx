@@ -4,6 +4,8 @@ import { fmtBRL, fmtDate, CNPJ_MAP, Badge, calcFarolProtheus, calcStatusOperacio
 import DetalheDrawer from '../components/DetalheDrawer.jsx';
 import ModalLancamentoManual from '../components/ModalLancamentoManual.jsx';
 import ModalImportProtheus from '../components/ModalImportProtheus.jsx';
+import RetornoCDTrabalho from '../components/RetornoCDTrabalho.jsx';
+import BarraSelecao from '../components/BarraSelecao.jsx';
 import { exportDevolucoesToExcel } from '../utils/exportExcel.js';
 import { baixarPlanilhaConsulta } from '../utils/planilhaConsulta.js';
 
@@ -31,6 +33,7 @@ const ICONES = {
 
 /* Colunas: NF · Cliente e motivo · NF Venda · Emissão e prazo · Valor · Situação */
 const COLS = '150px minmax(250px, 1.5fr) minmax(118px, 0.45fr) minmax(162px, 0.6fr) 132px minmax(192px, 0.65fr)';
+const COLS_SEL = '30px ' + COLS;
 
 /* Mesma paleta de status do Painel Gerencial, do drill-down e da planilha de consulta */
 const STATUS_OP_CFG = {
@@ -56,7 +59,7 @@ const EMPTY_FILTERS = {
   search: '', status: '', cnpj_dest: '', cnpj_emitente: '', uf: '', linha_produto: '',
   dt_inicio: '', dt_fim: '', mes: '', area: '', motivo: '',
   devolucao_total: '', com_motivo: '', flag_emissao: '', lancado: '', nf_venda: '',
-  centro_custo: '', transportador: '', retornou_cd: '', farol: '', validacao_fiscal: '',
+  centro_custo: '', transportador: '', retornou_cd: '', farol: '',
 };
 
 const titulo = (s) => !s ? '' : s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
@@ -215,8 +218,6 @@ function TranspMultiSelect({ transportadoras, value, onChange }) {
 /* ─── Alertas da linha ─────────────────────────────────── */
 function Alertas({ row }) {
   const itens = [];
-  if (row.validacao_fiscal?.status === 'divergente')
-    itens.push({ d: ICONES.alerta, cor: 'var(--red)', t: `Divergência fiscal: ${row.validacao_fiscal.issues?.[0]?.descricao || 'valores inconsistentes'}` });
   if (row.flag_emissao_entrega === 'divergente')
     itens.push({ d: ICONES.alerta, cor: 'var(--yellow)', t: 'Data de emissão divergente da entrega' });
   if (row.flag_emissao_entrega === 'aguardando_entrega')
@@ -235,6 +236,16 @@ function Alertas({ row }) {
 
 /* ═══ Tela ═════════════════════════════════════════════ */
 export default function Devolucoes({ user, initialFilters = {} }) {
+  const [modo, setModo] = useState('lista');        // lista | cd
+  const [selMode, setSelMode] = useState(false);
+  const [marcadas, setMarcadas] = useState(() => new Set());
+  const marcar = (id) => setMarcadas(s => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const marcarTodas = (lista) => setMarcadas(s => {
+    const todas = lista.every(r => s.has(r.id));
+    const n = new Set(s);
+    lista.forEach(r => (todas ? n.delete(r.id) : n.add(r.id)));
+    return n;
+  });
   const { _ts, ...initFilt } = initialFilters;
   const [rows, setRows]       = useState([]);
   const [total, setTotal]     = useState(0);
@@ -355,7 +366,6 @@ export default function Devolucoes({ user, initialFilters = {} }) {
   if (filters.farol === 'verde')    chips.push({ k: 'farol', label: 'Dentro do prazo' });
   if (filters.com_motivo === 'sem') chips.push({ k: 'com_motivo', label: 'Sem motivo' });
   if (filters.com_motivo === 'com') chips.push({ k: 'com_motivo', label: 'Com motivo' });
-  if (filters.validacao_fiscal)     chips.push({ k: 'validacao_fiscal', label: filters.validacao_fiscal === 'divergente' ? 'Divergência fiscal' : 'Fiscal consistente' });
   if (filters.flag_emissao === 'divergente') chips.push({ k: 'flag_emissao', label: 'Emissão divergente' });
   if (filters.flag_emissao === 'no_ato')     chips.push({ k: 'flag_emissao', label: 'Emitida no ato' });
   if (filters.flag_emissao === 'aguardando') chips.push({ k: 'flag_emissao', label: 'Aguardando entrega' });
@@ -383,6 +393,24 @@ export default function Devolucoes({ user, initialFilters = {} }) {
     { k: 'transportador', v: '__sem__', cor: '#9CA3AF', n: resumo?.sem_transportador, label: 'sem transportador' },
     { k: 'centro_custo', v: 'sem', cor: '#9CA3AF', n: resumo?.sem_centro_custo, label: 'sem centro de custo' },
   ];
+
+  if (modo === 'cd') {
+    return (
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14, flexWrap: 'wrap' }}>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>Recebimento no CD</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
+              Marque a chegada da nota e lance os produtos que vieram, com a condição de cada um
+            </div>
+          </div>
+          <div style={{ flex: 1 }}/>
+          <button className="btn btn-outline btn-sm" onClick={() => setModo('lista')}>Voltar para a lista</button>
+        </div>
+        <RetornoCDTrabalho onSair={() => setModo('lista')}/>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -432,6 +460,15 @@ export default function Devolucoes({ user, initialFilters = {} }) {
           <button onClick={() => load(filters, page)} className="btn btn-outline btn-sm"
             title="Atualizar lista" aria-label="Atualizar lista" disabled={loading}>
             <Ic d={ICONES.recarregar} size={13}/>
+          </button>
+
+          <button onClick={() => setModo('cd')} className="btn btn-outline btn-sm" title="Conferir as notas que chegaram ao CD">
+            Recebimento no CD
+          </button>
+
+          <button onClick={() => { setSelMode(v => !v); setMarcadas(new Set()); }}
+            className={`btn btn-sm ${selMode ? 'btn-primary' : 'btn-outline'}`} title="Marcar várias notas e alterar de uma vez">
+            {selMode ? 'Sair da seleção' : 'Selecionar várias'}
           </button>
 
           <div className="dv-spacer"/>
@@ -490,11 +527,6 @@ export default function Devolucoes({ user, initialFilters = {} }) {
                 <Campo label="NF de venda">
                   <select value={filters.nf_venda} onChange={e => applyFilter({ nf_venda: e.target.value })} className="input">
                     <Opcoes itens={[['', 'Todas'], ['localizada', 'Localizada'], ['nao_localizada', 'Não localizada']]}/>
-                  </select>
-                </Campo>
-                <Campo label="Validação fiscal">
-                  <select value={filters.validacao_fiscal} onChange={e => applyFilter({ validacao_fiscal: e.target.value })} className="input">
-                    <Opcoes itens={[['', 'Todas'], ['divergente', 'Com divergência'], ['ok', 'Consistente']]}/>
                   </select>
                 </Campo>
                 <Campo label="Linha">
@@ -581,7 +613,14 @@ export default function Devolucoes({ user, initialFilters = {} }) {
         </div>
 
         {/* ─ Cabeçalho ─ */}
-        <div className="dv-head" style={{ gridTemplateColumns: COLS }}>
+        <div className="dv-head" style={{ gridTemplateColumns: selMode ? COLS_SEL : COLS }}>
+          {selMode && (
+            <span>
+              <input type="checkbox" aria-label="Marcar todas da página" style={{ width: 15, height: 15, accentColor: 'var(--blue)', cursor: 'pointer' }}
+                checked={rows.length > 0 && rows.every(r => marcadas.has(r.id))}
+                onChange={() => marcarTodas(rows)}/>
+            </span>
+          )}
           <span>NF devolução</span>
           <span>Cliente e motivo</span>
           <span>NF de venda</span>
@@ -633,10 +672,17 @@ export default function Devolucoes({ user, initialFilters = {} }) {
 
           return (
             <div key={row.id} className="dv-linha" role="button" tabIndex={0}
-              aria-selected={selectedId === row.id}
-              style={{ gridTemplateColumns: COLS, '--dv-urgencia': urgente || 'transparent' }}
-              onClick={() => setSelected(row.id)}
-              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelected(row.id); } }}>
+              aria-selected={selMode ? marcadas.has(row.id) : selectedId === row.id}
+              style={{ gridTemplateColumns: selMode ? COLS_SEL : COLS, '--dv-urgencia': urgente || 'transparent' }}
+              onClick={() => (selMode ? marcar(row.id) : setSelected(row.id))}
+              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selMode ? marcar(row.id) : setSelected(row.id); } }}>
+
+              {selMode && (
+                <div onClick={e => e.stopPropagation()}>
+                  <input type="checkbox" checked={marcadas.has(row.id)} onChange={() => marcar(row.id)}
+                    aria-label={`Marcar NF ${row.nf_numero}`} style={{ width: 15, height: 15, accentColor: 'var(--blue)', cursor: 'pointer' }}/>
+                </div>
+              )}
 
               {/* NF devolução */}
               <div>
@@ -751,6 +797,12 @@ export default function Devolucoes({ user, initialFilters = {} }) {
             </div>
           );
         })}
+
+        {selMode && marcadas.size > 0 && (
+          <BarraSelecao ids={[...marcadas]}
+            onLimpar={() => setMarcadas(new Set())}
+            onAplicado={() => { setMarcadas(new Set()); load(filters, page); }}/>
+        )}
 
         {/* ─ Paginação ─ */}
         {totalPages > 1 && (
