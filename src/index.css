@@ -927,3 +927,6 @@ tr.drill-row:hover td { background: var(--blue-dim); }
 .cf-slide .cf-kpis { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 .cf-slide .cf-barra { padding: 5px 4px; }
 
+.cf-ver { opacity: 0; transition: opacity 120ms; }
+.cf-barra:hover .cf-ver, .cf-ver:focus-visible { opacity: 1; }
+@media (hover: none) { .cf-ver { opacity: 1; } }

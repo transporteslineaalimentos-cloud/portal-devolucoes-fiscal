@@ -226,10 +226,6 @@ function render(){
 
   /* filtros */
   var fl=el('div',{cls:'filtros'});
-  var bu=el('input',{type:'search',placeholder:'Buscar CT-e, NF, transportador, cliente…',value:f.busca,style:'flex:1 1 280px'});
-  bu.addEventListener('input',function(){f.busca=bu.value;render();setTimeout(function(){
-    var n=document.querySelector('input[type=search]');if(n){n.focus();n.setSelectionRange(n.value.length,n.value.length);}},0);});
-  fl.appendChild(bu);
   chips().forEach(function(c){fl.appendChild(el('button',{cls:'chip',onclick:function(){f[c[0]]='';render();}},c[1]+' <span>×</span>'));});
   if(chips().length)fl.appendChild(el('button',{cls:'btn',onclick:function(){
     f.transp='';f.uf='';f.tipo='';f.dest='';f.mes='';f.busca='';render();}},'Limpar'));
@@ -257,14 +253,14 @@ function render(){
 
   /* transportador + tipo */
   var g1=el('div',{cls:'grid2'});
-  g1.appendChild(cardBarras('Frete pago por transportador','Clique para filtrar o painel',
+  g1.appendChild(cardBarras('Frete pago por transportador','',
     agrupa(l,'TR'),'transp','por_transportador','nome'));
   g1.appendChild(cardTipos(l));
   w.appendChild(g1);
 
   /* destinatário + UF */
   var g2=el('div',{cls:'grid2'});
-  g2.appendChild(cardBarras('Frete por destinatário','Clique para filtrar o painel',
+  g2.appendChild(cardBarras('Frete por destinatário','',
     agrupa(l,'DR'),'dest','por_destinatario','nome'));
   g2.appendChild(cardUF(l));
   w.appendChild(g2);
@@ -278,7 +274,6 @@ function render(){
 function cardMensal(){
   var c=el('div',{cls:'card'});
   c.appendChild(el('h2',null,'Custo de frete por mês e % sobre o faturamento'));
-  c.appendChild(el('div',{cls:'sb'},'Cada mês traz o frete das notas emitidas nele. Clique em um mês para filtrar'));
   c.appendChild(el('div',{cls:'leg'},'<span><i style="background:'+VENDA+'"></i>Frete venda</span><span><i style="background:'+EXTRA+'"></i>Custo extra</span>'));
   var bd=el('div',{cls:'bd'});
   var m=(D.mensal||[]).filter(function(x){return mesesNoRange().indexOf(x.mes)>=0;}),W=Math.min(1500,Math.max(360,window.innerWidth-120)),H=270,pL=60,pR=12,pT=28,pB=30;
@@ -345,7 +340,6 @@ function tabelaMensal(){
 function cardBarras(titulo_,sub,itens,campo,lista,chave){
   var c=el('div',{cls:'card'});
   c.appendChild(el('h2',null,titulo_));
-  c.appendChild(el('div',{cls:'sb'},sub));
   c.appendChild(el('div',{cls:'leg'},'<span><i style="background:'+VENDA+'"></i>Venda</span><span><i style="background:'+EXTRA+'"></i>Extra</span>'));
   var bd=el('div',{cls:'bd'});
   var max=1;itens.forEach(function(i){max=Math.max(max,i.v);});
@@ -374,7 +368,6 @@ function cardBarras(titulo_,sub,itens,campo,lista,chave){
 function cardTipos(l){
   var c=el('div',{cls:'card'});
   c.appendChild(el('h2',null,'Custo por tipo de CT-e'));
-  c.appendChild(el('div',{cls:'sb'},'Clique em um tipo para filtrar o painel'));
   var bd=el('div',{cls:'bd'}),itens=agrupa(l,'T'),tot=itens.reduce(function(s,i){return s+i.v;},0),max=1;
   itens.forEach(function(i){max=Math.max(max,i.v);});
   itens.forEach(function(i){
@@ -392,8 +385,7 @@ function cardTipos(l){
 function cardUF(l){
   var c=el('div',{cls:'card'});
   var h=el('div',{style:'display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap'});
-  h.appendChild(el('div',null,'<h2 style="padding-bottom:0">Frete por UF de destino</h2>'+
-    '<div class="sb" style="padding-left:0">'+(ufModo==='pct'?'Frete dividido pelo valor das notas entregues naquela UF':'Clique em uma UF para filtrar o painel')+'</div>'));
+  h.appendChild(el('div',null,'<h2 style="padding-bottom:0">Frete por UF de destino</h2>'));
   var tg=el('div',{cls:'acoes',style:'padding:14px 18px 0'});
   ['valor','pct'].forEach(function(m){
     tg.appendChild(el('button',{cls:'btn'+(ufModo===m?' on':''),onclick:function(){ufModo=m;render();}},m==='valor'?'R$':'% da NF'));});

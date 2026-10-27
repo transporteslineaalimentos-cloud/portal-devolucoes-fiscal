@@ -21,6 +21,8 @@ export default function ModalCtesFrete({ titulo: tit, sub, params, filtrar, onFi
   const [busca, setBusca] = useState('');
   const [ordem, setOrdem] = useState('valor');
   const [aberto, setAberto] = useState(null);
+  const [mostrar, setMostrar] = useState(150);   // a tabela cresce sob demanda: 3 mil linhas de uma vez travam a tela
+  const [baixando, setBaixando] = useState(false);
   /* em tela cheia o navegador só desenha o que está dentro do elemento em
      tela cheia, então o modal precisa ser montado lá dentro. */
   const [alvo, setAlvo] = useState(() => (typeof document !== 'undefined' ? document.fullscreenElement || document.body : null));
@@ -56,25 +58,34 @@ export default function ModalCtesFrete({ titulo: tit, sub, params, filtrar, onFi
   const totalNfs = (res?.linhas || []).reduce((s, l) => s + (Number(l.valor_nfs) || 0), 0);
   const truncado = res && res.qtd > (res.linhas || []).length;
 
-  const baixar = () => {
+  /* O arquivo é montado em pedaços, devolvendo o controle ao navegador entre
+     eles, para a tela não congelar em recortes grandes. */
+  const baixar = async () => {
+    setBaixando(true);
+    await new Promise(r => setTimeout(r, 30));
     const cab = ['CT-e', 'Emissão do CT-e', 'Transportador', 'CNPJ transportador', 'Tipo', 'Operação', 'Destinatário', 'Cidade', 'UF',
       'NF', 'Emissão da NF', 'Chave da NF', 'Valor da NF', 'Frete rateado para a NF',
       'Valor total do CT-e', 'Frete considerado no painel', 'Valor das NFs do CT-e', 'Origem'];
     const num = (v) => (Number(v) || 0).toFixed(2).replace('.', ',');
     const esc = (v) => { const s = String(v ?? ''); return /[;"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
     const out = [cab.join(';')];
-    for (const l of linhas) for (const n of (l.nfs || [])) {
+    let desde = Date.now();
+    for (const l of linhas) {
+      if (Date.now() - desde > 60) { await new Promise(r => setTimeout(r, 0)); desde = Date.now(); }
+      for (const n of (l.nfs || [])) {
       out.push([l.cte_numero, dataBR(l.dt), l.transp_nome, fmtCnpj(l.transp_cnpj), l.tipo, OPERACAO[n.operacao] || n.operacao,
         l.dest_nome, l.cidade, l.uf, n.nf, dataBR(n.dt), n.chave, num(n.valor_nf), num(n.rateio),
         num(l.valor_cte), num(l.valor), num(l.valor_nfs),
         l.origem === 'planilha' ? 'Planilha importada' : 'Recebimento automático'].map(esc).join(';'));
+      }
     }
     const blob = new Blob(['﻿' + out.join('\r\n')], { type: 'text/csv;charset=utf-8' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = `CT-es ${tit}`.replace(/[\\/:*?"<>|]/g, '-').slice(0, 120) + '.csv';
     a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    setBaixando(false);
   };
 
   const th = { padding: '8px 10px', fontSize: 10.5, fontWeight: 700, color: 'var(--text-3)', textAlign: 'left', whiteSpace: 'nowrap',
@@ -109,12 +120,14 @@ export default function ModalCtesFrete({ titulo: tit, sub, params, filtrar, onFi
           )}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12, alignItems: 'center' }}>
             <input className="input" placeholder="Buscar CT-e, NF, transportador, cliente, cidade…" value={busca}
-              onChange={e => setBusca(e.target.value)} style={{ flex: '1 1 260px', height: 32, fontSize: 12.5 }}/>
-            <select className="input" value={ordem} onChange={e => setOrdem(e.target.value)} style={{ width: 150, height: 32, fontSize: 12.5 }} aria-label="Ordenar">
+              onChange={e => { setBusca(e.target.value); setMostrar(150); }} style={{ flex: '1 1 260px', height: 32, fontSize: 12.5 }}/>
+            <select className="input" value={ordem} onChange={e => { setOrdem(e.target.value); setMostrar(150); }} style={{ width: 150, height: 32, fontSize: 12.5 }} aria-label="Ordenar">
               <option value="valor">Maior valor</option>
               <option value="data">Mais recentes</option>
             </select>
-            <button className="btn btn-outline btn-sm" style={{ height: 32 }} onClick={baixar} disabled={!linhas.length}>Baixar planilha</button>
+            <button className="btn btn-outline btn-sm" style={{ height: 32 }} onClick={baixar} disabled={!linhas.length || baixando}>
+              {baixando ? 'Gerando…' : 'Baixar planilha'}
+            </button>
             {filtrar && onFiltrar && (
               <button className="btn btn-primary btn-sm" style={{ height: 32 }} onClick={() => { onFiltrar(); onClose(); }}>{filtrar}</button>
             )}
@@ -136,7 +149,7 @@ export default function ModalCtesFrete({ titulo: tit, sub, params, filtrar, onFi
                 </tr>
               </thead>
               <tbody>
-                {linhas.map((l, i) => {
+                {linhas.slice(0, mostrar).map((l, i) => {
                   const k = l.transp_cnpj + '|' + l.cte_numero + '|' + i;
                   const open = aberto === k;
                   const nfs = l.nfs || [];
@@ -210,6 +223,13 @@ export default function ModalCtesFrete({ titulo: tit, sub, params, filtrar, onFi
                 {linhas.length === 0 && (
                   <tr><td colSpan={9} style={{ ...td, textAlign: 'center', padding: 30, color: 'var(--text-3)' }}>Nenhum CT-e encontrado.</td></tr>
                 )}
+                {linhas.length > mostrar && (
+                  <tr><td colSpan={9} style={{ ...td, textAlign: 'center', padding: 14 }}>
+                    <button className="btn btn-ghost btn-sm" onClick={() => setMostrar(m => m + 300)}>
+                      Mostrar mais {Math.min(300, linhas.length - mostrar).toLocaleString('pt-BR')} de {(linhas.length - mostrar).toLocaleString('pt-BR')} restantes
+                    </button>
+                  </td></tr>
+                )}
               </tbody>
             </table>
           )}
@@ -217,7 +237,8 @@ export default function ModalCtesFrete({ titulo: tit, sub, params, filtrar, onFi
 
         {res && (
           <div style={{ padding: '10px 22px', borderTop: '1px solid var(--border)', fontSize: 11.5, color: 'var(--text-3)', display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-            <span>{linhas.length.toLocaleString('pt-BR')} CT-e{linhas.length === 1 ? '' : 's'} na lista · {brl(totalVisivel)}{busca ? ' (busca aplicada)' : ''}</span>
+            <span>{linhas.length.toLocaleString('pt-BR')} CT-e{linhas.length === 1 ? '' : 's'} na lista · {brl(totalVisivel)}{busca ? ' (busca aplicada)' : ''}
+              {linhas.length > mostrar ? ` · mostrando ${mostrar.toLocaleString('pt-BR')}` : ''} · a planilha traz tudo</span>
             {truncado && <span>Mostrando os {res.linhas.length.toLocaleString('pt-BR')} de maior valor; use um período menor para ver todos.</span>}
             <span>O período segue a emissão da NF · clique em um CT-e para ver as NFs e o rateio.</span>
           </div>
