@@ -920,3 +920,9 @@ tr.drill-row:hover td { background: var(--blue-dim); }
   .modal-overlay:has(.cf-modal-ctes) { padding: 0; }
   .cf-modal-ctes.modal { height: 100vh; max-height: 100vh; border-radius: 0; }
 }
+
+/* Modo apresentação da aba Custos de Frete */
+.cf-apresentar { font-size: 15px; }
+.cf-apresentar .cf-kpis { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.cf-apresentar h2 { font-size: 16px !important; }
+.cf-apresentar table { font-size: 13px; }

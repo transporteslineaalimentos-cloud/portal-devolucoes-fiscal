@@ -951,13 +951,14 @@ export async function dbGetCustosFrete({ de, ate, remetente = null, tipo = null,
 }
 
 // CT-es por trás de um número do painel (mesmos filtros + destinatário)
-export async function dbGetCustosFreteCtes({ de, ate, remetente = null, tipo = null, canal = null, uf = null, transportador = null, operacao = null, destinatario = null }) {
+export async function dbGetCustosFreteCtes({ de, ate, remetente = null, tipo = null, canal = null, uf = null, transportador = null, operacao = null, destinatario = null, limite = null }) {
   syncAuthToken();
   const { data, error } = await supabase.rpc('get_custos_frete_ctes', {
     p_de: de, p_ate: ate,
     p_remetente: remetente || null, p_tipo: tipo || null, p_canal: canal || null,
     p_uf: uf || null, p_transportador: transportador || null,
     p_operacao: operacao || null, p_destinatario: destinatario || null,
+    ...(limite ? { p_limite: limite } : {}),
   });
   if (error) throw new Error(error.message);
   return data;
