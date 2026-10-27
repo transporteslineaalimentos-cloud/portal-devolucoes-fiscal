@@ -3,6 +3,8 @@ import { dbGetPainelGerencial, dbExportDevolucoes } from '../config/supabase';
 import { exportPainelGerencialExcel } from '../utils/exportExcel.js';
 import { baixarPlanilhaConsulta } from '../utils/planilhaConsulta.js';
 import ModalNotasPainel from '../components/ModalNotasPainel.jsx';
+import Apresentacao from '../components/Apresentacao.jsx';
+import { gerarPainelDevolucoes } from '../lib/painelDevolucoes';
 
 /* ─────────────────────────────────────────────────────────────
    Painel Gerencial — substitui o dash montado no Excel
@@ -69,7 +71,7 @@ function Legend({ items }) {
 }
 
 /* ─── Gráfico de linhas mensal (Parcial x Total) ───────────── */
-function LinhaMensal({ meses, ini, fim, onDrill }) {
+function LinhaMensal({ meses, ini, fim, onDrill, altura }) {
   const wrapRef = useRef(null);
   const [w, setW] = useState(900);
   const [hover, setHover] = useState(null);
@@ -80,7 +82,7 @@ function LinhaMensal({ meses, ini, fim, onDrill }) {
   }, []);
 
   const dados = meses.slice(ini - 1, fim);
-  const H = 240, padL = 56, padR = 72, padT = 16, padB = 28;
+  const H = altura || 240, padL = 56, padR = 72, padT = 16, padB = 28;
   const max = Math.max(1, ...dados.map(d => Math.max(d.parcial, d.total)));
   const niceMax = (() => { const p = Math.pow(10, Math.floor(Math.log10(max))); return Math.ceil(max / p) * p; })();
   const x = (i) => padL + (dados.length === 1 ? (w - padL - padR) / 2 : (i * (w - padL - padR)) / (dados.length - 1));
@@ -157,7 +159,8 @@ const Row = ({ cor, label, valor }) => (
 );
 
 /* ─── Tabela mensal (visão em tabela do gráfico) ───────────── */
-function TabelaMensal({ meses, ini, fim, onDrill }) {
+function TabelaMensal({ meses, ini, fim, onDrill, ano }) {
+  const [colHover, setColHover] = useState(null);
   const dados = meses.slice(ini - 1, fim);
   const tot = dados.reduce((a, d) => ({ parcial: a.parcial + d.parcial, total: a.total + d.total, fat: a.fat + (Number(d.faturamento) || 0) }), { parcial: 0, total: 0, fat: 0 });
   const th = { padding: '6px 8px', fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textAlign: 'right', whiteSpace: 'nowrap' };
@@ -170,27 +173,34 @@ function TabelaMensal({ meses, ini, fim, onDrill }) {
     { k: 'Faturamento', f: d => d.faturamento ? brlK(d.faturamento) : '—', t: brlK(tot.fat), muted: true },
   ];
   return (
-    <div style={{ overflowX: 'auto', marginTop: 10 }}>
+    <div className="pg-tabela" style={{ overflowX: 'auto', marginTop: 10 }}>
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead><tr>
-          <th style={{ ...th, textAlign: 'left' }}/>
-          {dados.map(d => <th key={d.mes} style={th}>{MESES[d.mes - 1]}</th>)}
-          <th style={{ ...th, color: 'var(--text)' }}>Período</th>
+          <th style={{ ...th, textAlign: 'left', position: 'sticky', left: 0, background: 'var(--surface)', zIndex: 2 }}/>
+          {dados.map((d, i) => (
+            <th key={d.mes} style={{ ...th, color: colHover === i ? 'var(--blue)' : th.color }}
+              onMouseEnter={() => setColHover(i)}>
+              {MESES[d.mes - 1]}<span style={{ color: 'var(--text-3)', fontWeight: 400 }}>/{String(ano).slice(2)}</span>
+            </th>
+          ))}
+          <th style={{ ...th, color: 'var(--text)', borderLeft: '1px solid var(--border)' }}>Período</th>
         </tr></thead>
-        <tbody>
+        <tbody onMouseLeave={() => setColHover(null)}>
           {linhas.map(l => (
-            <tr key={l.k}>
-              <td style={{ ...td, textAlign: 'left', color: 'var(--text)', fontWeight: 600 }}>
+            <tr key={l.k} className="pg-linha">
+              <td style={{ ...td, textAlign: 'left', color: 'var(--text)', fontWeight: 600, position: 'sticky', left: 0, background: 'var(--surface)', zIndex: 1 }}>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                   {l.cor && <span style={{ width: 8, height: 8, borderRadius: 99, background: l.cor }}/>}{l.k}
                 </span>
               </td>
-              {dados.map(d => <td key={d.mes} className={l.drill && onDrill ? 'drill' : undefined}
+              {dados.map((d, i) => <td key={d.mes} className={l.drill && onDrill ? 'drill' : undefined}
                 onClick={l.drill && onDrill ? () => onDrill({ titulo: `${l.drill.rot} · ${MESES[d.mes - 1]}`, dim: l.drill.dim, valor: l.drill.valor, mesIni: d.mes, mesFim: d.mes }) : undefined}
-                style={{ ...td, fontWeight: l.bold ? 600 : 400, color: l.muted ? 'var(--text-3)' : l.bold ? 'var(--text)' : 'var(--text-2)' }}>{l.f(d)}</td>)}
+                onMouseEnter={() => setColHover(i)}
+                style={{ ...td, fontWeight: l.bold ? 600 : 400, color: l.muted ? 'var(--text-3)' : l.bold ? 'var(--text)' : 'var(--text-2)',
+                  boxShadow: colHover === i ? 'inset 0 0 0 1px var(--blue)' : undefined }}>{l.f(d)}</td>)}
               <td className={l.drill && onDrill ? 'drill' : undefined}
                 onClick={l.drill && onDrill ? () => onDrill({ titulo: l.drill.rot, dim: l.drill.dim, valor: l.drill.valor }) : undefined}
-                style={{ ...td, fontWeight: 700, color: l.muted ? 'var(--text-3)' : 'var(--text)' }}>{l.t}</td>
+                style={{ ...td, fontWeight: 700, color: l.muted ? 'var(--text-3)' : 'var(--text)', borderLeft: '1px solid var(--border)' }}>{l.t}</td>
             </tr>
           ))}
         </tbody>
@@ -205,6 +215,7 @@ function TabelaCalor({ linhas, ini, fim, fatMesVig, fatPeriodo, limite, rotuloDi
   const dc = onDrill ? 'drill' : undefined;
   const mesVig = fim;
   const [aberto, setAberto] = useState(false);
+  const [colHover, setColHover] = useState(null);
   const pivot = useMemo(() => {
     const m = new Map();
     for (const r of linhas) {
@@ -224,17 +235,21 @@ function TabelaCalor({ linhas, ini, fim, fatMesVig, fatPeriodo, limite, rotuloDi
   const maxTT  = Math.max(1, ...pivot.map(p => p.tt));
   const heat = (v, max) => v > 0 ? `rgba(${HEAT_RGB},${(0.06 + 0.5 * Math.sqrt(v / max)).toFixed(3)})` : 'transparent';
 
-  const th = { padding: '7px 8px', fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textAlign: 'right', whiteSpace: 'nowrap', position: 'sticky', top: 0, background: 'var(--surface)' };
-  const td = { padding: '6px 8px', fontSize: 11.5, textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', color: 'var(--text)', borderTop: '2px solid var(--surface)' };
+  const th = { padding: '7px 8px', fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textAlign: 'right', whiteSpace: 'nowrap', position: 'sticky', top: 0, background: 'var(--surface)', zIndex: 1 };
+  const td = { padding: '6px 8px', fontSize: 11.5, textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', color: 'var(--text)', borderTop: '1px solid var(--border)' };
+  const fixa = { position: 'sticky', left: 0, background: 'var(--surface)', zIndex: 2 };
 
   return (
     <>
-      <div style={{ overflowX: 'auto' }}>
+      <div className="pg-tabela" style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead><tr>
-            <th style={{ ...th, textAlign: 'left', minWidth: 200 }}>{rotuloDim}</th>
-            {cols.map(i => <th key={i} style={th}>{MESES[i]}</th>)}
-            <th style={{ ...th, color: 'var(--text)' }}>Período</th>
+            <th style={{ ...th, ...fixa, textAlign: 'left', minWidth: 200, zIndex: 3 }}>{rotuloDim}</th>
+            {cols.map(i => (
+              <th key={i} style={{ ...th, color: colHover === i ? 'var(--blue)' : th.color }}
+                onMouseEnter={() => setColHover(i)}>{MESES[i]}</th>
+            ))}
+            <th style={{ ...th, color: 'var(--text)', borderLeft: '1px solid var(--border)' }}>Período</th>
             <th style={{ ...th, color: 'var(--text)' }} title="Valor do período sobre o faturamento do período">% fat.</th>
             {ini !== fim && <>
               <th style={{ ...th, borderLeft: '1px solid var(--border)', color: 'var(--text)' }}>Último mês ({MESES[mesVig - 1]})</th>
@@ -245,11 +260,13 @@ function TabelaCalor({ linhas, ini, fim, fatMesVig, fatPeriodo, limite, rotuloDi
             {visiveis.map(p => {
               const vig = p.meses[mesVig - 1] || 0;
               return (
-                <tr key={p.dim}>
-                  <td className={dc} onClick={dr(p.dim)} style={{ ...td, textAlign: 'left', color: 'var(--text-2)', fontWeight: 500, maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis' }} title={`${p.dim} — clique para ver as notas do período`}>{p.dim}</td>
+                <tr key={p.dim} className="pg-linha" onMouseLeave={() => setColHover(null)}>
+                  <td className={dc} onClick={dr(p.dim)} style={{ ...td, ...fixa, textAlign: 'left', color: 'var(--text)', fontWeight: 600, maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis' }} title={`${p.dim} — clique para ver as notas do período`}>{p.dim}</td>
                   {cols.map(i => (
                     <td key={i} className={p.meses[i] ? dc : undefined} onClick={p.meses[i] ? dr(p.dim, i + 1, i + 1, MESES[i]) : undefined}
-                      style={{ ...td, background: heat(p.meses[i], maxCel), color: p.meses[i] ? 'var(--text)' : 'var(--text-3)' }}
+                      onMouseEnter={() => setColHover(i)}
+                      style={{ ...td, background: heat(p.meses[i], maxCel), color: p.meses[i] ? 'var(--text)' : 'var(--text-3)',
+                        boxShadow: colHover === i ? 'inset 0 0 0 1px var(--blue)' : undefined }}
                       title={`${p.dim} · ${MESES[i]}: ${brl0(p.meses[i])} (${p.qtd[i]} NFs)`}>
                       {p.meses[i] ? brl0(p.meses[i]) : '–'}
                     </td>
@@ -309,6 +326,8 @@ export default function PainelGerencial({ onGoTo, user }) {
   const [fim, setFim] = useState(mesAtual);
   const [baixando, setBaixando] = useState('');
   const [drill, setDrill] = useState(null);
+  const [apresentar, setApresentar] = useState(false);
+  const sairApresentacao = useCallback(() => setApresentar(false), []);
   const abrir = useCallback(({ titulo, dim = null, valor = null, mesIni, mesFim }) => {
     setDrill({ titulo, filtro: { ano, mesIni: mesIni ?? ini, mesFim: mesFim ?? fim, dim, valor } });
   }, [ano, ini, fim]);
@@ -359,17 +378,62 @@ export default function PainelGerencial({ onGoTo, user }) {
     } catch (e) { alert('Erro ao gerar a planilha: ' + e.message); }
     setBaixando('');
   };
-  const baixarPdf = () => {
-    const t = document.title;
-    document.title = `Painel devolucoes ${periodoTxt.replace('/', '-')}`;
-    window.print();
-    setTimeout(() => { document.title = t; }, 500);
+  /* Painel interativo: um .html que abre offline e continua clicável. */
+  const exportarPainel = async () => {
+    setBaixando('painel');
+    try {
+      const ult = new Date(ano, fim, 0).getDate();
+      const notas = await dbExportDevolucoes({ filters: {
+        dt_inicio: `${ano}-${String(ini).padStart(2, '0')}-01`,
+        dt_fim:    `${ano}-${String(fim).padStart(2, '0')}-${String(ult).padStart(2, '0')}`,
+      } });
+      const html = gerarPainelDevolucoes({ dados: data, notas, periodo: periodoTxt, ano, mesIni: ini, mesFim: fim,
+        geradoPor: user?.name || user?.email || '' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }));
+      a.download = `Painel de devoluções ${periodoTxt.replace(/\//g, '-')}.html`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    } catch (e) { alert('Não foi possível gerar o painel: ' + e.message); }
+    setBaixando('');
   };
 
   const tot = noPeriodo.reduce((a, m) => ({ p: a.p + m.parcial, t: a.t + m.total, qp: a.qp + (m.qtd_parcial || 0), qt: a.qt + (m.qtd_total || 0), f: a.f + (m.faturamento || 0) }), { p: 0, t: 0, qp: 0, qt: 0, f: 0 });
   const vig = meses[mesVig - 1] || { parcial: 0, total: 0 };
   const status = data?.status || [];
   const pend = data?.pendente_transp || [];
+
+  const alturaSlide = Math.max(260, Math.min(540, (typeof window !== 'undefined' ? window.innerHeight : 900) - 320));
+  const slides = !data ? [] : [
+    { id: 'resumo', titulo: `Geração de retorno e devoluções · ${periodoTxt}`,
+      corpo: (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className="painel-kpis" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+            <Kpi label="Retorno e devolução" value={brl0(tot.p + tot.t)} note={`${tot.qp + tot.qt} notas`} onClick={() => abrir({ titulo: 'Todas as devoluções' })}/>
+            <Kpi label="Devolução parcial" accent={COR_PARCIAL} value={brl0(tot.p)} note={`${tot.qp} NFDs`} onClick={() => abrir({ titulo: 'Devolução parcial', dim: 'tipo', valor: 'parcial' })}/>
+            <Kpi label="Devolução total" accent={COR_TOTAL} value={brl0(tot.t)} note={`${tot.qt} lançamentos manuais`} onClick={() => abrir({ titulo: 'Devolução total', dim: 'tipo', valor: 'total' })}/>
+            <Kpi label="% sobre o faturamento" value={pctFmt(tot.f ? (tot.p + tot.t) / tot.f : null)} note={`Faturamento ${brlK(tot.f)}`}/>
+          </div>
+          <div><LinhaMensal meses={meses} ini={ini} fim={fim} onDrill={abrir} altura={alturaSlide - 160}/>
+            <TabelaMensal meses={meses} ini={ini} fim={fim} onDrill={abrir} ano={ano}/></div>
+        </div>
+      ) },
+    { id: 'area', titulo: 'Abertura por área de responsabilidade',
+      corpo: <TabelaCalor linhas={data.area} ini={ini} fim={fim} fatMesVig={fatMesVig} fatPeriodo={tot.f} rotuloDim="Área" dimKey="area" onDrill={abrir}/> },
+    { id: 'motivo', titulo: 'Abertura por motivo',
+      corpo: <TabelaCalor linhas={data.motivo} ini={ini} fim={fim} fatMesVig={fatMesVig} fatPeriodo={tot.f} limite={15} rotuloDim="Motivo" dimKey="motivo" onDrill={abrir}/> },
+    { id: 'canal', titulo: 'Abertura por canal',
+      corpo: <TabelaCalor linhas={data.canal} ini={ini} fim={fim} fatMesVig={fatMesVig} fatPeriodo={tot.f} rotuloDim="Canal" dimKey="canal" onDrill={abrir}/> },
+    { id: 'status', titulo: 'Status operacional e pendências',
+      corpo: (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: 24 }}>
+          <div><div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, color: 'var(--text-2)' }}>Status operacional</div>
+            <BarrasH itens={status} labelKey="status" onClick={i => abrir({ titulo: `Status: ${i.status}`, dim: 'status', valor: i.status })}/></div>
+          <div><div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, color: 'var(--text-2)' }}>Pendente de retorno por transportador</div>
+            <BarrasH itens={pend} labelKey="transportador" cor={COR_TOTAL} onClick={i => abrir({ titulo: `Pendente de retorno: ${i.transportador}`, dim: 'transp', valor: i.key })}/></div>
+        </div>
+      ) },
+  ];
 
   return (
     <div className="painel-root" style={{ padding: '20px 24px 40px', display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 1600 }}>
@@ -396,7 +460,12 @@ export default function PainelGerencial({ onGoTo, user }) {
         </label>
         <button className="btn btn-outline btn-sm" onClick={carregar} disabled={loading}>{loading ? 'Atualizando…' : 'Atualizar'}</button>
         <div style={{ flex: 1 }}/>
-        <button className="btn btn-outline btn-sm" onClick={baixarPdf} disabled={!data}>Baixar PDF do painel</button>
+        <button className="btn btn-outline btn-sm" onClick={() => setApresentar(true)} disabled={!data}
+          title="Tela cheia, um bloco por vez, para apresentar">Apresentar</button>
+        <button className="btn btn-outline btn-sm" onClick={exportarPainel} disabled={!data || !!baixando}
+          title="Gera um arquivo que abre sozinho e continua clicável">
+          {baixando === 'painel' ? 'Gerando painel…' : 'Exportar painel'}
+        </button>
         <button className="btn btn-outline btn-sm" onClick={baixarConsulta} disabled={!data || !!baixando}
           title="Planilha formatada para enviar a quem não tem acesso ao portal: busca por número da NF, base de notas com filtros, itens e resumo">
           {baixando === 'consulta' ? 'Gerando planilha…' : 'Planilha de consulta de notas'}
@@ -431,7 +500,7 @@ export default function PainelGerencial({ onGoTo, user }) {
             sub="Parcial pela data de emissão da NFD; total pela data da devolução"
             right={<Legend items={[{ label: 'Devolução parcial', color: COR_PARCIAL }, { label: 'Devolução total', color: COR_TOTAL }]}/>}>
             <LinhaMensal meses={meses} ini={ini} fim={fim} onDrill={abrir}/>
-            <TabelaMensal meses={meses} ini={ini} fim={fim} onDrill={abrir}/>
+            <TabelaMensal meses={meses} ini={ini} fim={fim} onDrill={abrir} ano={ano}/>
           </Card>
 
           <Card title="Abertura por área de responsabilidade" sub="Quanto mais forte a cor, maior o valor no mês">
@@ -456,6 +525,11 @@ export default function PainelGerencial({ onGoTo, user }) {
             </Card>
           </div>
         </>
+      )}
+
+      {apresentar && data && (
+        <Apresentacao titulo="Devoluções" periodo={periodoTxt} filtros={[]}
+          slides={slides} onSair={sairApresentacao} carregando={loading}/>
       )}
 
       {drill && (

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { dbGetCustosFrete, dbGetCustosFreteCtes, dbRefreshCustosFrete } from '../config/supabase';
 import ModalCtesFrete from '../components/ModalCtesFrete.jsx';
-import ApresentacaoFrete from '../components/ApresentacaoFrete.jsx';
+import Apresentacao from '../components/Apresentacao.jsx';
 import { gerarPainelFrete } from '../lib/painelFrete';
 
 /* ─────────────────────────────────────────────────────────────
@@ -730,7 +730,7 @@ export default function CustosFrete({ user }) {
       )}
 
       {apresentar && data && (
-        <ApresentacaoFrete titulo="Custos de Frete" periodo={periodoTxt} filtros={chips}
+        <Apresentacao titulo="Custos de Frete" periodo={periodoTxt} filtros={chips}
           slides={slides} onSair={sairApresentacao} onLimpar={limpar} onTirarChip={tirarChip}
           onVerCtes={verCtes} carregando={loading}/>
       )}

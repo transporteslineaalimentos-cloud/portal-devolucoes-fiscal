@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 /* Apresentação em tela cheia: um bloco por tela, setas para navegar.
    Continua clicável — cada gráfico abre os CT-es por trás do número. */
 
-export default function ApresentacaoFrete({ titulo, periodo, filtros, slides, onSair, onLimpar, onTirarChip, onVerCtes, carregando }) {
+export default function Apresentacao({ titulo, periodo, filtros, slides, onSair, onLimpar, onTirarChip, onVerCtes, carregando }) {
   const [i, setI] = useState(0);
   const raiz = useRef(null);
   const n = slides.length;

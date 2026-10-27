@@ -930,3 +930,8 @@ tr.drill-row:hover td { background: var(--blue-dim); }
 .cf-ver { opacity: 0; transition: opacity 120ms; }
 .cf-barra:hover .cf-ver, .cf-ver:focus-visible { opacity: 1; }
 @media (hover: none) { .cf-ver { opacity: 1; } }
+
+/* ─── Painel Gerencial: leitura das tabelas ─────────────── */
+.pg-tabela tbody tr.pg-linha:hover > td { background-image: linear-gradient(var(--blue-dim), var(--blue-dim)); }
+.pg-tabela tbody tr.pg-linha:hover > td:first-child { color: var(--text); font-weight: 700; }
+.pg-tabela thead th { border-bottom: 1px solid var(--border-2); }
