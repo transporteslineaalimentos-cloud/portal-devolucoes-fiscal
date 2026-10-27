@@ -5,7 +5,22 @@
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 export function gerarPainelFrete({ data, ctes, periodo, filtros, geradoPor }) {
-  /* dicionários: os nomes se repetem muito, então vão uma vez só e as linhas guardam o índice */
+  /* A mesma transportadora aparece com grafias diferentes em cada filial.
+     O grupo é a raiz do CNPJ, e o nome exibido é o canônico do painel
+     (ou o primeiro visto, para quem está fora do top 40). */
+  const nomePorRaiz = (lista, campoRaiz, campoNome) => {
+    const m = new Map();
+    (data[lista] || []).forEach((i) => { if (i.raiz) m.set(i.raiz, i.nome); });
+    (ctes || []).forEach((c) => {
+      const r = c[campoRaiz];
+      if (r && !m.has(r)) m.set(r, c[campoNome] || '—');
+    });
+    return m;
+  };
+  const nTransp = nomePorRaiz('por_transportador', 'transp_raiz', 'transp_nome');
+  const nDest = nomePorRaiz('por_destinatario', 'dest_raiz', 'dest_nome');
+  const nomeDe = (mapa, raiz, fallback) => mapa.get(raiz) || fallback || '—';
+
   const dic = { tr: [], dr: [], ci: [], tp: [], uf: [] };
   const ix = { tr: new Map(), dr: new Map(), ci: new Map(), tp: new Map(), uf: new Map() };
   const id = (k, v) => {
@@ -16,9 +31,11 @@ export function gerarPainelFrete({ data, ctes, periodo, filtros, geradoPor }) {
   const enxuto = (ctes || []).map((c) => ({
     c: c.cte_numero, d: c.dt, dn: String(c.dt_nf).slice(0, 7),
     t: id('tp', c.tipo), g: c.categoria === 'FRETE VENDA' ? 1 : 0,
-    tr: id('tr', c.transp_nome), dr: id('dr', c.dest_nome), u: id('uf', c.uf), ci: id('ci', c.cidade),
-    v: Math.round(Number(c.valor) * 100) / 100, vc: Math.round(Number(c.valor_cte) * 100) / 100,
-    o: c.operacao === 'VENDA' ? 0 : 1, p: c.origem === 'planilha' ? 1 : 0,
+    tr: id('tr', nomeDe(nTransp, c.transp_raiz, c.transp_nome)),
+    dr: id('dr', nomeDe(nDest, c.dest_raiz, c.dest_nome)),
+    u: id('uf', c.uf), ci: id('ci', c.cidade),
+    v: Math.round(Number(c.valor) * 100) / 100,
+    o: c.operacao === 'VENDA' ? 0 : 1,
     n: (c.nfs || []).map((n) => n.nf).join(' '),
     nv: Math.round(Number(c.valor_nfs || 0) * 100) / 100,
   }));
@@ -50,14 +67,6 @@ const CSS = `
   --dim:rgba(30,77,183,.08);--shadow:0 1px 2px rgba(15,25,35,.06),0 1px 3px rgba(15,25,35,.04);
   --radius:12px;
 }
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
-  --bg:#0E1319;--surface:#161C24;--surface-2:#1C232C;--surface-3:#232B35;--border:#2A323C;
-  --text:#EDF1F5;--text-2:#AEBACA;--text-3:#7B8798;--venda:#5C8AF0;--extra:#E79A4D;--dim:rgba(92,138,240,.12);
-  --shadow:0 1px 2px rgba(0,0,0,.4);}}
-:root[data-theme="dark"]{
-  --bg:#0E1319;--surface:#161C24;--surface-2:#1C232C;--surface-3:#232B35;--border:#2A323C;
-  --text:#EDF1F5;--text-2:#AEBACA;--text-3:#7B8798;--venda:#5C8AF0;--extra:#E79A4D;--dim:rgba(92,138,240,.12);
-  --shadow:0 1px 2px rgba(0,0,0,.4);}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--text);
   font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Arial,sans-serif;
@@ -115,13 +124,13 @@ input{padding:0 11px}
 .barra .num b{color:var(--text)}
 .barra .det{font-size:10.5px;color:var(--text-3);font-variant-numeric:tabular-nums;margin-top:1px}
 table{width:100%;border-collapse:collapse}
+.periodo{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-3)}
 th{padding:8px 10px;font-size:10.5px;font-weight:700;color:var(--text-3);text-align:left;
   white-space:nowrap;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface);z-index:1}
 td{padding:7px 10px;font-size:12px;color:var(--text-2);border-bottom:1px solid var(--border)}
 td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 tr.cte{cursor:pointer}
 tr.cte:hover td{background:var(--dim)}
-.tbl-wrap{max-height:520px;overflow:auto}
 .vazio{padding:28px;text-align:center;color:var(--text-3);font-size:12.5px}
 .rodape{font-size:11px;color:var(--text-3);text-align:center;padding-top:6px}
 .tip{position:absolute;pointer-events:none;background:var(--surface);border:1px solid var(--border);
@@ -130,16 +139,6 @@ tr.cte:hover td{background:var(--dim)}
 .tip b{color:var(--text)}
 .lin{display:flex;justify-content:space-between;gap:10px;color:var(--text-2);padding:1px 0}
 svg{display:block}
-body.apre .wrap{max-width:none;padding:28px 40px}
-body.apre{font-size:15px}
-body.apre .kpi .vl{font-size:27px}
-body.apre .card>h2{font-size:16px}
-body.apre .no-apre{display:none}
-@media print{
-  body{background:#fff}
-  .no-print,.tbl-wrap{display:none}
-  .card{break-inside:avoid;box-shadow:none}
-}
 `;
 
 /* ─── comportamento do arquivo exportado ─────────────────── */
@@ -148,7 +147,10 @@ const JS = String.raw`
 var D=JSON.parse(document.getElementById('dados').textContent);
 var MESES=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 var VENDA='var(--venda)',EXTRA='var(--extra)';
-var f={transp:'',uf:'',tipo:'',dest:'',mes:'',busca:''};
+var MM=(D.mensal||[]).map(function(m){return m.mes;});
+var f={transp:'',uf:'',tipo:'',dest:'',mes:'',busca:'',de:MM[0]||'',ate:MM[MM.length-1]||''};
+function opMeses(sel){return MM.map(function(m){return '<option value="'+m+'"'+(m===sel?' selected':'')+'>'+mesLb(m)+'</option>';}).join('');}
+function mesesNoRange(){return MM.filter(function(m){return m>=f.de&&m<=f.ate;});}
 var DT=D.dic.tr,DD=D.dic.dr,DC=D.dic.ci,DP=D.dic.tp,DU=D.dic.uf;
 D.ctes.forEach(function(c){c.TR=DT[c.tr];c.DR=DD[c.dr];c.U=DU[c.u];c.CI=DC[c.ci];c.T=DP[c.t];});
 var ufModo='valor';
@@ -173,6 +175,7 @@ function ativos(){return D.ctes.filter(function(c){
   if(f.uf&&c.U!==f.uf)return false;
   if(f.dest&&c.DR!==f.dest)return false;
   if(f.tipo&&c.T!==f.tipo)return false;
+  if(c.dn<f.de||c.dn>f.ate)return false;
   if(f.mes&&c.dn!==f.mes)return false;
   if(f.busca){var q=semAc(f.busca);if(semAc(c.c+' '+c.TR+' '+c.DR+' '+c.U+' '+c.CI+' '+c.T+' '+c.n).indexOf(q)<0)return false;}
   return true;});}
@@ -198,9 +201,10 @@ function chips(){
 function render(){
   var l=ativos();
   var fv=soma(l,1),ce=soma(l,0),ft=fv+ce;
-  var semFiltro=!f.transp&&!f.uf&&!f.dest&&!f.tipo&&!f.mes&&!f.busca;
-  var fat=semFiltro?Number(D.kpis.faturamento)||0
-    :(f.mes?Number((D.mensal.filter(function(m){return m.mes===f.mes;})[0]||{faturamento:0}).faturamento):Number(D.kpis.faturamento)||0);
+  var semFiltro=!f.transp&&!f.uf&&!f.dest&&!f.tipo&&!f.busca;
+  var mesesSel=f.mes?[f.mes]:mesesNoRange();
+  var fat=(D.mensal||[]).reduce(function(s,m){return s+(mesesSel.indexOf(m.mes)>=0?Number(m.faturamento):0);},0);
+  var nfsSel=(D.mensal||[]).length&&mesesSel.length===MM.length?(Number(D.kpis.qtd_nfs)||0):null;
   var baseNf=semFiltro?null:l.reduce(function(s,c){return s+c.nv;},0);
 
   app.innerHTML='';
@@ -212,23 +216,23 @@ function render(){
     '<div class="mk"><svg width="18" height="18" viewBox="0 0 22 22"><path d="M3 17V5h3l5 9 5-9h3v12h-2.5V9.5l-4.5 7.5h-3L5 9.5V17H3z" fill="#B8956A"/></svg></div>'+
     '<div><h1>Custos de Frete</h1><div class="sub">Linea Alimentos · '+D.periodo+
     (D.filtros&&D.filtros.length?' · '+D.filtros.join(' · '):'')+'</div></div>'));
-  var ac=el('div',{cls:'acoes no-print'});
-  var bA=el('button',{cls:'btn',onclick:function(){document.body.classList.toggle('apre');bA.classList.toggle('on');}},'Modo apresentação');
-  var bT=el('button',{cls:'btn',onclick:function(){
-    var r=document.documentElement,atual=r.getAttribute('data-theme');
-    r.setAttribute('data-theme',atual==='dark'?'light':'dark');}},'Tema');
-  var bP=el('button',{cls:'btn',onclick:function(){window.print();}},'Imprimir');
-  ac.appendChild(bA);ac.appendChild(bT);ac.appendChild(bP);
+  var ac=el('div',{cls:'acoes'});
+  ac.appendChild(el('div',{cls:'periodo'},
+    '<span>Período</span>'+
+    '<select id="mDe">'+opMeses(f.de)+'</select><span>até</span><select id="mAte">'+opMeses(f.ate)+'</select>'));
   topo.appendChild(ac);w.appendChild(topo);
+  ac.querySelector('#mDe').addEventListener('change',function(e){f.de=e.target.value;if(f.de>f.ate)f.ate=f.de;f.mes='';render();});
+  ac.querySelector('#mAte').addEventListener('change',function(e){f.ate=e.target.value;if(f.ate<f.de)f.de=f.ate;f.mes='';render();});
 
   /* filtros */
-  var fl=el('div',{cls:'filtros no-print'});
+  var fl=el('div',{cls:'filtros'});
   var bu=el('input',{type:'search',placeholder:'Buscar CT-e, NF, transportador, cliente…',value:f.busca,style:'flex:1 1 280px'});
   bu.addEventListener('input',function(){f.busca=bu.value;render();setTimeout(function(){
     var n=document.querySelector('input[type=search]');if(n){n.focus();n.setSelectionRange(n.value.length,n.value.length);}},0);});
   fl.appendChild(bu);
   chips().forEach(function(c){fl.appendChild(el('button',{cls:'chip',onclick:function(){f[c[0]]='';render();}},c[1]+' <span>×</span>'));});
-  if(chips().length)fl.appendChild(el('button',{cls:'btn',onclick:function(){f={transp:'',uf:'',tipo:'',dest:'',mes:'',busca:''};render();}},'Limpar'));
+  if(chips().length)fl.appendChild(el('button',{cls:'btn',onclick:function(){
+    f.transp='';f.uf='';f.tipo='';f.dest='';f.mes='';f.busca='';render();}},'Limpar'));
   w.appendChild(fl);
 
   /* kpis */
@@ -237,7 +241,7 @@ function render(){
     return el('div',{cls:'kpi'+(forte?' forte':'')},
       '<div class="lb">'+(cor?'<span class="dot" style="background:'+cor+'"></span>':'')+lb+'</div>'+
       '<div class="vl">'+vl+'</div>'+(nt?'<div class="nt">'+nt+'</div>':''));}
-  k.appendChild(kpi('Faturamento',brlK(fat),(Number(D.kpis.qtd_nfs)||0).toLocaleString('pt-BR')+' NFs de venda'));
+  k.appendChild(kpi('Faturamento',brlK(fat),nfsSel!=null?nfsSel.toLocaleString('pt-BR')+' NFs de venda':'Notas emitidas no período'));
   k.appendChild(kpi('Frete venda',brlK(fv),'CT-es de entrega normal',VENDA));
   k.appendChild(kpi('Custo extra',brlK(ce),'Dedicado, descarga, pallet e demais',EXTRA));
   k.appendChild(kpi('% Frete total × faturamento',pct(ft,fat),brlK(ft)+' · '+l.length.toLocaleString('pt-BR')+' CT-es',null,true));
@@ -266,8 +270,7 @@ function render(){
   w.appendChild(g2);
 
   /* tabela */
-  w.appendChild(cardTabela(l));
-  w.appendChild(el('div',{cls:'rodape'},'Gerado em '+new Date(D.geradoEm).toLocaleString('pt-BR')+
+  w.appendChild(el('div',{cls:'rodape'},'Mostrando '+mesLb(f.de)+' a '+mesLb(f.ate)+' · gerado em '+new Date(D.geradoEm).toLocaleString('pt-BR')+
     (D.geradoPor?' por '+D.geradoPor:'')+' · dados do portal de Devoluções Fiscais · Linea Alimentos'));
   app.appendChild(w);
 }
@@ -278,7 +281,7 @@ function cardMensal(){
   c.appendChild(el('div',{cls:'sb'},'Cada mês traz o frete das notas emitidas nele. Clique em um mês para filtrar'));
   c.appendChild(el('div',{cls:'leg'},'<span><i style="background:'+VENDA+'"></i>Frete venda</span><span><i style="background:'+EXTRA+'"></i>Custo extra</span>'));
   var bd=el('div',{cls:'bd'});
-  var m=D.mensal||[],W=Math.min(1500,Math.max(360,window.innerWidth-120)),H=270,pL=60,pR=12,pT=28,pB=30;
+  var m=(D.mensal||[]).filter(function(x){return mesesNoRange().indexOf(x.mes)>=0;}),W=Math.min(1500,Math.max(360,window.innerWidth-120)),H=270,pL=60,pR=12,pT=28,pB=30;
   var max=1;m.forEach(function(x){max=Math.max(max,Number(x.frete_venda)+Number(x.custo_extra));});
   var p=Math.pow(10,Math.floor(Math.log10(max)));var nice=Math.ceil(max/p)*p;
   var slot=(W-pL-pR)/Math.max(1,m.length),bw=Math.min(62,slot*.58);
@@ -327,7 +330,7 @@ function tabelaMensal(){
   var t=el('table',{style:'margin-top:12px'}),h='<thead><tr><th>Mês</th><th class="n">Faturamento</th><th class="n">Frete venda</th>'+
     '<th class="n">Custo extra</th><th class="n">Frete total</th><th class="n">% total</th><th class="n">% venda</th><th class="n">% extra</th></tr></thead><tbody>';
   var tf=0,tv=0,te=0;
-  (D.mensal||[]).forEach(function(m){
+  (D.mensal||[]).filter(function(x){return mesesNoRange().indexOf(x.mes)>=0;}).forEach(function(m){
     var ff=Number(m.faturamento),v=Number(m.frete_venda),e=Number(m.custo_extra);tf+=ff;tv+=v;te+=e;
     h+='<tr><td style="font-weight:600;color:var(--text)">'+mesLb(m.mes)+'</td><td class="n">'+brlK(ff)+'</td>'+
        '<td class="n" style="color:'+VENDA+'">'+brl(v)+'</td><td class="n" style="color:'+EXTRA+'">'+brl(e)+'</td>'+
@@ -391,7 +394,7 @@ function cardUF(l){
   var h=el('div',{style:'display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap'});
   h.appendChild(el('div',null,'<h2 style="padding-bottom:0">Frete por UF de destino</h2>'+
     '<div class="sb" style="padding-left:0">'+(ufModo==='pct'?'Frete dividido pelo valor das notas entregues naquela UF':'Clique em uma UF para filtrar o painel')+'</div>'));
-  var tg=el('div',{cls:'acoes no-print',style:'padding:14px 18px 0'});
+  var tg=el('div',{cls:'acoes',style:'padding:14px 18px 0'});
   ['valor','pct'].forEach(function(m){
     tg.appendChild(el('button',{cls:'btn'+(ufModo===m?' on':''),onclick:function(){ufModo=m;render();}},m==='valor'?'R$':'% da NF'));});
   h.appendChild(tg);
@@ -426,28 +429,6 @@ function cardUF(l){
     g.addEventListener('mouseleave',escondeTip);});
   bd.appendChild(box);
   if(!itens.length)bd.appendChild(el('div',{cls:'vazio'},'Sem CT-es neste recorte.'));
-  c.appendChild(bd);return c;}
-
-function cardTabela(l){
-  var c=el('div',{cls:'card no-print'});
-  c.appendChild(el('h2',null,'CT-es do recorte'));
-  c.appendChild(el('div',{cls:'sb'},l.length.toLocaleString('pt-BR')+' CT-es · '+brlC(l.reduce(function(s,x){return s+x.v;},0))+
-    ' · mostrando os 400 de maior valor'));
-  var bd=el('div',{cls:'bd',style:'padding:10px 0 0'});
-  var ord=l.slice().sort(function(a,b){return b.v-a.v;}).slice(0,400);
-  var t=el('table'),h='<thead><tr><th>CT-e</th><th>Emissão CT-e</th><th>Mês da NF</th><th>Transportador</th><th>Tipo</th>'+
-    '<th>Destino</th><th>NFs</th><th class="n">Frete</th><th class="n">Valor das NFs</th><th class="n">% da NF</th></tr></thead><tbody>';
-  ord.forEach(function(x){
-    h+='<tr class="cte"><td style="font-weight:700;color:var(--text)">'+x.c+(x.p?'<div style="font-size:10px;font-weight:400;color:var(--text-3)">planilha</div>':'')+'</td>'+
-      '<td>'+dataBR(x.d)+'</td><td>'+mesLb(x.dn)+'</td>'+
-      '<td>'+titulo(x.TR)+'</td><td>'+titulo(x.T)+(x.o?'<div style="font-size:10px;color:var(--text-3)">Transferência</div>':'')+'</td>'+
-      '<td>'+titulo(x.DR)+'<div style="font-size:10px;color:var(--text-3)">'+titulo(x.CI)+' / '+x.U+'</div></td>'+
-      '<td style="max-width:150px;font-size:11px">'+x.n.split(' ').slice(0,3).join(', ')+(x.n.split(' ').length>3?' +'+(x.n.split(' ').length-3):'')+'</td>'+
-      '<td class="n" style="font-weight:700;color:var(--text)">'+brlC(x.v)+'</td><td class="n">'+brlC(x.nv)+'</td>'+
-      '<td class="n">'+pct(x.v,x.nv)+'</td></tr>';});
-  t.innerHTML=h+'</tbody>';
-  var wrp=el('div',{cls:'tbl-wrap'});wrp.appendChild(t);bd.appendChild(wrp);
-  if(!ord.length)bd.appendChild(el('div',{cls:'vazio'},'Sem CT-es neste recorte.'));
   c.appendChild(bd);return c;}
 
 render();

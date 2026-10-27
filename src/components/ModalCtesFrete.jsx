@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { dbGetCustosFreteCtes } from '../config/supabase';
 
 /* Lista dos CT-es por trás de um número da aba Custos de Frete.
@@ -20,6 +21,9 @@ export default function ModalCtesFrete({ titulo: tit, sub, params, filtrar, onFi
   const [busca, setBusca] = useState('');
   const [ordem, setOrdem] = useState('valor');
   const [aberto, setAberto] = useState(null);
+  /* em tela cheia o navegador só desenha o que está dentro do elemento em
+     tela cheia, então o modal precisa ser montado lá dentro. */
+  const [alvo, setAlvo] = useState(() => (typeof document !== 'undefined' ? document.fullscreenElement || document.body : null));
 
   useEffect(() => {
     let vivo = true;
@@ -30,9 +34,11 @@ export default function ModalCtesFrete({ titulo: tit, sub, params, filtrar, onFi
   }, [params]);
 
   useEffect(() => {
-    const esc = (e) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', esc);
-    return () => window.removeEventListener('keydown', esc);
+    const esc = (e) => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } };
+    const fs = () => setAlvo(document.fullscreenElement || document.body);
+    window.addEventListener('keydown', esc, true);
+    document.addEventListener('fullscreenchange', fs);
+    return () => { window.removeEventListener('keydown', esc, true); document.removeEventListener('fullscreenchange', fs); };
   }, [onClose]);
 
   const linhas = useMemo(() => {
@@ -73,8 +79,9 @@ export default function ModalCtesFrete({ titulo: tit, sub, params, filtrar, onFi
   const td = { padding: '8px 10px', fontSize: 12, color: 'var(--text-2)', borderBottom: '1px solid var(--border)', verticalAlign: 'top' };
   const tdN = { ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' };
 
-  return (
-    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+  if (!alvo) return null;
+  return createPortal((
+    <div className="modal-overlay" style={{ zIndex: 600 }} onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal cf-modal-ctes" role="dialog" aria-label={`CT-es — ${tit}`}>
         <div style={{ padding: '18px 22px 10px', borderBottom: '1px solid var(--border)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
@@ -196,5 +203,5 @@ export default function ModalCtesFrete({ titulo: tit, sub, params, filtrar, onFi
         )}
       </div>
     </div>
-  );
+  ), alvo);
 }

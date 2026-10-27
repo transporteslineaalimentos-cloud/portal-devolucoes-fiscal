@@ -921,8 +921,9 @@ tr.drill-row:hover td { background: var(--blue-dim); }
   .cf-modal-ctes.modal { height: 100vh; max-height: 100vh; border-radius: 0; }
 }
 
-/* Modo apresentação da aba Custos de Frete */
-.cf-apresentar { font-size: 15px; }
-.cf-apresentar .cf-kpis { grid-template-columns: repeat(6, minmax(0, 1fr)); }
-.cf-apresentar h2 { font-size: 16px !important; }
-.cf-apresentar table { font-size: 13px; }
+/* Apresentação em tela cheia da aba Custos de Frete */
+.cf-slide { animation: cf-entra 220ms ease-out; }
+@keyframes cf-entra { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.cf-slide .cf-kpis { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.cf-slide .cf-barra { padding: 5px 4px; }
+

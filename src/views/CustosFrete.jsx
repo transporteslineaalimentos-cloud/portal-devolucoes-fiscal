@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { dbGetCustosFrete, dbGetCustosFreteCtes, dbRefreshCustosFrete } from '../config/supabase';
 import ModalCtesFrete from '../components/ModalCtesFrete.jsx';
+import ApresentacaoFrete from '../components/ApresentacaoFrete.jsx';
 import { gerarPainelFrete } from '../lib/painelFrete';
 
 /* ─────────────────────────────────────────────────────────────
@@ -107,7 +108,7 @@ function Filtro({ label, value, onChange, children, width = 170 }) {
 }
 
 /* ─── Colunas mensais empilhadas + % sobre o faturamento ───── */
-function GraficoMensal({ meses, onMes }) {
+function GraficoMensal({ meses, onMes, altura = 260 }) {
   const wrapRef = useRef(null);
   const [w, setW] = useState(900);
   const [hover, setHover] = useState(null);
@@ -117,7 +118,7 @@ function GraficoMensal({ meses, onMes }) {
     ro.observe(el); return () => ro.disconnect();
   }, []);
 
-  const H = 260, padL = 58, padR = 12, padT = 26, padB = 28;
+  const H = altura, padL = 58, padR = 12, padT = 26, padB = 28;
   const max = Math.max(1, ...meses.map(m => m.frete_venda + m.custo_extra));
   const niceMax = (() => { const p = Math.pow(10, Math.floor(Math.log10(max))); return Math.ceil(max / p) * p; })();
   const n = Math.max(1, meses.length);
@@ -186,7 +187,7 @@ function GraficoMensal({ meses, onMes }) {
   );
 }
 const Linha = ({ cor, label, valor, pct, forte }) => (
-  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, color: 'var(--text-2)', padding: '1px 0' }}>
+  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, color: 'var(--text-2)', padding: '1px 0', whiteSpace: 'nowrap' }}>
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontWeight: forte ? 700 : 400 }}>
       {cor && <span style={{ width: 8, height: 8, borderRadius: 2, background: cor }}/>}{label}
     </span>
@@ -296,7 +297,7 @@ function Barras({ itens, rotulo, empilhado, cor = COR_VENDA, total, onClick, lim
 
 
 /* ─── Colunas por UF ───────────────────────────────────────── */
-function ColunasUF({ itens, total, ativo, onClick, modo }) {
+function ColunasUF({ itens, total, ativo, onClick, modo, altura = 220 }) {
   const wrapRef = useRef(null);
   const [w, setW] = useState(900);
   const [hover, setHover] = useState(null);
@@ -305,7 +306,7 @@ function ColunasUF({ itens, total, ativo, onClick, modo }) {
     const ro = new ResizeObserver(([e]) => setW(Math.max(320, e.contentRect.width)));
     ro.observe(el); return () => ro.disconnect();
   }, []);
-  const H = 220, padT = 22, padB = 24;
+  const H = altura, padT = 22, padB = 24;
   const pctUF = (i) => (Number(i.base_nf) > 0 ? Number(i.valor) / Number(i.base_nf) : null);
   const vis = modo === 'pct' ? itens.filter(i => pctUF(i) != null).sort((a, b) => pctUF(b) - pctUF(a)) : itens;
   const alt = (i) => (modo === 'pct' ? pctUF(i) : Number(i.valor) || 0);
@@ -341,9 +342,9 @@ function ColunasUF({ itens, total, ativo, onClick, modo }) {
       </svg>
       {hover != null && vis[hover] && (() => {
         const i = vis[hover];
-        const left = Math.min(Math.max(slot * hover + slot / 2 + 10, 0), w - 210);
+        const left = Math.min(Math.max(slot * hover + slot / 2 + 10, 0), Math.max(0, w - 244));
         return (
-          <div style={{ position: 'absolute', top: 4, left, width: 200, background: 'var(--surface)', border: '1px solid var(--border)',
+          <div style={{ position: 'absolute', top: 4, left, width: 232, background: 'var(--surface)', border: '1px solid var(--border)',
             borderRadius: 8, boxShadow: 'var(--shadow-sm)', padding: '8px 10px', fontSize: 11.5, pointerEvents: 'none', fontVariantNumeric: 'tabular-nums' }}>
             <div style={{ fontWeight: 700, color: 'var(--text)', marginBottom: 3 }}>{i.uf}</div>
             <Linha cor={COR_VENDA} label="Frete venda" valor={brl0(i.frete_venda)}/>
@@ -474,9 +475,101 @@ export default function CustosFrete({ user }) {
     setExportando(false);
   };
 
+  /* Blocos montados uma vez e reaproveitados na tela e na apresentação. */
+  const blocoKpis = !data ? null : (
+    <>
+          <div className="cf-kpis">
+        <Kpi label="Faturamento" value={brlK(fat)} note={`${(k.qtd_nfs || 0).toLocaleString('pt-BR')} NFs de venda`}/>
+        <Kpi label="Frete venda" accent={COR_VENDA} value={brlK(fv)} note="CT-es de entrega normal"
+          onClick={() => abrirKpi('Frete venda', 'FRETE VENDA')}/>
+        <Kpi label="Custo extra" accent={COR_EXTRA} value={brlK(ce)} note="Dedicado, descarga, pallet, complementar e demais"
+          onClick={() => abrirKpi('Custo extra', 'CUSTO EXTRA')}/>
+        <Kpi destaque label="% Frete total × faturamento" value={pctFmt(div(ft, fat))}
+          note={`${brlK(ft)} · ${(k.qtd_ctes || 0).toLocaleString('pt-BR')} CT-es` + (Number(k.transferencia) > 0 && !f.operacao ? ` · ${brlK(k.transferencia)} de transferência` : '')}
+          onClick={() => abrirKpi('Frete total')}/>
+        <Kpi label="% Frete venda × faturamento" accent={COR_VENDA} value={pctFmt(div(fv, fat))}
+          onClick={() => abrirKpi('Frete venda', 'FRETE VENDA')}/>
+        <Kpi label="% Custo extra × faturamento" accent={COR_EXTRA} value={pctFmt(div(ce, fat))}
+          onClick={() => abrirKpi('Custo extra', 'CUSTO EXTRA')}/>
+      </div>
+      {fatNaoFiltra && (
+        <div style={{ fontSize: 11.5, color: 'var(--text-3)', marginTop: -8 }}>
+          O faturamento não muda com os filtros de tipo de custo, transportador e operação; os percentuais mostram o peso desse recorte no faturamento total.
+        </div>
+      )}
+
+    </>
+  );
+
+  const blocoMensal = (altura) => !data ? null : (
+    <>
+      <GraficoMensal meses={meses} onMes={m => abrirMes(m.mes)} altura={altura}/>
+      <TabelaMensal meses={meses} onAbrir={abrirMes}/>
+    </>
+  );
+
+  const blocoTransp = !data ? null : (
+    <Barras itens={data.por_transportador || []} rotulo={i => titulo(i.nome)} empilhado total={ft} limite={14}
+      ativo={f.transportador} onClick={i => abrir(titulo(i.nome), { transportador: i.raiz || null },
+        i.raiz && f.transportador !== i.raiz ? { label: 'Filtrar a aba por este transportador', run: () => set('transportador', i.raiz) } : null)}/>
+  );
+
+  const blocoTipo = !data ? null : (
+    <Barras itens={data.por_tipo || []} rotulo={i => titulo(i.tipo)} total={ft} limite={20} modoPct="frete"
+      cor={i => i.categoria === 'FRETE VENDA' ? COR_VENDA : COR_EXTRA}
+      ativo={f.tipo} onClick={i => {
+        const t = i.tipo === 'ENTREGA NORMAL' ? 'FRETE VENDA' : i.tipo;
+        abrir(titulo(i.tipo), { tipo: i.tipo }, f.tipo !== t ? { label: 'Filtrar a aba por este tipo', run: () => set('tipo', t) } : null);
+      }}/>
+  );
+
+  const blocoDest = !data ? null : (
+    <Barras itens={data.por_destinatario || []} rotulo={nomeDest} empilhado total={ft} limite={14}
+      onClick={i => abrir(nomeDest(i), { destinatario: i.raiz || null })}/>
+  );
+
+  const blocoExtraDest = !data ? null : (
+    <Barras itens={data.extra_por_destinatario || []} rotulo={nomeDest} cor={COR_EXTRA} total={ce} modoPct="frete" limite={14}
+      onClick={i => abrir(`Custo extra · ${nomeDest(i)}`, { destinatario: i.raiz || null, tipo: f.tipo && f.tipo !== 'FRETE VENDA' ? f.tipo : 'CUSTO EXTRA' })}/>
+  );
+
+  const blocoUf = (altura) => !data ? null : (
+    <ColunasUF itens={(data.por_uf || []).filter(i => i.uf !== '—')} total={ft} modo={ufModo} altura={altura}
+      ativo={f.uf} onClick={i => abrir(`UF ${i.uf}`, { uf: i.uf },
+        f.uf !== i.uf ? { label: 'Filtrar a aba por esta UF', run: () => set('uf', i.uf) } : null)}/>
+  );
+
+  const seletorUf = (
+    <div style={{ display: 'flex', gap: 6 }}>
+      {[['valor', 'R$'], ['pct', '% da NF']].map(([v, l]) => (
+        <button key={v} className={'btn btn-sm ' + (ufModo === v ? 'btn-primary' : 'btn-outline')}
+          style={{ height: 28 }} onClick={() => setUfModo(v)}>{l}</button>
+      ))}
+    </div>
+  );
+
+  const legendaVE = <Legend items={[{ label: 'Venda', color: COR_VENDA }, { label: 'Extra', color: COR_EXTRA }]}/>;
+
+  const sairApresentacao = useCallback(() => setApresentar(false), []);
+  const alturaSlide = Math.max(260, Math.min(520, (typeof window !== 'undefined' ? window.innerHeight : 900) - 330));
+
+  const slides = [
+    { id: 'resumo', titulo: 'Resumo do período', sub: `Faturamento de ${brlK(fat)} e frete de ${brlK(ft)}`,
+      corpo: <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>{blocoKpis}<div>{blocoMensal(300)}</div></div> },
+    { id: 'transp', titulo: 'Frete pago por transportador', sub: 'O percentual é o frete sobre o valor das notas que cada um levou',
+      corpo: blocoTransp },
+    { id: 'tipo', titulo: 'Custo por tipo de CT-e', sub: 'Entrega normal é o frete da venda; os demais tipos são custo extra',
+      corpo: blocoTipo },
+    { id: 'dest', titulo: 'Frete por destinatário', sub: 'Clientes agrupados pela raiz do CNPJ, com todas as lojas juntas',
+      corpo: blocoDest },
+    { id: 'extra', titulo: 'Custo extra por destinatário', sub: 'Descarga, pallet, dedicado, complementar e demais',
+      corpo: blocoExtraDest },
+    { id: 'uf', titulo: 'Frete por UF de destino', sub: ufModo === 'pct' ? 'Frete dividido pelo valor das notas entregues naquela UF' : 'Valor do frete por UF',
+      corpo: <div><div style={{ marginBottom: 14 }}>{seletorUf}</div>{blocoUf(alturaSlide)}</div> },
+  ];
+
   return (
-    <div className={'painel-root' + (apresentar ? ' cf-apresentar' : '')}
-      style={{ padding: '20px 24px 40px', display: 'flex', flexDirection: 'column', gap: 16, maxWidth: apresentar ? 'none' : 1600 }}>
+    <div className="painel-root" style={{ padding: '20px 24px 40px', display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 1600 }}>
       <div className="print-only" style={{ marginBottom: 4 }}>
         <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>Custos de frete · {periodoTxt}</div>
         <div style={{ fontSize: 11, color: 'var(--text-3)' }}>
@@ -554,61 +647,31 @@ export default function CustosFrete({ user }) {
 
       {data && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, opacity: loading ? 0.6 : 1, transition: 'opacity 150ms' }}>
-          {/* KPIs */}
-          <div className="cf-kpis">
-            <Kpi label="Faturamento" value={brlK(fat)} note={`${(k.qtd_nfs || 0).toLocaleString('pt-BR')} NFs de venda`}/>
-            <Kpi label="Frete venda" accent={COR_VENDA} value={brlK(fv)} note="CT-es de entrega normal"
-              onClick={() => abrirKpi('Frete venda', 'FRETE VENDA')}/>
-            <Kpi label="Custo extra" accent={COR_EXTRA} value={brlK(ce)} note="Dedicado, descarga, pallet, complementar e demais"
-              onClick={() => abrirKpi('Custo extra', 'CUSTO EXTRA')}/>
-            <Kpi destaque label="% Frete total × faturamento" value={pctFmt(div(ft, fat))}
-              note={`${brlK(ft)} · ${(k.qtd_ctes || 0).toLocaleString('pt-BR')} CT-es` + (Number(k.transferencia) > 0 && !f.operacao ? ` · ${brlK(k.transferencia)} de transferência` : '')}
-              onClick={() => abrirKpi('Frete total')}/>
-            <Kpi label="% Frete venda × faturamento" accent={COR_VENDA} value={pctFmt(div(fv, fat))}
-              onClick={() => abrirKpi('Frete venda', 'FRETE VENDA')}/>
-            <Kpi label="% Custo extra × faturamento" accent={COR_EXTRA} value={pctFmt(div(ce, fat))}
-              onClick={() => abrirKpi('Custo extra', 'CUSTO EXTRA')}/>
-          </div>
-          {fatNaoFiltra && (
-            <div style={{ fontSize: 11.5, color: 'var(--text-3)', marginTop: -8 }}>
-              O faturamento não muda com os filtros de tipo de custo, transportador e operação; os percentuais mostram o peso desse recorte no faturamento total.
-            </div>
-          )}
-
+          {blocoKpis}
           {/* Evolução mensal */}
           <Card title="Custo de frete por mês e % sobre o faturamento"
             sub="Cada mês traz o frete das notas emitidas nele, mesmo que o CT-e tenha vindo depois. O número acima da coluna é o frete sobre o faturamento. Clique para ver os CT-es"
             right={<Legend items={[{ label: 'Frete venda', color: COR_VENDA }, { label: 'Custo extra', color: COR_EXTRA }]}/>}>
-            <GraficoMensal meses={meses} onMes={m => abrirMes(m.mes)}/>
-            <TabelaMensal meses={meses} onAbrir={abrirMes}/>
+            {blocoMensal(260)}
           </Card>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(440px, 1fr))', gap: 16 }}>
-            <Card title="Frete pago por transportador" sub="Clique em um transportador para ver os CT-es"
-              right={<Legend items={[{ label: 'Venda', color: COR_VENDA }, { label: 'Extra', color: COR_EXTRA }]}/>}>
-              <Barras itens={data.por_transportador || []} rotulo={i => titulo(i.nome)} empilhado total={ft}
-                ativo={f.transportador} onClick={i => abrir(titulo(i.nome), { transportador: i.raiz || null },
-                  i.raiz && f.transportador !== i.raiz ? { label: 'Filtrar a aba por este transportador', run: () => set('transportador', i.raiz) } : null)}/>
+            <Card title="Frete pago por transportador"
+              sub="Filiais do mesmo CNPJ já vêm somadas · clique para ver os CT-es" right={legendaVE}>
+              {blocoTransp}
             </Card>
             <Card title="Custo por tipo de CT-e" sub="Clique em um tipo para ver os CT-es">
-              <Barras itens={data.por_tipo || []} rotulo={i => titulo(i.tipo)} total={ft} limite={20} modoPct="frete"
-                cor={i => i.categoria === 'FRETE VENDA' ? COR_VENDA : COR_EXTRA}
-                ativo={f.tipo} onClick={i => {
-                  const t = i.tipo === 'ENTREGA NORMAL' ? 'FRETE VENDA' : i.tipo;
-                  abrir(titulo(i.tipo), { tipo: i.tipo }, f.tipo !== t ? { label: 'Filtrar a aba por este tipo', run: () => set('tipo', t) } : null);
-                }}/>
+              {blocoTipo}
             </Card>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(440px, 1fr))', gap: 16 }}>
             <Card title="Custo total de frete por destinatário" sub="Clientes agrupados pela raiz do CNPJ (todas as lojas juntas) · clique para ver os CT-es"
-              right={<Legend items={[{ label: 'Venda', color: COR_VENDA }, { label: 'Extra', color: COR_EXTRA }]}/>}>
-              <Barras itens={data.por_destinatario || []} rotulo={nomeDest} empilhado total={ft}
-                onClick={i => abrir(nomeDest(i), { destinatario: i.raiz || null })}/>
+              right={legendaVE}>
+              {blocoDest}
             </Card>
             <Card title="Custo extra por destinatário" sub="Descarga, pallet, dedicado, complementar e demais · clique para ver os CT-es">
-              <Barras itens={data.extra_por_destinatario || []} rotulo={nomeDest} cor={COR_EXTRA} total={ce} modoPct="frete"
-                onClick={i => abrir(`Custo extra · ${nomeDest(i)}`, { destinatario: i.raiz || null, tipo: f.tipo && f.tipo !== 'FRETE VENDA' ? f.tipo : 'CUSTO EXTRA' })}/>
+              {blocoExtraDest}
             </Card>
           </div>
 
@@ -616,18 +679,15 @@ export default function CustosFrete({ user }) {
             sub={ufModo === 'pct'
               ? 'Frete dividido pelo valor das notas entregues naquela UF · clique para ver os CT-es'
               : 'Valor do frete por UF · clique para ver os CT-es'}
-            right={
-              <div style={{ display: 'flex', gap: 6 }} className="no-print">
-                {[['valor', 'R$'], ['pct', '% da NF']].map(([v, l]) => (
-                  <button key={v} className={'btn btn-sm ' + (ufModo === v ? 'btn-primary' : 'btn-outline')}
-                    style={{ height: 28 }} onClick={() => setUfModo(v)}>{l}</button>
-                ))}
-              </div>}>
-            <ColunasUF itens={(data.por_uf || []).filter(i => i.uf !== '—')} total={ft} modo={ufModo}
-              ativo={f.uf} onClick={i => abrir(`UF ${i.uf}`, { uf: i.uf },
-                f.uf !== i.uf ? { label: 'Filtrar a aba por esta UF', run: () => set('uf', i.uf) } : null)}/>
+            right={seletorUf}>
+            {blocoUf(220)}
           </Card>
         </div>
+      )}
+
+      {apresentar && data && (
+        <ApresentacaoFrete titulo="Custos de Frete" periodo={periodoTxt} filtros={chips.map(c => c.l)}
+          slides={slides} onSair={sairApresentacao}/>
       )}
 
       {detalhe && (
