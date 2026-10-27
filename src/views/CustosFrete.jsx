@@ -64,7 +64,7 @@ function Card({ title, sub, right, children, style }) {
 
 function Kpi({ label, value, note, accent, destaque, onClick }) {
   const clic = onClick ? {
-    role: 'button', tabIndex: 0, className: 'cf-clicavel', onClick, title: 'Ver os CT-es',
+    role: 'button', tabIndex: 0, className: 'cf-clicavel', onClick, title: 'Ver a lista de CT-es deste recorte',
     onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } },
   } : {};
   return (
@@ -108,7 +108,7 @@ function Filtro({ label, value, onChange, children, width = 170 }) {
 }
 
 /* ─── Colunas mensais empilhadas + % sobre o faturamento ───── */
-function GraficoMensal({ meses, onMes, altura = 260 }) {
+function GraficoMensal({ meses, onMes, altura = 260, mesAtivo }) {
   const wrapRef = useRef(null);
   const [w, setW] = useState(900);
   const [hover, setHover] = useState(null);
@@ -132,7 +132,12 @@ function GraficoMensal({ meses, onMes, altura = 260 }) {
     <div ref={wrapRef} style={{ position: 'relative' }}>
       <svg width={w} height={H} role="img" aria-label="Custo de frete por mês" style={{ display: 'block' }}
         onMouseLeave={() => setHover(null)}
-        onClick={() => { if (onMes && hover != null && meses[hover]) onMes(meses[hover]); }}
+        onClick={e => {
+          if (!onMes) return;
+          const r = e.currentTarget.getBoundingClientRect();
+          const j = Math.floor((e.clientX - r.left - padL) / slot);
+          if (j >= 0 && j < meses.length) onMes(meses[j]);
+        }}
         cursor={onMes ? 'pointer' : undefined}
         onMouseMove={e => {
           const r = e.currentTarget.getBoundingClientRect();
@@ -150,15 +155,19 @@ function GraficoMensal({ meses, onMes, altura = 260 }) {
           const pct = div(tot, m.faturamento);
           const yV = y(m.frete_venda), yT = y(tot);
           return (
-            <g key={m.mes} opacity={hover == null || hover === i ? 1 : 0.55}>
-              {hover === i && <rect x={x(i) - slot / 2 + 2} y={padT - 22} width={slot - 4} height={H - padT - padB + 22} fill="var(--surface-2)" rx="6"/>}
+            <g key={m.mes} opacity={mesAtivo && mesAtivo !== m.mes ? 0.35 : (hover == null || hover === i ? 1 : 0.6)}>
+              {(hover === i || mesAtivo === m.mes) && (
+                <rect x={x(i) - slot / 2 + 2} y={padT - 22} width={slot - 4} height={H - padT - padB + 22}
+                  fill={mesAtivo === m.mes ? 'var(--blue-dim)' : 'var(--surface-2)'} rx="6"/>
+              )}
               <rect x={x(i) - bw / 2} y={yV} width={bw} height={Math.max(0, y(0) - yV)} fill={COR_VENDA} rx="2"/>
               <rect x={x(i) - bw / 2} y={yT} width={bw} height={Math.max(0, yV - yT)} fill={COR_EXTRA} rx="2"/>
               {tot > 0 && (
                 <text x={x(i)} y={yT - 7} textAnchor="middle" fontSize="11" fontWeight="700" fill="var(--text)">{pctFmt(pct)}</text>
               )}
               {(w >= 560 || i % 2 === 0 || i === meses.length - 1) && (
-                <text x={x(i)} y={H - 9} textAnchor="middle" fontSize="11" fill="var(--text-3)">{mesLabel(m.mes)}</text>
+                <text x={x(i)} y={H - 9} textAnchor="middle" fontSize="11"
+                  fontWeight={mesAtivo === m.mes ? 700 : 400} fill={mesAtivo === m.mes ? 'var(--text)' : 'var(--text-3)'}>{mesLabel(m.mes)}</text>
               )}
             </g>
           );
@@ -178,7 +187,9 @@ function GraficoMensal({ meses, onMes, altura = 260 }) {
               <Linha label="Frete total" valor={brl0(tot)} pct={pctFmt(div(tot, m.faturamento))} forte/>
               <Linha label="Faturamento" valor={brlK(m.faturamento)}/>
               {m.transferencia > 0 && <div style={{ color: 'var(--text-3)', marginTop: 3 }}>Inclui {brl0(m.transferencia)} de transferência</div>}
-              {onMes && <div style={{ color: 'var(--blue)', marginTop: 4 }}>Clique para ver os CT-es</div>}
+              {onMes && <div style={{ color: 'var(--blue)', marginTop: 4 }}>
+                {mesAtivo === m.mes ? 'Clique para ver o período todo' : 'Clique para recortar o painel neste mês'}
+              </div>}
             </div>
           </div>
         );
@@ -196,7 +207,7 @@ const Linha = ({ cor, label, valor, pct, forte }) => (
 );
 
 /* ─── Tabela mensal (os percentuais da 2ª página do BI) ────── */
-function TabelaMensal({ meses, onAbrir }) {
+function TabelaMensal({ meses, onAbrir, onMes, mesAtivo }) {
   const th = { padding: '7px 10px', fontSize: 10.5, fontWeight: 700, color: 'var(--text-3)', textAlign: 'right', whiteSpace: 'nowrap', borderBottom: '1px solid var(--border)' };
   const td = { padding: '7px 10px', fontSize: 12, textAlign: 'right', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', borderBottom: '1px solid var(--border)' };
   const tot = meses.reduce((a, m) => ({ f: a.f + m.faturamento, v: a.v + m.frete_venda, e: a.e + m.custo_extra }), { f: 0, v: 0, e: 0 });
@@ -204,8 +215,12 @@ function TabelaMensal({ meses, onAbrir }) {
     className: 'cf-celula', title: 'Ver os CT-es', onClick: (ev) => { ev.stopPropagation(); onAbrir(mes, cat); },
   } : {};
   const linha = (k, lab, f, v, e, forte, mes) => (
-    <tr key={k} style={forte ? { background: 'var(--surface-2)' } : undefined}>
-      <td style={{ ...td, textAlign: 'left', fontWeight: forte ? 700 : 600, color: 'var(--text)' }}>{lab}</td>
+    <tr key={k} style={forte ? { background: 'var(--surface-2)' } : (mesAtivo && mesAtivo === mes ? { background: 'var(--blue-dim)' } : undefined)}>
+      <td style={{ ...td, textAlign: 'left', fontWeight: (forte || mesAtivo === mes) ? 700 : 600, color: 'var(--text)',
+        cursor: onMes && mes ? 'pointer' : undefined }}
+        className={onMes && mes ? 'cf-celula' : undefined}
+        title={onMes && mes ? 'Recortar o painel neste mês' : undefined}
+        onClick={onMes && mes ? () => onMes(mes) : undefined}>{lab}</td>
       <td style={{ ...td, color: 'var(--text-2)' }}>{brlK(f)}</td>
       <td style={{ ...td, color: COR_VENDA }} {...cel(mes, 'FRETE VENDA')}>{brl0(v)}</td>
       <td style={{ ...td, color: COR_EXTRA }} {...cel(mes, 'CUSTO EXTRA')}>{brl0(e)}</td>
@@ -251,7 +266,7 @@ function Barras({ itens, rotulo, empilhado, cor = COR_VENDA, total, onClick, lim
           return (
             <div key={(i.raiz ?? '') + rotulo(i)} className={onClick ? 'cf-barra' : undefined}
               onClick={onClick ? () => onClick(i) : undefined}
-              title={onClick ? 'Clique para ver os CT-es' : undefined}
+              title={onClick ? 'Clique para recortar o painel' : undefined}
               style={{ display: 'grid', gridTemplateColumns: 'minmax(110px, 30%) minmax(0, 1fr)', gap: 10, alignItems: 'center',
                 cursor: onClick ? 'pointer' : 'default', borderRadius: 6, padding: '3px 4px',
                 background: sel ? 'var(--blue-dim)' : undefined }}>
@@ -351,7 +366,7 @@ function ColunasUF({ itens, total, ativo, onClick, modo, altura = 220 }) {
             <Linha cor={COR_EXTRA} label="Custo extra" valor={brl0(i.custo_extra)}/>
             <Linha label="Frete total" valor={brl0(i.valor)} pct={pctFmt(div(Number(i.valor), total))} forte/>
             {Number(i.base_nf) > 0 && <Linha label="Valor das NFs" valor={brlK(i.base_nf)} pct={pctFmt(pctUF(i))}/>}
-            <div style={{ color: 'var(--text-3)', marginTop: 3 }}>{i.qtd} CT-es{onClick ? ' · clique para ver' : ''}</div>
+            <div style={{ color: 'var(--text-3)', marginTop: 3 }}>{i.qtd} CT-es{onClick ? ' · clique para recortar' : ''}</div>
           </div>
         );
       })()}
@@ -360,7 +375,7 @@ function ColunasUF({ itens, total, ativo, onClick, modo, altura = 220 }) {
 }
 
 /* ─── Página ───────────────────────────────────────────────── */
-const FILTROS_PADRAO = { remetente: '', tipo: '', canal: '', uf: '', transportador: '', operacao: 'VENDA' };
+const FILTROS_PADRAO = { remetente: '', tipo: '', canal: '', uf: '', transportador: '', operacao: 'VENDA', destinatario: '' };
 const OPERACOES = [
   { v: '',              l: 'Venda + transferência' },
   { v: 'VENDA',         l: 'Só venda' },
@@ -377,24 +392,41 @@ export default function CustosFrete({ user }) {
   const [loading, setLoading] = useState(true);
   const [atualizando, setAtualizando] = useState(false);
   const [detalhe, setDetalhe] = useState(null);
+  const [mesSel, setMesSel] = useState('');       // mês clicado: recorta o resto do painel
+  const [dataPeriodo, setDataPeriodo] = useState(null);   // período inteiro, para o gráfico mensal
   const [ufModo, setUfModo] = useState('valor');
   const [apresentar, setApresentar] = useState(false);
   const [exportando, setExportando] = useState(false);
   const req = useRef(0);
+  const cachePeriodo = useRef({ chave: '', dados: null });
 
   const set = (k, v) => setF(prev => ({ ...prev, [k]: prev[k] === v ? '' : v }));
   const setSelect = (k) => (v) => setF(prev => ({ ...prev, [k]: v }));
+
+  /* Com um mês clicado, o painel inteiro recorta para ele — menos o gráfico
+     mensal, que continua mostrando o período todo para dar a comparação. */
+  const deEff = mesSel ? (`${mesSel}-01` > de ? `${mesSel}-01` : de) : de;
+  const ateEff = mesSel ? (fimDoMes(mesSel) < ate ? fimDoMes(mesSel) : ate) : ate;
 
   const carregar = useCallback(async () => {
     if (!de || !ate || de > ate) return;
     const id = ++req.current;
     setLoading(true); setErro('');
+    const chave = JSON.stringify({ de, ate, ...f });
     try {
-      const r = await dbGetCustosFrete({ de, ate, ...f });
-      if (id === req.current) setData(r);
+      const [periodo, recorte] = await Promise.all([
+        cachePeriodo.current.chave === chave && cachePeriodo.current.dados
+          ? cachePeriodo.current.dados                       // trocar de mês não refaz a consulta do período
+          : dbGetCustosFrete({ de, ate, ...f }),
+        mesSel ? dbGetCustosFrete({ de: deEff, ate: ateEff, ...f }) : null,
+      ]);
+      if (id === req.current) {
+        cachePeriodo.current = { chave, dados: periodo };
+        setDataPeriodo(periodo); setData(recorte || periodo);
+      }
     } catch (e) { if (id === req.current) setErro(e.message); }
     if (id === req.current) setLoading(false);
-  }, [de, ate, f]);
+  }, [de, ate, f, mesSel, deEff, ateEff]);
 
   useEffect(() => { const t = setTimeout(carregar, 200); return () => clearTimeout(t); }, [carregar]);
 
@@ -408,7 +440,7 @@ export default function CustosFrete({ user }) {
       for (let i = 0; i < 24; i++) {
         await new Promise(r => setTimeout(r, 10000));
         const r = await dbGetCustosFrete({ de, ate, ...f });
-        if (r?.cobertura?.atualizado_em !== antes) { setData(r); break; }
+        if (r?.cobertura?.atualizado_em !== antes) { cachePeriodo.current = { chave: '', dados: null }; await carregar(); break; }
       }
     } catch (e) { alert('Não foi possível atualizar: ' + e.message); }
     setAtualizando(false);
@@ -420,31 +452,42 @@ export default function CustosFrete({ user }) {
   const fv = Number(k.frete_venda) || 0;
   const ce = Number(k.custo_extra) || 0;
   const ft = fv + ce;
-  const meses = useMemo(() => (data?.mensal || []).map(m => ({
+  const meses = useMemo(() => (dataPeriodo?.mensal || []).map(m => ({
     mes: m.mes, faturamento: Number(m.faturamento) || 0, frete_venda: Number(m.frete_venda) || 0,
     custo_extra: Number(m.custo_extra) || 0, transferencia: Number(m.transferencia) || 0, qtd_ctes: m.qtd_ctes || 0,
-  })), [data]);
+  })), [dataPeriodo]);
   const op = data?.opcoes || {};
   const nomeTransp = (raiz) => (op.transportadores || []).find(t => t.raiz === raiz)?.nome || raiz;
+  const nomeDestinatario = (raiz) => (data?.por_destinatario || []).find(d => d.raiz === raiz)?.nome || raiz;
 
   const chips = [
+    mesSel && { k: 'mes', l: mesLabel(mesSel) },
     f.remetente && { k: 'remetente', l: REMETENTES.find(r => r.v === f.remetente)?.l },
     f.tipo && { k: 'tipo', l: titulo(f.tipo) },
     f.canal && { k: 'canal', l: titulo(f.canal) },
     f.uf && { k: 'uf', l: 'UF ' + f.uf },
     f.transportador && { k: 'transportador', l: titulo(nomeTransp(f.transportador)) },
+    f.destinatario && { k: 'destinatario', l: titulo(nomeDestinatario(f.destinatario)) },
     f.operacao && f.operacao !== FILTROS_PADRAO.operacao && { k: 'operacao', l: OPERACOES.find(o => o.v === f.operacao)?.l },
   ].filter(Boolean);
-  const fatNaoFiltra = f.tipo || f.transportador || f.operacao === 'TRANSFERENCIA';
+  const fatNaoFiltra = f.tipo || f.transportador || f.destinatario || f.operacao === 'TRANSFERENCIA';
   const periodoTxt = `${dataBR(de)} a ${dataBR(ate)}`;
 
-  /* Abre a lista de CT-es por trás de um número: filtros da aba + o recorte clicado.
-     `filtrar` (opcional) vira um botão no modal para aplicar o recorte na aba toda. */
+  const limpar = () => { setF(FILTROS_PADRAO); setMesSel(''); };
+  const tirarChip = (c) => (c === 'mes' ? setMesSel('') : setF(prev => ({ ...prev, [c]: FILTROS_PADRAO[c] ?? '' })));
+
+  /* Clicar em um gráfico recorta o painel inteiro; clicar de novo desfaz. */
+  const cruzar = (campo, valor) => {
+    if (campo === 'mes') setMesSel(m => (m === valor ? '' : valor));
+    else set(campo, valor);
+  };
+
+  /* Abre a lista de CT-es do recorte atual (ou de um recorte extra). */
   const abrir = (tit, extra = {}, filtrar = null) => {
-    const params = { de, ate, ...f, ...extra };
+    const params = { de: deEff, ate: ateEff, ...f, ...extra };
     const rec = [
       params.de === de && params.ate === ate ? periodoTxt : `${dataBR(params.de)} a ${dataBR(params.ate)}`,
-      ...chips.filter(c => !(c.k in extra)).map(c => c.l),
+      ...chips.filter(c => c.k !== 'mes' && !(c.k in extra)).map(c => c.l),
     ];
     setDetalhe({ titulo: tit, sub: rec.join(' · '), params, filtrar });
   };
@@ -456,6 +499,7 @@ export default function CustosFrete({ user }) {
     abrir(`${nome} · ${lab}`, extra);
   };
   const abrirKpi = (nome, tipo) => abrir(nome, tipo ? { tipo } : {});
+  const verCtes = () => abrir(chips.length ? chips.map(c => c.l).join(' · ') : 'Todos os CT-es');
 
   /* Painel interativo: um .html que abre offline e continua clicável. */
   const exportarPainel = async () => {
@@ -503,40 +547,35 @@ export default function CustosFrete({ user }) {
 
   const blocoMensal = (altura) => !data ? null : (
     <>
-      <GraficoMensal meses={meses} onMes={m => abrirMes(m.mes)} altura={altura}/>
-      <TabelaMensal meses={meses} onAbrir={abrirMes}/>
+      <GraficoMensal meses={meses} onMes={m => cruzar('mes', m.mes)} mesAtivo={mesSel} altura={altura}/>
+      <TabelaMensal meses={meses} onAbrir={abrirMes} onMes={m => cruzar('mes', m)} mesAtivo={mesSel}/>
     </>
   );
 
   const blocoTransp = !data ? null : (
     <Barras itens={data.por_transportador || []} rotulo={i => titulo(i.nome)} empilhado total={ft} limite={14}
-      ativo={f.transportador} onClick={i => abrir(titulo(i.nome), { transportador: i.raiz || null },
-        i.raiz && f.transportador !== i.raiz ? { label: 'Filtrar a aba por este transportador', run: () => set('transportador', i.raiz) } : null)}/>
+      ativo={f.transportador} onClick={i => i.raiz && cruzar('transportador', i.raiz)}/>
   );
 
   const blocoTipo = !data ? null : (
     <Barras itens={data.por_tipo || []} rotulo={i => titulo(i.tipo)} total={ft} limite={20} modoPct="frete"
       cor={i => i.categoria === 'FRETE VENDA' ? COR_VENDA : COR_EXTRA}
-      ativo={f.tipo} onClick={i => {
-        const t = i.tipo === 'ENTREGA NORMAL' ? 'FRETE VENDA' : i.tipo;
-        abrir(titulo(i.tipo), { tipo: i.tipo }, f.tipo !== t ? { label: 'Filtrar a aba por este tipo', run: () => set('tipo', t) } : null);
-      }}/>
+      ativo={f.tipo} onClick={i => cruzar('tipo', i.tipo)}/>
   );
 
   const blocoDest = !data ? null : (
     <Barras itens={data.por_destinatario || []} rotulo={nomeDest} empilhado total={ft} limite={14}
-      onClick={i => abrir(nomeDest(i), { destinatario: i.raiz || null })}/>
+      ativo={f.destinatario} onClick={i => i.raiz && cruzar('destinatario', i.raiz)}/>
   );
 
   const blocoExtraDest = !data ? null : (
     <Barras itens={data.extra_por_destinatario || []} rotulo={nomeDest} cor={COR_EXTRA} total={ce} modoPct="frete" limite={14}
-      onClick={i => abrir(`Custo extra · ${nomeDest(i)}`, { destinatario: i.raiz || null, tipo: f.tipo && f.tipo !== 'FRETE VENDA' ? f.tipo : 'CUSTO EXTRA' })}/>
+      ativo={f.destinatario} onClick={i => i.raiz && cruzar('destinatario', i.raiz)}/>
   );
 
   const blocoUf = (altura) => !data ? null : (
     <ColunasUF itens={(data.por_uf || []).filter(i => i.uf !== '—')} total={ft} modo={ufModo} altura={altura}
-      ativo={f.uf} onClick={i => abrir(`UF ${i.uf}`, { uf: i.uf },
-        f.uf !== i.uf ? { label: 'Filtrar a aba por esta UF', run: () => set('uf', i.uf) } : null)}/>
+      ativo={f.uf} onClick={i => cruzar('uf', i.uf)}/>
   );
 
   const seletorUf = (
@@ -556,7 +595,7 @@ export default function CustosFrete({ user }) {
   const slides = [
     { id: 'resumo', titulo: 'Resumo do período', sub: `Faturamento de ${brlK(fat)} e frete de ${brlK(ft)}`,
       corpo: <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>{blocoKpis}<div>{blocoMensal(300)}</div></div> },
-    { id: 'transp', titulo: 'Frete pago por transportador', sub: 'O percentual é o frete sobre o valor das notas que cada um levou',
+    { id: 'transp', titulo: 'Frete pago por transportador', sub: 'O percentual é o frete sobre o valor das notas que cada um levou · clique para recortar',
       corpo: blocoTransp },
     { id: 'tipo', titulo: 'Custo por tipo de CT-e', sub: 'Entrega normal é o frete da venda; os demais tipos são custo extra',
       corpo: blocoTipo },
@@ -614,7 +653,7 @@ export default function CustosFrete({ user }) {
           {(op.transportadores || []).map(t => <option key={t.raiz} value={t.raiz}>{titulo(t.nome)}</option>)}
         </Filtro>
         {chips.length > 0 && (
-          <button className="btn btn-ghost btn-sm" style={{ height: 32 }} onClick={() => setF(FILTROS_PADRAO)}>Limpar filtros</button>
+          <button className="btn btn-ghost btn-sm" style={{ height: 32 }} onClick={limpar}>Limpar filtros</button>
         )}
         <div style={{ flex: 1 }}/>
         <button className="btn btn-outline btn-sm" style={{ height: 32 }} onClick={() => setApresentar(a => !a)}
@@ -632,7 +671,7 @@ export default function CustosFrete({ user }) {
 
       <div className="no-print" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginTop: -6, fontSize: 11.5, color: 'var(--text-3)' }}>
         {chips.map(c => (
-          <button key={c.k} className="dv-chip" onClick={() => setF(prev => ({ ...prev, [c.k]: '' }))} title="Remover filtro">
+          <button key={c.k} className="dv-chip" onClick={() => tirarChip(c.k)} title="Remover filtro">
             {c.l} <span aria-hidden="true">×</span>
           </button>
         ))}
@@ -650,35 +689,35 @@ export default function CustosFrete({ user }) {
           {blocoKpis}
           {/* Evolução mensal */}
           <Card title="Custo de frete por mês e % sobre o faturamento"
-            sub="Cada mês traz o frete das notas emitidas nele, mesmo que o CT-e tenha vindo depois. O número acima da coluna é o frete sobre o faturamento. Clique para ver os CT-es"
+            sub="Cada mês traz o frete das notas emitidas nele. O número acima da coluna é o frete sobre o faturamento. Clique em um mês para recortar o painel inteiro"
             right={<Legend items={[{ label: 'Frete venda', color: COR_VENDA }, { label: 'Custo extra', color: COR_EXTRA }]}/>}>
             {blocoMensal(260)}
           </Card>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(440px, 1fr))', gap: 16 }}>
             <Card title="Frete pago por transportador"
-              sub="Filiais do mesmo CNPJ já vêm somadas · clique para ver os CT-es" right={legendaVE}>
+              sub="Filiais do mesmo CNPJ já vêm somadas · clique para recortar o painel" right={legendaVE}>
               {blocoTransp}
             </Card>
-            <Card title="Custo por tipo de CT-e" sub="Clique em um tipo para ver os CT-es">
+            <Card title="Custo por tipo de CT-e" sub="Clique em um tipo para recortar o painel">
               {blocoTipo}
             </Card>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(440px, 1fr))', gap: 16 }}>
-            <Card title="Custo total de frete por destinatário" sub="Clientes agrupados pela raiz do CNPJ (todas as lojas juntas) · clique para ver os CT-es"
+            <Card title="Custo total de frete por destinatário" sub="Clientes agrupados pela raiz do CNPJ (todas as lojas juntas) · clique para recortar o painel"
               right={legendaVE}>
               {blocoDest}
             </Card>
-            <Card title="Custo extra por destinatário" sub="Descarga, pallet, dedicado, complementar e demais · clique para ver os CT-es">
+            <Card title="Custo extra por destinatário" sub="Descarga, pallet, dedicado, complementar e demais · clique para recortar o painel">
               {blocoExtraDest}
             </Card>
           </div>
 
           <Card title="Frete por UF de destino"
             sub={ufModo === 'pct'
-              ? 'Frete dividido pelo valor das notas entregues naquela UF · clique para ver os CT-es'
-              : 'Valor do frete por UF · clique para ver os CT-es'}
+              ? 'Frete dividido pelo valor das notas entregues naquela UF · clique para recortar o painel'
+              : 'Valor do frete por UF · clique para recortar o painel'}
             right={seletorUf}>
             {blocoUf(220)}
           </Card>
@@ -686,8 +725,9 @@ export default function CustosFrete({ user }) {
       )}
 
       {apresentar && data && (
-        <ApresentacaoFrete titulo="Custos de Frete" periodo={periodoTxt} filtros={chips.map(c => c.l)}
-          slides={slides} onSair={sairApresentacao}/>
+        <ApresentacaoFrete titulo="Custos de Frete" periodo={periodoTxt} filtros={chips}
+          slides={slides} onSair={sairApresentacao} onLimpar={limpar} onTirarChip={tirarChip}
+          onVerCtes={verCtes} carregando={loading}/>
       )}
 
       {detalhe && (

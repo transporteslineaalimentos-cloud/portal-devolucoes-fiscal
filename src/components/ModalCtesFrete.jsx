@@ -53,17 +53,20 @@ export default function ModalCtesFrete({ titulo: tit, sub, params, filtrar, onFi
   }, [res, busca, ordem]);
 
   const totalVisivel = linhas.reduce((s, l) => s + (Number(l.valor) || 0), 0);
+  const totalNfs = (res?.linhas || []).reduce((s, l) => s + (Number(l.valor_nfs) || 0), 0);
   const truncado = res && res.qtd > (res.linhas || []).length;
 
   const baixar = () => {
     const cab = ['CT-e', 'Emissão do CT-e', 'Transportador', 'CNPJ transportador', 'Tipo', 'Operação', 'Destinatário', 'Cidade', 'UF',
-      'NF', 'Emissão da NF', 'Chave da NF', 'Valor da NF', 'Frete rateado para a NF', 'Valor total do CT-e', 'Origem'];
+      'NF', 'Emissão da NF', 'Chave da NF', 'Valor da NF', 'Frete rateado para a NF',
+      'Valor total do CT-e', 'Frete considerado no painel', 'Valor das NFs do CT-e', 'Origem'];
     const num = (v) => (Number(v) || 0).toFixed(2).replace('.', ',');
     const esc = (v) => { const s = String(v ?? ''); return /[;"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
     const out = [cab.join(';')];
     for (const l of linhas) for (const n of (l.nfs || [])) {
       out.push([l.cte_numero, dataBR(l.dt), l.transp_nome, fmtCnpj(l.transp_cnpj), l.tipo, OPERACAO[n.operacao] || n.operacao,
-        l.dest_nome, l.cidade, l.uf, n.nf, dataBR(n.dt), n.chave, num(n.valor_nf), num(n.rateio), num(l.valor_cte),
+        l.dest_nome, l.cidade, l.uf, n.nf, dataBR(n.dt), n.chave, num(n.valor_nf), num(n.rateio),
+        num(l.valor_cte), num(l.valor), num(l.valor_nfs),
         l.origem === 'planilha' ? 'Planilha importada' : 'Recebimento automático'].map(esc).join(';'));
     }
     const blob = new Blob(['﻿' + out.join('\r\n')], { type: 'text/csv;charset=utf-8' });
@@ -96,6 +99,12 @@ export default function ModalCtesFrete({ titulo: tit, sub, params, filtrar, onFi
             <div style={{ display: 'flex', gap: 22, flexWrap: 'wrap', marginTop: 12, fontVariantNumeric: 'tabular-nums' }}>
               <div><div style={{ fontSize: 11, color: 'var(--text-3)' }}>Frete considerado</div><div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>{brl(res.total)}</div></div>
               <div><div style={{ fontSize: 11, color: 'var(--text-3)' }}>CT-es</div><div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>{Number(res.qtd).toLocaleString('pt-BR')}</div></div>
+              {totalNfs > 0 && (
+                <div><div style={{ fontSize: 11, color: 'var(--text-3)' }}>% sobre o valor das NFs</div>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>
+                    {((Number(res.total) / totalNfs) * 100).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%
+                  </div></div>
+              )}
             </div>
           )}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12, alignItems: 'center' }}>
@@ -121,8 +130,9 @@ export default function ModalCtesFrete({ titulo: tit, sub, params, filtrar, onFi
                 <tr>
                   <th style={th}>CT-e</th><th style={th} title="Data em que o CT-e foi emitido; o custo entra no mês da NF">Emissão CT-e</th><th style={th}>Transportador</th><th style={th}>Tipo</th>
                   <th style={th}>Destino</th><th style={th}>NFs</th>
-                  <th style={{ ...th, textAlign: 'right' }} title="Parte do CT-e rateada para as NFs consideradas no painel">Frete considerado</th>
                   <th style={{ ...th, textAlign: 'right' }}>Valor do CT-e</th>
+                  <th style={{ ...th, textAlign: 'right' }} title="Valor das notas fiscais transportadas neste CT-e">Valor das NFs</th>
+                  <th style={{ ...th, textAlign: 'right' }} title="Frete dividido pelo valor das notas">% da NF</th>
                 </tr>
               </thead>
               <tbody>
@@ -148,12 +158,23 @@ export default function ModalCtesFrete({ titulo: tit, sub, params, filtrar, onFi
                         <td style={{ ...td, maxWidth: 160 }}>
                           {nfs.slice(0, 3).map(n => n.nf).join(', ')}{nfs.length > 3 ? ` +${nfs.length - 3}` : ''}
                         </td>
-                        <td style={{ ...tdN, fontWeight: 700, color: 'var(--text)' }}>{brl(l.valor)}</td>
-                        <td style={{ ...tdN, color: parcial ? 'var(--text-3)' : 'var(--text-2)' }} title={parcial ? 'Parte do CT-e é de NFs que não entram no painel (remessa, bonificação etc.)' : undefined}>{brl(l.valor_cte)}</td>
+                        <td style={{ ...tdN, fontWeight: 700, color: 'var(--text)' }}>
+                          {brl(l.valor_cte)}
+                          {parcial && (
+                            <div style={{ fontSize: 10.5, fontWeight: 400, color: 'var(--text-3)' }}
+                              title="Parte do CT-e é de NFs que não entram no painel (remessa, bonificação etc.)">
+                              no painel {brl(l.valor)}
+                            </div>
+                          )}
+                        </td>
+                        <td style={tdN}>{brl(l.valor_nfs)}</td>
+                        <td style={{ ...tdN, fontWeight: 600, color: 'var(--text)' }}>
+                          {Number(l.valor_nfs) > 0 ? ((Number(l.valor) / Number(l.valor_nfs)) * 100).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%' : '—'}
+                        </td>
                       </tr>
                       {open && (
                         <tr>
-                          <td colSpan={8} style={{ padding: '4px 10px 12px 32px', background: 'var(--surface-2)', borderBottom: '1px solid var(--border)' }}>
+                          <td colSpan={9} style={{ padding: '4px 10px 12px 32px', background: 'var(--surface-2)', borderBottom: '1px solid var(--border)' }}>
                             <table style={{ borderCollapse: 'collapse', width: '100%', maxWidth: 760 }}>
                               <thead>
                                 <tr>
@@ -187,7 +208,7 @@ export default function ModalCtesFrete({ titulo: tit, sub, params, filtrar, onFi
                   );
                 })}
                 {linhas.length === 0 && (
-                  <tr><td colSpan={8} style={{ ...td, textAlign: 'center', padding: 30, color: 'var(--text-3)' }}>Nenhum CT-e encontrado.</td></tr>
+                  <tr><td colSpan={9} style={{ ...td, textAlign: 'center', padding: 30, color: 'var(--text-3)' }}>Nenhum CT-e encontrado.</td></tr>
                 )}
               </tbody>
             </table>

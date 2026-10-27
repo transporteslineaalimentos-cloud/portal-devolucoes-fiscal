@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 /* Apresentação em tela cheia: um bloco por tela, setas para navegar.
    Continua clicável — cada gráfico abre os CT-es por trás do número. */
 
-export default function ApresentacaoFrete({ titulo, periodo, filtros, slides, onSair }) {
+export default function ApresentacaoFrete({ titulo, periodo, filtros, slides, onSair, onLimpar, onTirarChip, onVerCtes, carregando }) {
   const [i, setI] = useState(0);
   const raiz = useRef(null);
   const n = slides.length;
@@ -63,11 +63,14 @@ export default function ApresentacaoFrete({ titulo, periodo, filtros, slides, on
           <div style={{ minWidth: 0 }}>
             <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--text)' }}>{titulo}</div>
             <div style={{ fontSize: 12.5, color: 'var(--text-3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              Linea Alimentos · {periodo}{filtros?.length ? ' · ' + filtros.join(' · ') : ''}
+              Linea Alimentos · {periodo}
             </div>
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {onVerCtes && (
+            <button className="btn btn-outline btn-sm" style={{ height: 34 }} onClick={onVerCtes}>Ver CT-es</button>
+          )}
           <div style={{ display: 'flex', gap: 6, marginRight: 6 }}>
             {slides.map((sl, k) => (
               <button key={sl.id} onClick={() => setI(k)} title={sl.titulo}
@@ -81,19 +84,34 @@ export default function ApresentacaoFrete({ titulo, periodo, filtros, slides, on
         </div>
       </header>
 
-      <div style={{ flex: '1 1 auto', minHeight: 0, padding: '4px 36px 10px', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ marginBottom: 10 }}>
-          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--text)' }}>{s.titulo}</h2>
-          {s.sub && <div style={{ fontSize: 13, color: 'var(--text-3)', marginTop: 2 }}>{s.sub}</div>}
+      {(filtros?.length > 0) && (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', padding: '0 36px 8px' }}>
+          <span style={{ fontSize: 11.5, color: 'var(--text-3)' }}>Recorte:</span>
+          {filtros.map(c => (
+            <button key={c.k} className="dv-chip" onClick={() => onTirarChip?.(c.k)} title="Remover">
+              {c.l} <span aria-hidden="true">×</span>
+            </button>
+          ))}
+          <button className="btn btn-ghost btn-sm" style={{ height: 26 }} onClick={onLimpar}>Limpar</button>
         </div>
-        <div key={s.id} className="cf-slide" style={{ flex: '1 1 auto', minHeight: 0, overflow: 'auto' }}>
+      )}
+
+      <div style={{ flex: '1 1 auto', minHeight: 0, padding: '4px 36px 10px', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ marginBottom: 10, display: 'flex', alignItems: 'baseline', gap: 10 }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--text)' }}>{s.titulo}</h2>
+            {s.sub && <div style={{ fontSize: 13, color: 'var(--text-3)', marginTop: 2 }}>{s.sub}</div>}
+          </div>
+          {carregando && <span style={{ fontSize: 11.5, color: 'var(--text-3)' }}>atualizando…</span>}
+        </div>
+        <div key={s.id} className="cf-slide" style={{ flex: '1 1 auto', minHeight: 0, overflow: 'auto',
+          opacity: carregando ? 0.55 : 1, transition: 'opacity 150ms' }}>
           {s.corpo}
         </div>
       </div>
 
-      <footer style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16,
-        padding: '8px 36px 16px', fontSize: 11.5, color: 'var(--text-3)', flexShrink: 0 }}>
-        <span>Use as setas do teclado para navegar · clique em qualquer número para ver os CT-es</span>
+      <footer style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center',
+        padding: '6px 36px 16px', fontSize: 11.5, color: 'var(--text-3)', flexShrink: 0 }}>
         <span>{i + 1} de {n}</span>
       </footer>
     </div>
