@@ -999,7 +999,7 @@ export async function dbListarRetornoCD({ status = 'pendente', busca = '', de = 
   syncAuthToken();
   let q = supabase
     .from('oobj_nfe_recebidas')
-    .select('id, nf_numero, nf_serie, dt_emissao, dt_devolucao, nome_emitente, cnpj_emitente, uf_emitente, valor, valor_produtos, devolucao_total, motivo_devolucao, area_responsavel, transportador_cobranca, centro_custo, status_operacional, lancado_protheus, retornou_cd, dt_recebimento_cd, filial_cd, itens_cd, itens, tem_itens_cobrar, obs_retorno_cd, retorno_cd_por, retorno_cd_em, chave_nfe')
+    .select('id, nf_numero, nf_serie, dt_emissao, dt_devolucao, nome_emitente, cnpj_emitente, uf_emitente, valor, valor_produtos, devolucao_total, motivo_devolucao, area_responsavel, transportador_cobranca, centro_custo, status_operacional, lancado_protheus, retornou_cd, dt_recebimento_cd, filial_cd, itens_cd, itens, itens_protheus, tem_itens_cobrar, obs_retorno_cd, retorno_cd_por, retorno_cd_em, chave_nfe')
     .eq('tipo', 'devolucao')
     .limit(limite);
 

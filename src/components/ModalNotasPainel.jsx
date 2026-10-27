@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { supabase } from '../config/supabase';
 import { STATUS_CORES, baixarPlanilhaConsulta } from '../utils/planilhaConsulta.js';
 import DetalheDrawer from './DetalheDrawer.jsx';
@@ -49,6 +50,9 @@ export default function ModalNotasPainel({ filtro, titulo, user, onClose, onChan
   const [selId, setSelId] = useState(null);
   const [baixando, setBaixando] = useState(false);
   const [reload, setReload] = useState(0);
+  /* em tela cheia (modo apresentação) o navegador só desenha o que está
+     dentro do elemento em tela cheia, então o modal é montado lá dentro. */
+  const [alvo, setAlvo] = useState(() => (typeof document !== 'undefined' ? document.fullscreenElement || document.body : null));
 
   useEffect(() => {
     let vivo = true;
@@ -64,9 +68,11 @@ export default function ModalNotasPainel({ filtro, titulo, user, onClose, onChan
   }, [filtro, reload]);
 
   useEffect(() => {
-    const h = (e) => { if (e.key === 'Escape' && !selId) onClose(); };
-    window.addEventListener('keydown', h);
-    return () => window.removeEventListener('keydown', h);
+    const h = (e) => { if (e.key === 'Escape' && !selId) { e.stopPropagation(); onClose(); } };
+    const fs = () => setAlvo(document.fullscreenElement || document.body);
+    window.addEventListener('keydown', h, true);
+    document.addEventListener('fullscreenchange', fs);
+    return () => { window.removeEventListener('keydown', h, true); document.removeEventListener('fullscreenchange', fs); };
   }, [onClose, selId]);
 
   const visiveis = useMemo(() => {
@@ -92,9 +98,11 @@ export default function ModalNotasPainel({ filtro, titulo, user, onClose, onChan
   const th = { padding: '8px 10px', fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textAlign: 'left', whiteSpace: 'nowrap', position: 'sticky', top: 0, background: 'var(--surface)', borderBottom: '1px solid var(--border)', cursor: 'pointer', userSelect: 'none', zIndex: 1 };
   const td = { padding: '7px 10px', fontSize: 12, color: 'var(--text-2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', borderBottom: '1px solid var(--border)', fontVariantNumeric: 'tabular-nums' };
 
-  return (
+  if (!alvo) return null;
+
+  return createPortal(
     <>
-      <div className="modal-overlay" style={{ zIndex: 150, padding: 20 }} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal-overlay" style={{ zIndex: 600, padding: 20 }} onClick={e => e.target === e.currentTarget && onClose()}>
         <div className="modal" role="dialog" aria-label={titulo}
           style={{ maxWidth: 1480, width: '100%', height: 'calc(100vh - 40px)', maxHeight: 'none' }}>
           <div className="modal-header" style={{ padding: '16px 20px 12px', borderBottom: '1px solid var(--border)' }}>
@@ -162,5 +170,5 @@ export default function ModalNotasPainel({ filtro, titulo, user, onClose, onChan
           onSaved={() => { setReload(x => x + 1); onChanged?.(); }}/>
       )}
     </>
-  );
+  , alvo);
 }

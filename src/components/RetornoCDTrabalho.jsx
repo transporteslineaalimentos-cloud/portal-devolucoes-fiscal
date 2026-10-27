@@ -26,7 +26,15 @@ const num = (v) => { const n = Number(String(v ?? '').replace(',', '.')); return
 
 /* ─── Conferência de uma nota ──────────────────────────────── */
 function Conferencia({ nota, onSalvo, onFechar }) {
-  const itensNf = useMemo(() => (Array.isArray(nota.itens) ? nota.itens : []), [nota]);
+  /* Lançamento manual (devolução total sem NFD) não tem XML, então os
+     produtos vêm do Protheus; se nem isso existir, ela lança à mão. */
+  const { itensNf, fonteItens } = useMemo(() => {
+    const xml = Array.isArray(nota.itens) ? nota.itens : [];
+    if (xml.length) return { itensNf: xml, fonteItens: 'xml' };
+    const pro = Array.isArray(nota.itens_protheus) ? nota.itens_protheus : [];
+    if (pro.length) return { itensNf: pro, fonteItens: 'protheus' };
+    return { itensNf: [], fonteItens: 'nenhuma' };
+  }, [nota]);
   const jaLancado = useMemo(() => {
     const m = new Map();
     (Array.isArray(nota.itens_cd) ? nota.itens_cd : []).forEach(i => {
@@ -43,14 +51,39 @@ function Conferencia({ nota, onSalvo, onFechar }) {
   const [salvando, setSalvando] = useState(false);
 
   /* Uma linha por item da nota; cada linha pode ser dividida em condições. */
-  const [linhas, setLinhas] = useState(() => itensNf.map((it, idx) => {
-    const antes = jaLancado.get(String(it.codigo ?? '')) || [];
-    const partes = antes.length
-      ? antes.map(a => ({ destino: a.destino || 'BOM', qtd: String(a.qtd ?? ''), lote: a.lote || '' }))
-      : [{ destino: 'BOM', qtd: String(it.quantidade ?? ''), lote: '' }];
-    return { idx, codigo: it.codigo, descricao: it.descricao, unidade: it.unidade || 'CX',
-      qtdNf: Number(it.quantidade) || 0, conferido: antes.length > 0 || !nota.retornou_cd, partes };
-  }));
+  const [linhas, setLinhas] = useState(() => {
+    const base = itensNf.map((it, idx) => {
+      const cod = it.codigo ?? it.codigo_produto;
+      const antes = jaLancado.get(String(cod ?? '')) || [];
+      const partes = antes.length
+        ? antes.map(a => ({ destino: a.destino || 'BOM', qtd: String(a.qtd ?? ''), lote: a.lote || '' }))
+        : [{ destino: 'BOM', qtd: String(it.quantidade ?? ''), lote: '' }];
+      return { idx, codigo: cod, descricao: it.descricao, unidade: it.unidade || 'CX',
+        qtdNf: Number(it.quantidade) || 0, conferido: antes.length > 0 || !nota.retornou_cd, partes, manual: false };
+    });
+    if (base.length) return base;
+    /* Nota sem nenhuma origem de produto: traz de volta o que já foi lançado,
+       senão começa com uma linha em branco para ela preencher. */
+    const antes = Array.isArray(nota.itens_cd) ? nota.itens_cd : [];
+    if (antes.length) {
+      const porCod = new Map();
+      antes.forEach(a => { const k = String(a.codigo ?? '') + '|' + (a.descricao || ''); porCod.set(k, (porCod.get(k) || []).concat([a])); });
+      return [...porCod.values()].map((grupo, idx) => ({
+        idx, codigo: grupo[0].codigo || '', descricao: grupo[0].descricao || '', unidade: grupo[0].unidade || 'CX',
+        qtdNf: 0, conferido: true, manual: true,
+        partes: grupo.map(a => ({ destino: a.destino || 'BOM', qtd: String(a.qtd ?? ''), lote: a.lote || '' })),
+      }));
+    }
+    return [{ idx: 0, codigo: '', descricao: '', unidade: 'CX', qtdNf: 0, conferido: true, manual: true,
+      partes: [{ destino: 'BOM', qtd: '', lote: '' }] }];
+  });
+  const [proxIdx, setProxIdx] = useState(1000);
+  const addProduto = () => {
+    setLinhas(ls => [...ls, { idx: proxIdx, codigo: '', descricao: '', unidade: 'CX', qtdNf: 0,
+      conferido: true, manual: true, partes: [{ destino: 'BOM', qtd: '', lote: '' }] }]);
+    setProxIdx(i => i + 1);
+  };
+  const tirarProduto = (idx) => setLinhas(ls => (ls.length > 1 ? ls.filter(l => l.idx !== idx) : ls));
 
   const setLinha = (idx, fn) => setLinhas(ls => ls.map(l => (l.idx === idx ? fn(l) : l)));
   const setParte = (idx, pi, campo, valor) =>
@@ -58,7 +91,8 @@ function Conferencia({ nota, onSalvo, onFechar }) {
   const addParte = (idx) => setLinha(idx, l => ({ ...l, partes: [...l.partes, { destino: 'AVARIA', qtd: '', lote: '' }] }));
   const tirarParte = (idx, pi) => setLinha(idx, l => ({ ...l, partes: l.partes.length > 1 ? l.partes.filter((_, i) => i !== pi) : l.partes }));
 
-  const marcarTudoBom = () => setLinhas(ls => ls.map(l => ({ ...l, conferido: true, partes: [{ destino: 'BOM', qtd: String(l.qtdNf || ''), lote: l.partes[0]?.lote || '' }] })));
+  const marcarTudoBom = () => setLinhas(ls => ls.map(l => ({ ...l, conferido: true,
+    partes: [{ destino: 'BOM', qtd: String(l.qtdNf || l.partes.reduce((s, p) => s + num(p.qtd), 0) || ''), lote: l.partes[0]?.lote || '' }] })));
 
   const resumo = useMemo(() => {
     const r = { total: 0, porDestino: {}, divergencias: [] };
@@ -79,7 +113,10 @@ function Conferencia({ nota, onSalvo, onFechar }) {
       for (const p of l.partes) {
         const q = num(p.qtd);
         if (q <= 0) continue;
-        itens.push({ codigo: l.codigo, descricao: l.descricao, unidade: l.unidade, qtd: q,
+        if (l.manual && !String(l.descricao || '').trim() && !String(l.codigo || '').trim()) {
+          setErro('Informe o código ou a descrição dos produtos lançados à mão.'); return;
+        }
+        itens.push({ codigo: l.codigo || null, descricao: l.descricao || null, unidade: l.unidade, qtd: q,
           lote: p.lote || null, destino: p.destino, cobrar: COBRAR.has(p.destino), formulario: 'PORTAL' });
       }
     }
@@ -131,16 +168,21 @@ function Conferencia({ nota, onSalvo, onFechar }) {
         <div className="modal-body" style={{ padding: '14px 22px', overflow: 'auto', flex: 1 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 10 }}>
             <div style={{ fontSize: 12.5, color: 'var(--text-2)' }}>
-              {itensNf.length} produto{itensNf.length === 1 ? '' : 's'} na nota · marque o que chegou e em que condição
+              {fonteItens === 'nenhuma'
+                ? 'Lançamento manual sem produtos na base · informe os produtos que chegaram'
+                : `${itensNf.length} produto${itensNf.length === 1 ? '' : 's'} na nota · marque o que chegou e em que condição`}
+              {fonteItens === 'protheus' && (
+                <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20,
+                  background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE' }}>produtos do Protheus</span>
+              )}
             </div>
-            <button className="btn btn-outline btn-sm" onClick={marcarTudoBom}>Tudo chegou bom</button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {fonteItens === 'nenhuma' && (
+                <button className="btn btn-outline btn-sm" onClick={addProduto}>+ Produto</button>
+              )}
+              <button className="btn btn-outline btn-sm" onClick={marcarTudoBom}>Tudo chegou bom</button>
+            </div>
           </div>
-
-          {itensNf.length === 0 && (
-            <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-3)', fontSize: 12.5 }}>
-              A nota não tem itens no XML, então não dá para conferir produto a produto.
-            </div>
-          )}
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {linhas.map(l => {
@@ -150,17 +192,38 @@ function Conferencia({ nota, onSalvo, onFechar }) {
                 <div key={l.idx} style={{ border: '1px solid ' + (l.conferido ? 'var(--border)' : 'var(--surface-3)'), borderRadius: 10,
                   padding: '10px 12px', background: l.conferido ? 'var(--surface)' : 'var(--surface-2)' }}>
                   <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}>
-                    <input type="checkbox" checked={l.conferido} style={{ marginTop: 3, width: 16, height: 16, accentColor: 'var(--blue)' }}
-                      onChange={e => setLinha(l.idx, x => ({ ...x, conferido: e.target.checked }))}/>
+                    {!l.manual && (
+                      <input type="checkbox" checked={l.conferido} style={{ marginTop: 3, width: 16, height: 16, accentColor: 'var(--blue)' }}
+                        onChange={e => setLinha(l.idx, x => ({ ...x, conferido: e.target.checked }))}/>
+                    )}
                     <span style={{ flex: 1, minWidth: 0 }}>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', display: 'block' }}>{l.descricao}</span>
-                      <span style={{ fontSize: 11, color: 'var(--text-3)' }}>
-                        Código {l.codigo} · nota traz {l.qtdNf} {l.unidade}
-                      </span>
+                      {l.manual ? (
+                        <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }} onClick={e => e.preventDefault()}>
+                          <input className="input" value={l.codigo} placeholder="Código"
+                            onChange={e => setLinha(l.idx, x => ({ ...x, codigo: e.target.value }))}
+                            style={{ width: 120, height: 30, fontSize: 12.5 }}/>
+                          <input className="input" value={l.descricao} placeholder="Descrição do produto"
+                            onChange={e => setLinha(l.idx, x => ({ ...x, descricao: e.target.value }))}
+                            style={{ flex: 1, minWidth: 200, height: 30, fontSize: 12.5 }}/>
+                          <input className="input" value={l.unidade} placeholder="UN"
+                            onChange={e => setLinha(l.idx, x => ({ ...x, unidade: e.target.value.toUpperCase() }))}
+                            style={{ width: 70, height: 30, fontSize: 12.5 }}/>
+                          {linhas.length > 1 && (
+                            <button className="btn btn-ghost btn-sm" style={{ height: 30 }} onClick={() => tirarProduto(l.idx)}>Remover</button>
+                          )}
+                        </span>
+                      ) : (
+                        <>
+                          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', display: 'block' }}>{l.descricao}</span>
+                          <span style={{ fontSize: 11, color: 'var(--text-3)' }}>
+                            Código {l.codigo} · nota traz {l.qtdNf} {l.unidade}
+                          </span>
+                        </>
+                      )}
                     </span>
                     {l.conferido && (
                       <span style={{ fontSize: 11.5, fontWeight: 700, color: diverge ? 'var(--yellow)' : 'var(--text-2)', whiteSpace: 'nowrap' }}>
-                        {soma} de {l.qtdNf} {l.unidade}
+                        {l.qtdNf > 0 ? `${soma} de ${l.qtdNf} ${l.unidade}` : `${soma} ${l.unidade}`}
                       </span>
                     )}
                   </label>

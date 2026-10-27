@@ -124,7 +124,7 @@ function MotivoAutocomplete({ value, onChange, motivos }) {
             );
           })}
         </div>
-      ), document.body)}
+      ), (typeof document !== 'undefined' && document.fullscreenElement) || document.body)}
     </div>
   );
 }
