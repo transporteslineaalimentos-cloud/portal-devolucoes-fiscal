@@ -41,6 +41,8 @@ function nfVendaNumero(chave) {
   return String(parseInt(chave.slice(25, 34), 10) || '');
 }
 
+const titleCase = (t) => String(t).toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase());
+
 export function mapDevolucaoRow(r) {
   return ({
     'NF Devolução':        r.nf_numero ?? '',
@@ -249,8 +251,8 @@ export function exportPainelGerencialExcel(painel, notas, { ano, mesIni, mesFim 
   XLSX.utils.book_append_sheet(wb, sheetComTitulo(titulo('Abertura por canal'), pivotDim(painel.canal, mesIni, mesFim, fatMes, 'Canal')), 'Por canal');
   XLSX.utils.book_append_sheet(wb, sheetComTitulo(titulo('Status operacional'),
     (painel.status || []).map(s => ({ 'Status': s.status, 'Valor (R$)': r2(s.valor), 'Qtd NFs': s.qtd }))), 'Status operacional');
-  XLSX.utils.book_append_sheet(wb, sheetComTitulo(titulo('Pendente de retorno por transportador (AGENDAR REVERSA)'),
-    (painel.pendente_transp || []).map(s => ({ 'Transportador': s.transportador, 'Valor (R$)': r2(s.valor), 'Qtd NFs': s.qtd }))), 'Pendente transportador');
+  XLSX.utils.book_append_sheet(wb, sheetComTitulo(titulo('Pendente de retorno por transportador (agendar reversa e reversa agendada)'),
+    (painel.pendente_transp || []).map(s => ({ 'Transportador': s.transportador, 'Situação': titleCase(s.status || 'AGENDAR REVERSA'), 'Valor (R$)': r2(s.valor), 'Qtd NFs': s.qtd }))), 'Pendente transportador');
 
   const wsN = XLSX.utils.json_to_sheet(notas.map(mapDevolucaoRow));
   wsN['!autofilter'] = { ref: wsN['!ref'] };

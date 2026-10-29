@@ -320,6 +320,52 @@ function BarrasH({ itens, labelKey, cor = COR_PARCIAL, onClick }) {
   );
 }
 
+
+/* Pendente de retorno por transportador: o que falta agendar com o transportador
+   e o que já foi agendado e está aguardando chegar ao CD. */
+const MODOS_PEND = [
+  { k: 'agendar',  l: 'Agendar reversa',  st: ['AGENDAR REVERSA'],  dim: 'transp',          cor: '#C2413B' },
+  { k: 'agendada', l: 'Reversa agendada', st: ['REVERSA AGENDADA'], dim: 'transp_agendada', cor: '#6D4FC2' },
+  { k: 'todas',    l: 'Todas pendentes',  st: ['AGENDAR REVERSA', 'REVERSA AGENDADA'], dim: 'transp_pend', cor: COR_TOTAL },
+];
+function PendenteRetorno({ pend, onDrill }) {
+  const [modo, setModo] = useState('agendar');
+  const cfg = MODOS_PEND.find(m => m.k === modo);
+  const tot = (st) => pend.filter(r => st.includes(r.status ?? 'AGENDAR REVERSA'))
+    .reduce((a, r) => ({ v: a.v + (Number(r.valor) || 0), q: a.q + (Number(r.qtd) || 0) }), { v: 0, q: 0 });
+  const itens = useMemo(() => {
+    const m = new Map();
+    for (const r of pend) {
+      if (!cfg.st.includes(r.status ?? 'AGENDAR REVERSA')) continue;
+      const a = m.get(r.transportador) || { transportador: r.transportador, key: r.key, valor: 0, qtd: 0 };
+      a.valor += Number(r.valor) || 0; a.qtd += Number(r.qtd) || 0;
+      m.set(r.transportador, a);
+    }
+    return [...m.values()].sort((a, b) => b.valor - a.valor);
+  }, [pend, cfg]);
+  return (
+    <div>
+      <div role="tablist" aria-label="Situação da reversa" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
+        {MODOS_PEND.map(m => {
+          const t = tot(m.st), on = m.k === modo;
+          return (
+            <button key={m.k} type="button" role="tab" aria-selected={on} onClick={() => setModo(m.k)}
+              style={{ padding: '5px 10px', borderRadius: 8, cursor: 'pointer', fontSize: 11.5, fontWeight: 600, textAlign: 'left',
+                border: `1px solid ${on ? m.cor : 'var(--border)'}`, background: on ? m.cor : 'var(--surface)', color: on ? '#fff' : 'var(--text-2)' }}>
+              {m.l}
+              <span style={{ display: 'block', fontWeight: 500, fontSize: 10.5, opacity: on ? 0.9 : 0.75, fontVariantNumeric: 'tabular-nums' }}>
+                {brl0(t.v)} · {t.q} NF{t.q === 1 ? '' : 's'}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      <BarrasH itens={itens} labelKey="transportador" cor={cfg.cor}
+        onClick={i => onDrill({ titulo: `${cfg.l}: ${i.transportador}`, dim: cfg.dim, valor: i.transportador })}/>
+    </div>
+  );
+}
+
 /* ─── Página ───────────────────────────────────────────────── */
 export default function PainelGerencial({ onGoTo, user }) {
   const anoAtual = new Date().getFullYear();
@@ -442,7 +488,7 @@ export default function PainelGerencial({ onGoTo, user }) {
           <div><div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, color: 'var(--text-2)' }}>Status operacional</div>
             <BarrasH itens={status} labelKey="status" onClick={i => abrir({ titulo: `Status: ${i.status}`, dim: 'status', valor: i.status })}/></div>
           <div><div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, color: 'var(--text-2)' }}>Pendente de retorno por transportador</div>
-            <BarrasH itens={pend} labelKey="transportador" cor={COR_TOTAL} onClick={i => abrir({ titulo: `Pendente de retorno: ${i.transportador}`, dim: 'transp', valor: i.key })}/></div>
+            <PendenteRetorno pend={pend} onDrill={abrir}/></div>
         </div>
       ) },
   ];
@@ -545,8 +591,8 @@ export default function PainelGerencial({ onGoTo, user }) {
             <Card title="Status operacional" sub={`Notas do período (${periodoTxt}) em cada situação`}>
               <BarrasH itens={status} labelKey="status" onClick={i => abrir({ titulo: `Status: ${i.status}`, dim: 'status', valor: i.status })}/>
             </Card>
-            <Card title="Pendente de retorno por transportador" sub="Notas em AGENDAR REVERSA">
-              <BarrasH itens={pend} labelKey="transportador" cor={COR_TOTAL} onClick={i => abrir({ titulo: `Pendente de retorno: ${i.transportador}`, dim: 'transp', valor: i.key })}/>
+            <Card title="Pendente de retorno por transportador" sub="Ainda não chegou ao CD: falta agendar com o transportador ou já está agendada">
+              <PendenteRetorno pend={pend} onDrill={abrir}/>
             </Card>
           </div>
         </>
