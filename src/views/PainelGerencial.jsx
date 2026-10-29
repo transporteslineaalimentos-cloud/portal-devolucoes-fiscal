@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { dbGetPainelGerencial, dbExportDevolucoes } from '../config/supabase';
+import { dbGetPainelGerencial, dbExportDevolucoes, dbInfoClientesVendedor, dbVendedorPorCnpj } from '../config/supabase';
 import { exportPainelGerencialExcel } from '../utils/exportExcel.js';
 import { baixarPlanilhaConsulta } from '../utils/planilhaConsulta.js';
 import ModalNotasPainel from '../components/ModalNotasPainel.jsx';
 import Apresentacao from '../components/Apresentacao.jsx';
 import { gerarPainelDevolucoes } from '../lib/painelDevolucoes';
+import { RankingVendedor, TabelaVendedor } from '../components/PainelVendedor.jsx';
+import { usePivotVendedor } from '../lib/pivotVendedor.js';
+import ModalImportVendedores from '../components/ModalImportVendedores.jsx';
 
 /* ─────────────────────────────────────────────────────────────
    Painel Gerencial — substitui o dash montado no Excel
@@ -333,6 +336,10 @@ export default function PainelGerencial({ onGoTo, user }) {
   }, [ano, ini, fim]);
   const [data, setData] = useState(null);
   const [erro, setErro] = useState('');
+  const [infoVend, setInfoVend] = useState(null);
+  const [importVend, setImportVend] = useState(false);
+  const carregarInfoVend = useCallback(() => { dbInfoClientesVendedor().then(setInfoVend).catch(() => {}); }, []);
+  useEffect(() => { carregarInfoVend(); }, [carregarInfoVend]);
   const [loading, setLoading] = useState(true);
 
   const carregar = useCallback(async () => {
@@ -387,6 +394,8 @@ export default function PainelGerencial({ onGoTo, user }) {
         dt_inicio: `${ano}-${String(ini).padStart(2, '0')}-01`,
         dt_fim:    `${ano}-${String(fim).padStart(2, '0')}-${String(ult).padStart(2, '0')}`,
       } });
+      const vendPorCnpj = await dbVendedorPorCnpj(ano, ini, fim).catch(() => new Map());
+      for (const n of notas) n.vendedor = vendPorCnpj.get(String(n.cnpj_emitente || '').replace(/\D/g, '')) || 'SEM VENDEDOR NO CADASTRO';
       const html = gerarPainelDevolucoes({ dados: data, notas, periodo: periodoTxt, ano, mesIni: ini, mesFim: fim,
         geradoPor: user?.name || user?.email || '' });
       const a = document.createElement('a');
@@ -398,6 +407,7 @@ export default function PainelGerencial({ onGoTo, user }) {
     setBaixando('');
   };
 
+  const pv = usePivotVendedor(data?.vendedor, ini, fim);
   const tot = noPeriodo.reduce((a, m) => ({ p: a.p + m.parcial, t: a.t + m.total, qp: a.qp + (m.qtd_parcial || 0), qt: a.qt + (m.qtd_total || 0), f: a.f + (m.faturamento || 0) }), { p: 0, t: 0, qp: 0, qt: 0, f: 0 });
   const vig = meses[mesVig - 1] || { parcial: 0, total: 0 };
   const status = data?.status || [];
@@ -424,6 +434,10 @@ export default function PainelGerencial({ onGoTo, user }) {
       corpo: <TabelaCalor linhas={data.motivo} ini={ini} fim={fim} fatMesVig={fatMesVig} fatPeriodo={tot.f} limite={15} rotuloDim="Motivo" dimKey="motivo" onDrill={abrir}/> },
     { id: 'canal', titulo: 'Abertura por canal',
       corpo: <TabelaCalor linhas={data.canal} ini={ini} fim={fim} fatMesVig={fatMesVig} fatPeriodo={tot.f} rotuloDim="Canal" dimKey="canal" onDrill={abrir}/> },
+    { id: 'vendedor', titulo: 'Devolução por vendedor · % do faturado',
+      corpo: <RankingVendedor pv={pv} onDrill={abrir} limite={12}/> },
+    { id: 'vendedor-mes', titulo: 'Devolução por vendedor · mês a mês',
+      corpo: <TabelaVendedor pv={pv} ini={ini} fim={fim} onDrill={abrir} limite={14}/> },
     { id: 'status', titulo: 'Status operacional e pendências',
       corpo: (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: 24 }}>
@@ -515,6 +529,19 @@ export default function PainelGerencial({ onGoTo, user }) {
             <TabelaCalor linhas={data.canal} ini={ini} fim={fim} fatMesVig={fatMesVig} fatPeriodo={tot.f} rotuloDim="Canal" dimKey="canal" onDrill={abrir}/>
           </Card>
 
+          <Card title="Devolução por vendedor"
+            sub="Índice = valor devolvido ÷ valor faturado para os clientes de cada vendedor, no mesmo período"
+            right={
+              <button className="btn btn-ghost btn-sm no-print" onClick={() => setImportVend(true)}
+                title={infoVend?.clientes ? `${infoVend.clientes.toLocaleString('pt-BR')} clientes · atualizado em ${new Date(infoVend.atualizado_em).toLocaleDateString('pt-BR')}` : 'Carregar o cadastro de vendedores'}>
+                Atualizar cadastro de vendedores
+              </button>
+            }>
+            <RankingVendedor pv={pv} onDrill={abrir}/>
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-2)', margin: '22px 0 8px' }}>Mês a mês</div>
+            <TabelaVendedor pv={pv} ini={ini} fim={fim} onDrill={abrir}/>
+          </Card>
+
           {/* Status operacional */}
           <div className="painel-bloco" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: 16 }}>
             <Card title="Status operacional" sub={`Notas do período (${periodoTxt}) em cada situação`}>
@@ -530,6 +557,11 @@ export default function PainelGerencial({ onGoTo, user }) {
       {apresentar && data && (
         <Apresentacao titulo="Devoluções" periodo={periodoTxt} filtros={[]}
           slides={slides} onSair={sairApresentacao} carregando={loading}/>
+      )}
+
+      {importVend && (
+        <ModalImportVendedores info={infoVend} onClose={() => setImportVend(false)}
+          onImportado={() => { carregarInfoVend(); carregar(); }}/>
       )}
 
       {drill && (

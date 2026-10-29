@@ -12,13 +12,16 @@ export function gerarPainelDevolucoes({ dados, notas, periodo, ano, mesIni, mesF
     mo: n.motivo_devolucao || 'Sem motivo', ar: n.area_responsavel || 'Sem área',
     ca: n.centro_custo || 'Sem centro de custo', st: n.status_operacional || '',
     tr: n.transportador_cobranca || '—', lp: n.lancado_protheus ? 1 : 0, cd: n.retornou_cd ? 1 : 0,
+    ve: n.vendedor || 'SEM VENDEDOR NO CADASTRO',
   }));
+  // faturamento por vendedor e mês, para o índice (devolvido ÷ faturado)
+  const vendFat = (dados?.vendedor || []).filter(v => Number(v.fat)).map(v => [v.nome, Number(v.mes), Math.round(Number(v.fat))]);
 
   const payload = {
     periodo, ano, mesIni, mesFim, geradoEm: new Date().toISOString(), geradoPor: geradoPor || '',
     meses: dados?.meses || [], area: dados?.area || [], motivo: dados?.motivo || [],
     canal: dados?.canal || [], status: dados?.status || [], pendente: dados?.pendente_transp || [],
-    notas: enxuto,
+    vendFat, notas: enxuto,
   };
 
   return `<!doctype html>
@@ -111,7 +114,7 @@ const JS = String.raw`
 var D=JSON.parse(document.getElementById('dados').textContent);
 var MESES=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 var PARCIAL='var(--parcial)',TOTAL='var(--total)';
-var f={mes:null,area:'',motivo:'',canal:'',status:'',uf:'',transp:''};
+var f={mes:null,area:'',motivo:'',canal:'',status:'',uf:'',transp:'',vend:''};
 var app=document.getElementById('app');
 
 function brl(v){return 'R$ '+Math.round(Number(v)||0).toLocaleString('pt-BR');}
@@ -134,6 +137,7 @@ function ativos(){return D.notas.filter(function(n){
   if(f.status&&n.st!==f.status)return false;
   if(f.uf&&n.uf!==f.uf)return false;
   if(f.transp&&n.tr!==f.transp)return false;
+  if(f.vend&&n.ve!==f.vend)return false;
   return true;});}
 function agrupa(l,k){var m={};l.forEach(function(n){var a=m[n[k]]||(m[n[k]]={v:0,q:0,p:0,t:0});
   a.v+=n.v;a.q++;a[n.t?'t':'p']+=n.v;});
@@ -147,6 +151,7 @@ function chips(){var c=[];
   if(f.status)c.push(['status',f.status]);
   if(f.uf)c.push(['uf','UF '+f.uf]);
   if(f.transp)c.push(['transp',f.transp]);
+  if(f.vend)c.push(['vend',f.vend]);
   return c;}
 
 function render(){
@@ -167,7 +172,7 @@ function render(){
 
   var fl=el('div',{cls:'filtros'});
   chips().forEach(function(c){fl.appendChild(el('button',{cls:'chip',onclick:function(){f[c[0]]=c[0]==='mes'?null:'';render();}},c[1]+' <span>×</span>'));});
-  if(chips().length)fl.appendChild(el('button',{cls:'btn',onclick:function(){f={mes:null,area:'',motivo:'',canal:'',status:'',uf:'',transp:''};render();}},'Limpar'));
+  if(chips().length)fl.appendChild(el('button',{cls:'btn',onclick:function(){f={mes:null,area:'',motivo:'',canal:'',status:'',uf:'',transp:'',vend:''};render();}},'Limpar'));
   if(chips().length)w.appendChild(fl);
 
   var k=el('div',{cls:'kpis'});
@@ -190,6 +195,8 @@ function render(){
   w.appendChild(g1);
 
   w.appendChild(cardBarras('Abertura por motivo',agrupa(l,'mo').slice(0,15),'motivo'));
+
+  w.appendChild(cardVendedor(l));
 
   var g2=el('div',{cls:'grid2'});
   g2.appendChild(cardBarras('Status operacional',agrupa(l.filter(function(n){return n.st;}),'st'),'status'));
@@ -301,17 +308,68 @@ function cardBarras(titulo,itens,campo){
   if(!itens.length)bd.appendChild(el('div',{style:'font-size:12px;color:var(--text-3);padding:8px 0'},'Nada neste recorte.'));
   c.appendChild(bd);return c;}
 
+var vendModo='indice',vendTodos=false;
+function cardVendedor(l){
+  var c=el('div',{cls:'card'});
+  c.appendChild(el('h2',null,'Devolução por vendedor'));
+  // o índice só faz sentido quando o recorte é de vendedor/mês: faturamento não se divide por área ou motivo
+  var soMes=!f.area&&!f.motivo&&!f.canal&&!f.status&&!f.uf&&!f.transp;
+  var fat={},fatG=0;
+  (D.vendFat||[]).forEach(function(x){
+    if(x[1]<D.mesIni||x[1]>D.mesFim||(f.mes&&x[1]!==f.mes))return;
+    fat[x[0]]=(fat[x[0]]||0)+x[2];fatG+=x[2];});
+  var g=agrupa(l,'ve').map(function(i){var fv=fat[i.k]||0;return {k:i.k,v:i.v,q:i.q,f:fv,ind:fv?i.v/fv:null};});
+  var devG=g.reduce(function(s,i){return s+i.v;},0),media=fatG?devG/fatG:0;
+  var modo=soMes?vendModo:'valor';
+  var lista=g.filter(function(i){return i.k!=='SEM VENDEDOR NO CADASTRO';});
+  if(modo==='indice')lista=lista.filter(function(i){return i.f>=50000;}).sort(function(a,b){return b.ind-a.ind;});
+  else lista.sort(function(a,b){return b.v-a.v;});
+  var vis=vendTodos?lista:lista.slice(0,15);
+
+  var leg=el('div',{cls:'leg'});
+  if(soMes){
+    ['indice','valor'].forEach(function(m){
+      var b=el('button',{cls:'btn',style:'height:24px;padding:0 9px;font-size:11px;'+(vendModo===m?'background:var(--text);color:#fff;border-color:var(--text)':''),
+        onclick:function(){vendModo=m;render();}},m==='indice'?'% do faturado':'Valor devolvido');
+      leg.appendChild(b);});
+    leg.appendChild(el('span',null,'Média: <b style="color:var(--text)">'+pct(devG,fatG)+'</b>'));
+  }else leg.appendChild(el('span',null,'Com filtro de área, motivo, canal, status, UF ou transportador o índice não se aplica (o faturamento não se divide assim). Mostrando o valor.'));
+  c.appendChild(leg);
+
+  var bd=el('div',{cls:'bd'});
+  var max=0.000001;vis.forEach(function(i){max=Math.max(max,modo==='indice'?i.ind:i.v);});
+  if(modo==='indice')max=Math.max(max,media);
+  vis.forEach(function(i){
+    var row=el('div',{cls:'barra'+(f.vend===i.k?' sel':'')});
+    row.addEventListener('click',function(){f.vend=(f.vend===i.k)?'':i.k;render();});
+    row.appendChild(el('div',{cls:'nm',title:i.k},i.k));
+    var val=modo==='indice'?i.ind:i.v;
+    var cor=(i.ind!=null&&i.ind>media)?'var(--total)':'var(--parcial)';
+    var txt=modo==='indice'
+      ?'<b>'+pct(i.v,i.f)+'</b> <span style="color:var(--text-3)">· '+brlK(i.v)+' de '+brlK(i.f)+'</span>'
+      :'<b>'+brl(i.v)+'</b> <span style="color:var(--text-3)">· '+i.q+' NF'+(i.q===1?'':'s')+(soMes&&i.f?' · '+pct(i.v,i.f)+' do faturado':'')+'</span>';
+    row.appendChild(el('div',null,'<div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap">'+
+      '<span class="tubo" style="display:block;width:'+Math.max(2,(val/max)*52)+'%;background:'+cor+'"></span>'+
+      '<span class="num">'+txt+'</span></div>'));
+    bd.appendChild(row);});
+  if(!vis.length)bd.appendChild(el('div',{style:'font-size:12px;color:var(--text-3);padding:8px 0'},'Nada neste recorte.'));
+  if(lista.length>15)bd.appendChild(el('button',{cls:'btn',style:'margin-top:8px',onclick:function(){vendTodos=!vendTodos;render();}},
+    vendTodos?'Mostrar só os 15 primeiros':'Mostrar todos ('+lista.length+')'));
+  var sem=g.filter(function(i){return i.k==='SEM VENDEDOR NO CADASTRO';})[0];
+  if(sem)bd.appendChild(el('div',{style:'font-size:11px;color:var(--text-3);margin-top:8px'},'Sem vendedor no cadastro: '+brl(sem.v)+' · '+sem.q+' NF'+(sem.q===1?'':'s')));
+  c.appendChild(bd);return c;}
+
 function cardNotas(l){
   var c=el('div',{cls:'card'});
   c.appendChild(el('h2',null,'Notas do recorte · '+l.length.toLocaleString('pt-BR')+' · '+brl(l.reduce(function(s,n){return s+n.v;},0))));
   var bd=el('div',{cls:'bd',style:'padding:0 0 8px'});
   var ord=l.slice().sort(function(a,b){return b.v-a.v;}).slice(0,300);
   var h='<thead><tr><th class="l">NF</th><th class="l">Data</th><th class="l">Cliente</th><th class="l">UF</th>'+
-    '<th class="l">Tipo</th><th class="l">Motivo</th><th class="l">Área</th><th>Valor</th></tr></thead><tbody>';
+    '<th class="l">Vendedor</th><th class="l">Tipo</th><th class="l">Motivo</th><th class="l">Área</th><th>Valor</th></tr></thead><tbody>';
   ord.forEach(function(n){
     h+='<tr><td class="l" style="font-weight:700">'+(n.nf||'—')+'</td><td class="l">'+dataBR(n.d)+'</td>'+
       '<td class="l" style="max-width:260px;overflow:hidden;text-overflow:ellipsis">'+n.cl+'</td><td class="l">'+n.uf+'</td>'+
-      '<td class="l">'+(n.t?'Total':'Parcial')+'</td><td class="l" style="max-width:220px;overflow:hidden;text-overflow:ellipsis">'+n.mo+'</td>'+
+      '<td class="l" style="max-width:180px;overflow:hidden;text-overflow:ellipsis">'+n.ve+'</td><td class="l">'+(n.t?'Total':'Parcial')+'</td><td class="l" style="max-width:220px;overflow:hidden;text-overflow:ellipsis">'+n.mo+'</td>'+
       '<td class="l">'+n.ar+'</td><td style="font-weight:600">'+brl(n.v)+'</td></tr>';});
   var d=el('div',{cls:'rolagem'});d.appendChild(el('table',null,h+'</tbody>'));
   bd.appendChild(d);

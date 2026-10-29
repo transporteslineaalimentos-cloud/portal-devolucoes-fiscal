@@ -30,6 +30,7 @@ const COLS = [
   { k: 'data',    t: 'Data ref.',     w: 98,  v: r => dt(r.dt_ref), s: r => r.dt_ref || '' },
   { k: 'tipo',    t: 'Tipo',          w: 64,  v: r => r.tipo_dev === 'total' ? 'Total' : 'Parcial', s: r => r.tipo_dev },
   { k: 'cliente', t: 'Cliente',       w: 220, v: r => r.nome_emitente || '—', s: r => r.nome_emitente || '' },
+  { k: 'vend',    t: 'Vendedor',      w: 170, v: r => r.vendedor || '—', s: r => r.vendedor || '' },
   { k: 'uf',      t: 'UF',            w: 46,  v: r => r.uf_emitente || '—', s: r => r.uf_emitente || '' },
   { k: 'valor',   t: 'Valor',         w: 124, v: r => brl(r.valor), s: r => Number(r.valor) || 0, right: true },
   { k: 'motivo',  t: 'Motivo',        w: 190, v: r => r.motivo, s: r => r.motivo },
@@ -79,7 +80,7 @@ export default function ModalNotasPainel({ filtro, titulo, user, onClose, onChan
     if (!rows) return [];
     const q = busca.trim().toLowerCase();
     let r = rows;
-    if (q) r = r.filter(x => [x.nf_numero, nfv(x.chave_nfe_referenciada), x.nome_emitente, x.cnpj_emitente, x.motivo, x.transp_nome, x.st_op, x.canal]
+    if (q) r = r.filter(x => [x.nf_numero, nfv(x.chave_nfe_referenciada), x.nome_emitente, x.cnpj_emitente, x.motivo, x.transp_nome, x.st_op, x.canal, x.vendedor]
       .some(v => String(v ?? '').toLowerCase().includes(q)));
     const col = COLS.find(c => c.k === ord.k);
     return [...r].sort((a, b) => { const va = col.s(a), vb = col.s(b); return (va > vb ? 1 : va < vb ? -1 : 0) * ord.dir; });
@@ -113,7 +114,7 @@ export default function ModalNotasPainel({ filtro, titulo, user, onClose, onChan
                   {periodo} · {rows ? `${visiveis.length} nota${visiveis.length === 1 ? '' : 's'}${busca ? ` de ${rows.length}` : ''} · ${brl(total)}` : 'carregando…'}
                 </div>
               </div>
-              <input className="input" placeholder="Buscar NF, cliente, CNPJ, motivo, transportador…" value={busca}
+              <input className="input" placeholder="Buscar NF, cliente, CNPJ, vendedor, motivo, transportador…" value={busca}
                 onChange={e => setBusca(e.target.value)} style={{ width: 320 }} autoFocus/>
               <button className="btn btn-outline btn-sm" onClick={baixar} disabled={!rows || !visiveis.length || baixando}>
                 {baixando ? 'Gerando…' : 'Baixar estas notas (Excel)'}

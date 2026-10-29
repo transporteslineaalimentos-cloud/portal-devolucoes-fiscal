@@ -1018,3 +1018,37 @@ export async function dbListarRetornoCD({ status = 'pendente', busca = '', de = 
   if (error) throw new Error(error.message);
   return data || [];
 }
+
+// ─── Cliente x vendedor (cadastro do Protheus, provisório via planilha) ───
+export async function dbInfoClientesVendedor() {
+  syncAuthToken();
+  const { data, error } = await supabase.rpc('dev_info_clientes_vendedor');
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+// Envia em lotes para não estourar o tempo de uma chamada; soma os resultados.
+export async function dbImportarClientesVendedor(linhas, onProgresso) {
+  syncAuthToken();
+  const LOTE = 800;
+  const tot = { novos: 0, vendedor_alterado: 0, sem_mudanca: 0, ignorados: 0, total_cadastro: 0 };
+  for (let i = 0; i < linhas.length; i += LOTE) {
+    const { data, error } = await supabase.rpc('dev_importar_clientes_vendedor', { p_linhas: linhas.slice(i, i + LOTE) });
+    if (error) throw new Error(error.message);
+    for (const k of ['novos', 'vendedor_alterado', 'sem_mudanca', 'ignorados']) tot[k] += Number(data?.[k]) || 0;
+    tot.total_cadastro = Number(data?.total_cadastro) || tot.total_cadastro;
+    onProgresso?.(Math.min(linhas.length, i + LOTE), linhas.length);
+  }
+  return tot;
+}
+
+// Vendedor por CNPJ do cliente (só dígitos) para as notas do período, usado no painel exportado.
+// O vendedor depende só do cliente, então o CNPJ basta como chave.
+export async function dbVendedorPorCnpj(ano, mesIni, mesFim) {
+  syncAuthToken();
+  const { data, error } = await supabase.rpc('get_painel_notas', { p_ano: ano, p_mes_ini: mesIni, p_mes_fim: mesFim });
+  if (error) throw new Error(error.message);
+  const m = new Map();
+  for (const r of data || []) m.set(String(r.cnpj_emitente || '').replace(/\D/g, ''), r.vendedor || 'SEM VENDEDOR NO CADASTRO');
+  return m;
+}
