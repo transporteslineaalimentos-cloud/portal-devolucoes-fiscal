@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { dbGetPainelGerencial, dbExportDevolucoes, dbInfoClientesVendedor, dbVendedorPorCnpj } from '../config/supabase';
+import { dbGetPainelGerencial, dbExportDevolucoes, dbInfoClientesVendedor } from '../config/supabase';
 import { exportPainelGerencialExcel } from '../utils/exportExcel.js';
 import { baixarPlanilhaConsulta } from '../utils/planilhaConsulta.js';
 import ModalNotasPainel from '../components/ModalNotasPainel.jsx';
@@ -394,8 +394,6 @@ export default function PainelGerencial({ onGoTo, user }) {
         dt_inicio: `${ano}-${String(ini).padStart(2, '0')}-01`,
         dt_fim:    `${ano}-${String(fim).padStart(2, '0')}-${String(ult).padStart(2, '0')}`,
       } });
-      const vendPorCnpj = await dbVendedorPorCnpj(ano, ini, fim).catch(() => new Map());
-      for (const n of notas) n.vendedor = vendPorCnpj.get(String(n.cnpj_emitente || '').replace(/\D/g, '')) || 'SEM VENDEDOR NO CADASTRO';
       const html = gerarPainelDevolucoes({ dados: data, notas, periodo: periodoTxt, ano, mesIni: ini, mesFim: fim,
         geradoPor: user?.name || user?.email || '' });
       const a = document.createElement('a');

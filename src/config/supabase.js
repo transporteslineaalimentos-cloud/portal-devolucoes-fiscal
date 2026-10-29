@@ -259,7 +259,28 @@ export async function dbExportDevolucoes({ filters = {} } = {}) {
     if (!data || data.length < BATCH) break;
     from += BATCH;
   }
+  await anexarVendedor(allRows);
   return allRows;
+}
+
+// Vendedor do cliente (quem emitiu a NFD; na devolução total, o cliente da NF de venda),
+// pela mesma regra dos gráficos do painel. Se falhar, a exportação segue sem a coluna preenchida.
+async function anexarVendedor(rows) {
+  const dig = (c) => String(c || '').replace(/\D/g, '');
+  const cnpjs = [...new Set(rows.map(r => dig(r.cnpj_emitente)).filter(Boolean))];
+  const mapa = new Map();
+  try {
+    for (let i = 0; i < cnpjs.length; i += 500) {
+      const { data, error } = await supabase.rpc('dev_vendedor_de_cnpjs', { p_cnpjs: cnpjs.slice(i, i + 500) });
+      if (error) throw error;
+      for (const v of data || []) mapa.set(v.cnpj, v);
+    }
+  } catch (e) { console.error('[vendedor]', e.message || e); return; }
+  for (const r of rows) {
+    const v = mapa.get(dig(r.cnpj_emitente));
+    r.vendedor_cod = v?.vendedor_cod || '';
+    r.vendedor = v?.vendedor_nome || 'SEM VENDEDOR NO CADASTRO';
+  }
 }
 
 export async function dbGetDevolucaoDetail(id) {

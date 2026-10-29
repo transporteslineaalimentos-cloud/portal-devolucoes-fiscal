@@ -65,6 +65,8 @@ export function mapDevolucaoRow(r) {
     'Status':              STATUS_LABELS[r.status_portal] || r.status_portal || '',
     'Motivo Devolução':    r.motivo_devolucao ?? '',
     'Área Responsável':    r.area_responsavel ?? '',
+    'Cód. Vendedor':       r.vendedor_cod ?? '',
+    'Vendedor':            r.vendedor ?? '',
     'Observação NF (XML)': r.inf_complementar ?? '',
     'NF Venda (nº)':       nfVendaNumero(r.chave_nfe_referenciada),
     'Chave NF Venda':      r.chave_nfe_referenciada ?? '',
