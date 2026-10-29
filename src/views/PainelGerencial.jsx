@@ -530,7 +530,7 @@ export default function PainelGerencial({ onGoTo, user }) {
           </Card>
 
           <Card title="Devolução comercial por vendedor"
-            sub="Só devoluções com área responsável Comercial · índice = valor devolvido ÷ valor faturado para os clientes do vendedor, no mesmo período"
+            sub="Só devoluções com área responsável Comercial ou Customer Service · índice = valor devolvido ÷ valor faturado para os clientes do vendedor, no mesmo período"
             right={
               <button className="btn btn-ghost btn-sm no-print" onClick={() => setImportVend(true)}
                 title={infoVend?.clientes ? `${infoVend.clientes.toLocaleString('pt-BR')} clientes · atualizado em ${new Date(infoVend.atualizado_em).toLocaleDateString('pt-BR')}` : 'Carregar o cadastro de vendedores'}>

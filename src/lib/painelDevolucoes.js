@@ -312,10 +312,10 @@ var vendModo='indice',vendTodos=false;
 function cardVendedor(l){
   var c=el('div',{cls:'card'});
   c.appendChild(el('h2',null,'Devolução comercial por vendedor'));
-  // só conta devolução com área responsável Comercial (o faturamento é o do vendedor inteiro)
-  l=l.filter(function(n){return semAc(n.ar)==='comercial';});
+  // só conta devolução das áreas comerciais: Comercial e Customer Service (o faturamento é o do vendedor inteiro)
+  l=l.filter(function(n){var a=semAc(n.ar);return a==='comercial'||a==='customer service';});
   // o índice só faz sentido quando o recorte é de vendedor/mês: faturamento não se divide por área ou motivo
-  var soMes=(!f.area||semAc(f.area)==='comercial')&&!f.motivo&&!f.canal&&!f.status&&!f.uf&&!f.transp;
+  var soMes=(!f.area||semAc(f.area)==='comercial'||semAc(f.area)==='customer service')&&!f.motivo&&!f.canal&&!f.status&&!f.uf&&!f.transp;
   var fat={},fatG=0;
   (D.vendFat||[]).forEach(function(x){
     if(x[1]<D.mesIni||x[1]>D.mesFim||(f.mes&&x[1]!==f.mes))return;
@@ -334,8 +334,8 @@ function cardVendedor(l){
       var b=el('button',{cls:'btn',style:'height:24px;padding:0 9px;font-size:11px;'+(vendModo===m?'background:var(--text);color:#fff;border-color:var(--text)':''),
         onclick:function(){vendModo=m;render();}},m==='indice'?'% do faturado':'Valor devolvido');
       leg.appendChild(b);});
-    leg.appendChild(el('span',null,'Só área Comercial · média: <b style="color:var(--text)">'+pct(devG,fatG)+'</b>'));
-  }else leg.appendChild(el('span',null,'Só área Comercial. Com filtro de motivo, canal, status, UF ou transportador o índice não se aplica (o faturamento não se divide assim); mostrando o valor.'));
+    leg.appendChild(el('span',null,'Só áreas Comercial e Customer Service · média: <b style="color:var(--text)">'+pct(devG,fatG)+'</b>'));
+  }else leg.appendChild(el('span',null,'Só áreas Comercial e Customer Service. Com filtro de motivo, canal, status, UF ou transportador o índice não se aplica (o faturamento não se divide assim); mostrando o valor.'));
   c.appendChild(leg);
 
   var bd=el('div',{cls:'bd'});

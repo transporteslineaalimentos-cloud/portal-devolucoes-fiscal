@@ -65,7 +65,7 @@ export function RankingVendedor({ pv, onDrill, modoInicial = 'indice', limite = 
           return (
             <div key={o.cod} className="drill-row" onClick={() => abrir(o)} role="button" tabIndex={0}
               onKeyDown={e => e.key === 'Enter' && abrir(o)}
-              title={`${o.nome}\nDevolvido (área Comercial): ${brl0(o.devT)} (${o.qT} NFs)\nFaturado: ${brl0(o.fatT)}\nÍndice: ${pct(o.devT, o.fatT)}\nClique para ver as notas`}
+              title={`${o.nome}\nDevolvido (Comercial + Customer Service): ${brl0(o.devT)} (${o.qT} NFs)\nFaturado: ${brl0(o.fatT)}\nÍndice: ${pct(o.devT, o.fatT)}\nClique para ver as notas`}
               style={{ display: 'grid', gridTemplateColumns: '22px minmax(110px, 30%) minmax(0, 1fr)', gap: 10, alignItems: 'center', cursor: 'pointer' }}>
               <span style={{ fontSize: 11, color: 'var(--text-3)', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{i + 1}</span>
               <span style={{ fontSize: 12, color: 'var(--text)', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{o.nome}</span>
@@ -140,7 +140,7 @@ export function TabelaVendedor({ pv, ini, fim, onDrill, limite = 15 }) {
             {cols.map(i => (
               <th key={i} style={{ ...th, color: colHover === i ? 'var(--blue)' : th.color }} onMouseEnter={() => setColHover(i)}>{MESES[i]}</th>
             ))}
-            <th style={{ ...th, color: 'var(--text)', borderLeft: '1px solid var(--border)' }} title="Só área responsável Comercial">Devolvido</th>
+            <th style={{ ...th, color: 'var(--text)', borderLeft: '1px solid var(--border)' }} title="Só áreas Comercial e Customer Service">Devolvido</th>
             <th style={{ ...th, color: 'var(--text)' }}>Faturado</th>
             <th style={{ ...th, color: 'var(--text)' }} title="Devolvido ÷ faturado no período">Índice</th>
             <th style={{ ...th, color: 'var(--text)' }}>NFs</th>
@@ -155,7 +155,7 @@ export function TabelaVendedor({ pv, ini, fim, onDrill, limite = 15 }) {
                   return (
                     <td key={i} className={d ? 'drill' : undefined} onClick={d ? dr(o, i + 1, i + 1, MESES[i]) : undefined}
                       onMouseEnter={() => setColHover(i)}
-                      title={`${o.nome} · ${MESES[i]}\nDevolvido (área Comercial): ${brl0(d)} (${o.qtd[i]} NFs)\nFaturado: ${brl0(f)}`}
+                      title={`${o.nome} · ${MESES[i]}\nDevolvido (Comercial + Customer Service): ${brl0(d)} (${o.qtd[i]} NFs)\nFaturado: ${brl0(f)}`}
                       style={{ ...td, background: cor(d, f), color: d ? 'var(--text)' : 'var(--text-3)',
                         boxShadow: colHover === i ? 'inset 0 0 0 1px var(--blue)' : undefined }}>
                       {d ? (f ? pct(d, f) : 'sem fat.') : '–'}
