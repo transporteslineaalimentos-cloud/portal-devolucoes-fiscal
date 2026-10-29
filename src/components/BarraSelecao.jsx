@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { dbAtualizarMassa, dbGetMotivos, dbGetTransportadoras } from '../config/supabase';
 import { STATUS_OP_MANUAIS } from '../utils.jsx';
 
@@ -50,9 +51,22 @@ export default function BarraSelecao({ ids, onLimpar, onAplicado }) {
 
   const campoAtual = CAMPOS.find(c => c.k === campo);
 
-  return (
-    <div style={{ position: 'sticky', bottom: 0, zIndex: 20, margin: '0 -1px', background: 'var(--surface)',
-      borderTop: '2px solid var(--blue)', boxShadow: '0 -4px 14px rgba(15,25,35,.08)', padding: '12px 16px',
+  // A barra fica presa no rodapé da tela (sobre a área de conteúdo), não no fim da lista.
+  const [pos, setPos] = useState(null);
+  useEffect(() => {
+    const medir = () => {
+      const r = document.querySelector('.app-content')?.getBoundingClientRect();
+      setPos(r ? { left: r.left + 16, right: window.innerWidth - r.right + 16 } : { left: 16, right: 16 });
+    };
+    medir();
+    window.addEventListener('resize', medir);
+    return () => window.removeEventListener('resize', medir);
+  }, []);
+
+  return createPortal(
+    <div role="region" aria-label="Alterar notas marcadas" style={{ position: 'fixed', bottom: 16, left: pos?.left ?? 16, right: pos?.right ?? 16,
+      zIndex: 400, background: 'var(--surface)', border: '1px solid var(--border)', borderTop: '3px solid var(--blue)',
+      borderRadius: 12, boxShadow: '0 10px 30px rgba(15,25,35,.18)', padding: '12px 16px',
       display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
       <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', whiteSpace: 'nowrap' }}>
         {ids.length.toLocaleString('pt-BR')} nota{ids.length === 1 ? '' : 's'} marcada{ids.length === 1 ? '' : 's'}
@@ -61,10 +75,17 @@ export default function BarraSelecao({ ids, onLimpar, onAplicado }) {
 
       <div style={{ width: 1, height: 22, background: 'var(--border)' }}/>
 
-      <select className="input" value={campo} style={{ width: 180, height: 32, fontSize: 12.5 }}
-        onChange={e => { setCampo(e.target.value); setValor(''); setErro(''); setFeito(''); }}>
-        {CAMPOS.map(c => <option key={c.k} value={c.k}>{c.l}</option>)}
-      </select>
+      <div role="tablist" aria-label="O que alterar" style={{ display: 'inline-flex', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+        {CAMPOS.map(c => (
+          <button key={c.k} type="button" role="tab" aria-selected={campo === c.k}
+            onClick={() => { setCampo(c.k); setValor(''); setErro(''); setFeito(''); }}
+            style={{ height: 32, padding: '0 12px', fontSize: 12.5, fontWeight: 600, border: 0, cursor: 'pointer',
+              borderRight: '1px solid var(--border)',
+              background: campo === c.k ? 'var(--blue)' : 'var(--surface)', color: campo === c.k ? '#fff' : 'var(--text-2)' }}>
+            {c.l}
+          </button>
+        ))}
+      </div>
 
       {campo === 'status_operacional' && (
         <select className="input" value={valor} onChange={e => setValor(e.target.value)} style={{ width: 300, height: 32, fontSize: 12.5 }}>
@@ -106,8 +127,9 @@ export default function BarraSelecao({ ids, onLimpar, onAplicado }) {
       {erro && <span style={{ color: 'var(--red)', fontSize: 12 }}>{erro}</span>}
       {feito && <span style={{ color: 'var(--green)', fontSize: 12 }}>{feito}</span>}
       <span style={{ fontSize: 11, color: 'var(--text-3)' }}>
-        Muda só o {campoAtual?.l.toLowerCase()}; o resto da nota fica como está e tudo entra no histórico.
+        Muda só o {campoAtual?.l.toLowerCase()}; o resto da nota fica como está e tudo entra no histórico.{campo === 'transportador_cobranca' && ' Para devolução que não volta (contrato), use LINEA ALIMENTOS.'}
       </span>
-    </div>
+    </div>,
+    document.body
   );
 }

@@ -803,6 +803,7 @@ export default function Devolucoes({ user, initialFilters = {} }) {
             onLimpar={() => setMarcadas(new Set())}
             onAplicado={() => { setMarcadas(new Set()); load(filters, page); }}/>
         )}
+        {selMode && marcadas.size > 0 && <div aria-hidden style={{ height: 96 }}/>}
 
         {/* ─ Paginação ─ */}
         {totalPages > 1 && (
