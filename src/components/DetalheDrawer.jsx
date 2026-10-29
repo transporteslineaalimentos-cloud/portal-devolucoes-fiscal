@@ -178,6 +178,30 @@ function ValorLinha({ label, value, forte }) {
   );
 }
 
+/* Composição do total da NF, na ordem em que a nota soma:
+   produtos + ICMS-ST + (IPI, frete, seguro, outras despesas − descontos) = total.
+   O ICMS próprio já está dentro do valor dos produtos, então aparece à parte. */
+function ValoresNota({ dev }) {
+  const num = (v) => (v == null || v === '' ? null : Number(v));
+  const total = num(dev.valor), prod = num(dev.valor_produtos), st = num(dev.valor_st) || 0, icms = num(dev.valor_icms);
+  const outros = total != null && prod != null ? Math.round((total - prod - st) * 100) / 100 : null;
+  return (
+    <>
+      {prod != null && <ValorLinha label="Produtos" value={prod}/>}
+      {st > 0 && <ValorLinha label="+ ICMS-ST" value={st}/>}
+      {outros != null && Math.abs(outros) >= 0.01 && (
+        <ValorLinha label={outros < 0 ? '− Descontos' : '+ IPI, frete e outras despesas'} value={Math.abs(outros)}/>
+      )}
+      <ValorLinha label="Total da NF" value={total} forte/>
+      {icms != null && icms > 0 && (
+        <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 6 }}>
+          ICMS destacado: <b style={{ color: 'var(--text-2)', fontVariantNumeric: 'tabular-nums' }}>{fmtBRL(icms)}</b> (já incluso no valor dos produtos)
+        </div>
+      )}
+    </>
+  );
+}
+
 /* ═══ Componente principal ═════════════════════════════ */
 export default function DetalheDrawer({ id, user, onClose, onSaved }) {
   const [data, setData]       = useState(null);
@@ -685,10 +709,7 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
                   </Bloco>
 
                   <Bloco titulo="Valores da nota">
-                    <ValorLinha label="Produtos" value={dev.valor_produtos}/>
-                    <ValorLinha label="ICMS" value={dev.valor_icms}/>
-                    <ValorLinha label="ICMS-ST" value={dev.valor_st}/>
-                    <ValorLinha label="Total da NF" value={dev.valor} forte/>
+                    <ValoresNota dev={dev}/>
                   </Bloco>
 
                   <Bloco titulo="Prazo e lançamento no Protheus">
