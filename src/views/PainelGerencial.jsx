@@ -434,9 +434,9 @@ export default function PainelGerencial({ onGoTo, user }) {
       corpo: <TabelaCalor linhas={data.motivo} ini={ini} fim={fim} fatMesVig={fatMesVig} fatPeriodo={tot.f} limite={15} rotuloDim="Motivo" dimKey="motivo" onDrill={abrir}/> },
     { id: 'canal', titulo: 'Abertura por canal',
       corpo: <TabelaCalor linhas={data.canal} ini={ini} fim={fim} fatMesVig={fatMesVig} fatPeriodo={tot.f} rotuloDim="Canal" dimKey="canal" onDrill={abrir}/> },
-    { id: 'vendedor', titulo: 'Devolução por vendedor · % do faturado',
+    { id: 'vendedor', titulo: 'Devolução comercial por vendedor · % do faturado',
       corpo: <RankingVendedor pv={pv} onDrill={abrir} limite={12}/> },
-    { id: 'vendedor-mes', titulo: 'Devolução por vendedor · mês a mês',
+    { id: 'vendedor-mes', titulo: 'Devolução comercial por vendedor · mês a mês',
       corpo: <TabelaVendedor pv={pv} ini={ini} fim={fim} onDrill={abrir} limite={14}/> },
     { id: 'status', titulo: 'Status operacional e pendências',
       corpo: (
@@ -529,8 +529,8 @@ export default function PainelGerencial({ onGoTo, user }) {
             <TabelaCalor linhas={data.canal} ini={ini} fim={fim} fatMesVig={fatMesVig} fatPeriodo={tot.f} rotuloDim="Canal" dimKey="canal" onDrill={abrir}/>
           </Card>
 
-          <Card title="Devolução por vendedor"
-            sub="Índice = valor devolvido ÷ valor faturado para os clientes de cada vendedor, no mesmo período"
+          <Card title="Devolução comercial por vendedor"
+            sub="Só devoluções com área responsável Comercial · índice = valor devolvido ÷ valor faturado para os clientes do vendedor, no mesmo período"
             right={
               <button className="btn btn-ghost btn-sm no-print" onClick={() => setImportVend(true)}
                 title={infoVend?.clientes ? `${infoVend.clientes.toLocaleString('pt-BR')} clientes · atualizado em ${new Date(infoVend.atualizado_em).toLocaleDateString('pt-BR')}` : 'Carregar o cadastro de vendedores'}>
