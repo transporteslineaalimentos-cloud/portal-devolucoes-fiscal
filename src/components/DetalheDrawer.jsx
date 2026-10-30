@@ -901,7 +901,15 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
               )}
 
               {aba === 'cd' && <RetornoCDSection dev={dev}/>}
-              {aba === 'anexos' && <AnexosSection devolucaoId={id} user={user} onCount={setNAnexos}/>}
+              {aba === 'anexos' && <AnexosSection devolucaoId={id} user={user} onCount={(n) => {
+                setNAnexos(n);
+                // o banco marca "Evidência anexada" sozinho quando a nota ganha anexo; reflete aqui e na lista
+                if (n > 0 && data?.dev && data.dev.status_portal !== 'evidencia_anexada') {
+                  setData(d => ({ ...d, dev: { ...d.dev, status_portal: 'evidencia_anexada' } }));
+                  setNewStatus('evidencia_anexada');
+                  onSaved?.();
+                }
+              }}/>}
 
               {aba === 'historico' && (
                 <>
