@@ -8,6 +8,7 @@ import RetornoCDTrabalho from '../components/RetornoCDTrabalho.jsx';
 import BarraSelecao from '../components/BarraSelecao.jsx';
 import { exportDevolucoesToExcel } from '../utils/exportExcel.js';
 import { baixarPlanilhaConsulta } from '../utils/planilhaConsulta.js';
+import { baixarPlanilhaControle } from '../utils/planilhaControle.js';
 import { somenteLeitura } from '../lib/permissoes.js';
 
 const Ic = ({ d, size = 14, color = 'currentColor', w = 1.8 }) => (
@@ -43,6 +44,7 @@ const STATUS_OP_CFG = {
   'TROCA DE NOTA':                       { bg: '#E3ECFB', fg: '#1E4DB7', l: 'Troca de nota' },
   'ENVIAR PARA LANÇAMENTO':              { bg: '#FFF0CC', fg: '#7A4E00', l: 'Enviar p/ lançamento' },
   'ENVIAR PARA LANÇAMENTO - SEM FÍSICO': { bg: '#FFF7E0', fg: '#7A4E00', l: 'Enviar sem físico' },
+  'VALIDAR RETORNO DA NF':               { bg: '#E0F2FE', fg: '#0B5C8A', l: 'Validar retorno da NF' },
   'AGENDAR REVERSA':                     { bg: '#FDE4E2', fg: '#A8261B', l: 'Agendar reversa' },
   'REVERSA AGENDADA':                    { bg: '#ECE7FA', fg: '#5B3FA8', l: 'Reversa agendada' },
   'RECUSADA SEFAZ':                      { bg: '#ECEDEF', fg: '#3F4650', l: 'Recusada SEFAZ' },
@@ -60,8 +62,13 @@ const EMPTY_FILTERS = {
   search: '', status: '', cnpj_dest: '', cnpj_emitente: '', uf: '', linha_produto: '',
   dt_inicio: '', dt_fim: '', mes: '', area: '', motivo: '',
   devolucao_total: '', com_motivo: '', flag_emissao: '', lancado: '', nf_venda: '',
-  centro_custo: '', transportador: '', retornou_cd: '', farol: '',
+  centro_custo: '', transportador: '', retornou_cd: '', farol: '', status_op: '',
 };
+
+const STATUS_OP_TODOS = [
+  'VALIDAR RETORNO DA NF', 'AGENDAR REVERSA', 'REVERSA AGENDADA', 'ENVIAR PARA LANÇAMENTO - SEM FÍSICO',
+  'ENVIAR PARA LANÇAMENTO', 'LANÇADA', 'LANÇADA SEM FÍSICO', 'TROCA DE NOTA', 'RECUSADA SEFAZ',
+];
 
 const titulo = (s) => !s ? '' : s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
 
@@ -77,7 +84,7 @@ function Campo({ label, children, largura }) {
 const Opcoes = ({ itens }) => itens.map(([v, l]) => <option key={v} value={v}>{l}</option>);
 
 /* ─── Menu de ações secundárias ────────────────────────── */
-function MenuAcoes({ onImportar, onExcel, onConsulta, exportando, gerando }) {
+function MenuAcoes({ onImportar, onExcel, onConsulta, onControle, exportando, gerando, gerandoControle }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   useEffect(() => {
@@ -102,6 +109,7 @@ function MenuAcoes({ onImportar, onExcel, onConsulta, exportando, gerando }) {
         <div className="dv-menu" role="menu">
           {item(ICONES.baixar,   'Exportar Excel',       onExcel,    exportando && 'Exportando…')}
           {item(ICONES.planilha, 'Planilha de consulta', onConsulta, gerando && 'Gerando…')}
+          {item(ICONES.planilha, 'Planilha de controle (assistentes)', onControle, gerandoControle && 'Gerando…')}
           {onImportar && <>
           <div style={{ height: 1, background: 'var(--border)', margin: '4px 6px' }}/>
           {item(ICONES.subir,    'Importar Protheus',    onImportar)}
@@ -393,6 +401,15 @@ export default function Devolucoes({ user, initialFilters = {} }) {
     } catch (e) { alert('Erro ao exportar: ' + e.message); }
     finally { setExporting(false); }
   };
+  const [gerandoControle, setGerandoControle] = useState(false);
+  const handleControle = async () => {
+    setGerandoControle(true);
+    try {
+      const todas = await dbExportDevolucoes({ filters });
+      await baixarPlanilhaControle(todas, { sufixo: hasFilters ? 'filtrado' : '' });
+    } catch (e) { alert('Erro ao gerar a planilha: ' + e.message); }
+    finally { setGerandoControle(false); }
+  };
   const handleConsulta = async () => {
     setGerandoConsulta(true);
     try {
@@ -431,6 +448,10 @@ export default function Devolucoes({ user, initialFilters = {} }) {
     const cc = filters.centro_custo.split('|').filter(Boolean);
     chips.push({ k: 'centro_custo', label: cc.length > 1 ? `${cc.length} centros de custo`
       : cc[0] === 'sem' ? 'Sem centro de custo' : `Centro: ${titulo(cc[0])}` });
+  }
+  if (filters.status_op) {
+    const sts = filters.status_op.split('|').filter(Boolean);
+    chips.push({ k: 'status_op', label: sts.length > 1 ? `${sts.length} status operacionais` : `Status: ${titulo(sts[0])}` });
   }
   if (filters.retornou_cd === 'sim')    chips.push({ k: 'retornou_cd', label: 'Retornou ao CD' });
   if (filters.retornou_cd === 'cobrar') chips.push({ k: 'retornou_cd', label: 'CD com itens a cobrar' });
@@ -535,6 +556,7 @@ export default function Devolucoes({ user, initialFilters = {} }) {
           <div className="dv-spacer"/>
 
           <MenuAcoes onImportar={leitura ? null : () => setShowImport(true)} onExcel={handleExport} onConsulta={handleConsulta}
+            onControle={handleControle} gerandoControle={gerandoControle}
             exportando={exporting} gerando={gerandoConsulta}/>
           {!leitura && <button onClick={() => setShowModal(true)} className="btn btn-primary btn-sm">
             <Ic d={ICONES.mais} size={13}/> Lançar manual
@@ -547,6 +569,10 @@ export default function Devolucoes({ user, initialFilters = {} }) {
             <div className="dv-filtros-grupo">
               <div className="dv-filtros-titulo">Situação e prazo</div>
               <div className="dv-campos">
+                <Campo label="Status operacional">
+                  <MultiOpcoes value={filters.status_op} onChange={v => applyFilter({ status_op: v })}
+                    opcoes={STATUS_OP_TODOS.map(st => [st, titulo(st)])} rotuloTodos="Todos" plural="status"/>
+                </Campo>
                 <Campo label="Prazo de 90 dias">
                   <select value={filters.farol} onChange={e => applyFilter({ farol: e.target.value })} className="input">
                     <Opcoes itens={[['', 'Todos'], ['vermelho', 'Prazo vencido'], ['amarelo', 'Vence em até 15 dias'], ['verde', 'Dentro do prazo']]}/>
@@ -722,7 +748,7 @@ export default function Devolucoes({ user, initialFilters = {} }) {
             ? String(parseInt(row.chave_nfe_referenciada.slice(25, 34), 10) || '') : null;
           const farol  = calcFarolProtheus(row);
           const stOp   = calcStatusOperacional(row);
-          const cfgOp  = STATUS_OP_CFG[stOp] || STATUS_OP_CFG['AGENDAR REVERSA'];
+          const cfgOp  = STATUS_OP_CFG[stOp] || STATUS_OP_CFG['VALIDAR RETORNO DA NF'];
           const urgente = !row.lancado_protheus ? URGENCIA[farol.cor] : null;
           const consumido = farol.dias != null ? Math.max(0, Math.min(100, (farol.dias / 90) * 100)) : null;
           const empresaDest = CNPJ_MAP[row.cnpj_destinatario];

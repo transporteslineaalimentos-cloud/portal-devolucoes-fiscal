@@ -138,6 +138,11 @@ function applyDevolucoesFilters(q, filters = {}) {
   if (filters.com_motivo === 'com')           q = q.not('motivo_devolucao', 'is', null);
   if (filters.com_motivo === 'sem')           q = q.is('motivo_devolucao', null);
   if (filters.linha_produto)                  q = q.eq('linha_produto', filters.linha_produto);
+  if (filters.status_op) {
+    const sts = String(filters.status_op).split('|').filter(Boolean);
+    if (sts.length === 1) q = q.eq('status_op', sts[0]);
+    else if (sts.length)  q = q.in('status_op', sts);
+  }
   if (filters.retornou_cd === 'sim')    q = q.eq('retornou_cd', true);
   if (filters.retornou_cd === 'nao')    q = q.or('retornou_cd.eq.false,retornou_cd.is.null');
   if (filters.retornou_cd === 'cobrar') q = q.eq('retornou_cd', true).eq('tem_itens_cobrar', true);
@@ -231,11 +236,11 @@ export async function dbListDevolucoes({ page = 0, filters = {} }) {
       municipio_emitente, uf_emitente, cnpj_emitente, cnpj_destinatario,
       nat_operacao, dt_emissao, dt_devolucao, valor, valor_produtos, valor_icms, valor_st,
       cfops, tipo, status_portal, xml_baixado, xml_path,
-      chave_nfe_referenciada, itens, created_at,
+      chave_nfe_referenciada, created_at,
       inf_complementar, motivo_devolucao, devolucao_total, lancamento_manual,
       nf_venda_localizada, area_responsavel, flag_emissao_entrega,
       lancado_protheus, dt_lancamento_protheus, linha_produto,
-      retornou_cd, tem_itens_cobrar, status_operacional, transportador_cobranca, centro_custo
+      retornou_cd, tem_itens_cobrar, status_operacional, status_op, transportador_cobranca, centro_custo
     `, { count: 'exact' })
     .eq('tipo', 'devolucao')
     .or('status_sefaz.neq.CANCELADA,status_sefaz.is.null')   // ocultar canceladas
@@ -274,7 +279,7 @@ export async function dbExportDevolucoes({ filters = {} } = {}) {
         lancado_protheus, dt_lancamento_protheus,
         status_cobranca, nf_debito, data_cobranca, cobrado_por, obs_cobranca,
         transportador_cobranca, transportador_cnpj_cobranca, centro_custo,
-        retornou_cd, tem_itens_cobrar, valor_cobrar_transp, linha_produto, status_operacional, dt_recebimento_cd, itens_protheus
+        retornou_cd, tem_itens_cobrar, valor_cobrar_transp, linha_produto, status_operacional, status_op, dt_recebimento_cd, itens_protheus
       `)
       .eq('tipo', 'devolucao')
       .or('status_sefaz.neq.CANCELADA,status_sefaz.is.null')
@@ -317,6 +322,13 @@ async function anexarVendedor(rows) {
 
 export async function dbGetDevolucaoDetail(id) {
   syncAuthToken();
+  // tudo numa ida ao banco (nota, NF de venda, entrega, chamados do GLPI)
+  const { data: rpc, error: rpcErr } = await supabase.rpc('get_devolucao_detalhe', { p_id: id });
+  if (!rpcErr) return rpc ? { dev: rpc.dev, nfVenda: rpc.nfVenda || null, chamados: rpc.chamados || [] } : null;
+  return dbGetDevolucaoDetailLegado(id);
+}
+
+async function dbGetDevolucaoDetailLegado(id) {
   const dev = await safeQuery(
     supabase.from('oobj_nfe_recebidas').select('*').eq('id', id).single(),
     null
@@ -707,14 +719,17 @@ export async function dbReabrirCobranca(id) {
 }
 
 // Buscar motivos cadastrados da tabela (para o dropdown do drawer)
+let _cacheMotivos = null;
 export async function dbGetMotivos() {
+  if (_cacheMotivos && Date.now() - _cacheMotivos.t < 5 * 60 * 1000) return _cacheMotivos.d;
   const { data } = await supabase
     .from('motivos_devolucao')
     .select('motivo, area')
     .eq('ativo', true)
     .order('area')
     .order('motivo');
-  return data || [];
+  _cacheMotivos = { t: Date.now(), d: data || [] };
+  return _cacheMotivos.d;
 }
 
 // ─── Importação de lançamentos do Protheus (planilha) ────────
@@ -809,20 +824,24 @@ export async function dbSetCentroCustoCliente({ cnpj_emitente, nome_emitente, ce
 }
 
 // Lista transportadoras cadastradas (para o seletor)
+let _cacheTransps = null;
 export async function dbGetTransportadoras() {
   syncAuthToken();
+  if (_cacheTransps && Date.now() - _cacheTransps.t < 5 * 60 * 1000) return _cacheTransps.d;
   const { data, error } = await supabase
     .from('transportadoras')
     .select('cnpj, nome, nome_curto')
     .eq('ativo', true)
     .order('nome');
   if (error) throw new Error(error.message);
-  return data || [];
+  _cacheTransps = { t: Date.now(), d: data || [] };
+  return _cacheTransps.d;
 }
 
 // Cria ou atualiza uma transportadora no cadastro
 export async function dbSalvarTransportadora({ cnpj, nome, nome_curto }) {
   syncAuthToken();
+  _cacheTransps = null;
   const { error } = await supabase
     .from('transportadoras')
     .upsert({ cnpj, nome, nome_curto: nome_curto || nome }, { onConflict: 'cnpj' });

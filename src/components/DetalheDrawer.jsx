@@ -20,12 +20,38 @@ const AREA_CORES = {
   'CUSTOMER SERVICE':  { color: '#DB2777',        bg: 'rgba(219,39,119,0.10)' },
   'A VALIDAR':         { color: 'var(--text-3)',  bg: 'var(--surface-3)' },
 };
+/* Itens da nota com o código interno da Linea: o XML do cliente não traz o nosso código,
+   então cada item é casado com o item lançado no Protheus (mesmo valor e quantidade; senão,
+   mesmo valor; senão, mesma posição quando as listas têm o mesmo tamanho). Sem XML, mostra os do Protheus. */
+function montarItens(dev) {
+  const xml = Array.isArray(dev?.itens) ? dev.itens : [];
+  const prot = Array.isArray(dev?.itens_protheus) ? dev.itens_protheus : [];
+  if (!xml.length) {
+    const r = prot.map(p => ({ ...p, codigo: null, codLinea: p.codigo_produto || null, descLinea: p.descricao }));
+    r.fonte = 'protheus';
+    return r;
+  }
+  const usado = new Set();
+  const perto = (a, b) => Math.abs((Number(a) || 0) - (Number(b) || 0)) < 0.02;
+  const r = xml.map((it, i) => {
+    let j = prot.findIndex((p, k) => !usado.has(k) && perto(p.valor_total, it.valor_total) && perto(p.quantidade, it.quantidade));
+    if (j < 0) j = prot.findIndex((p, k) => !usado.has(k) && perto(p.valor_total, it.valor_total));
+    if (j < 0 && prot.length === xml.length && !usado.has(i)) j = i;
+    if (j >= 0) usado.add(j);
+    const p = j >= 0 ? prot[j] : null;
+    return { ...it, codLinea: p?.codigo_produto || null, descLinea: p?.descricao || null };
+  });
+  r.fonte = 'xml';
+  return r;
+}
+
 const STATUS_OP_CFG = {
   'LANÇADA':                             { bg: '#DDF3E4', fg: '#17663A', l: 'Lançada' },
   'LANÇADA SEM FÍSICO':                  { bg: '#DDF1EF', fg: '#1F6F6A', l: 'Lançada sem físico' },
   'TROCA DE NOTA':                       { bg: '#E3ECFB', fg: '#1E4DB7', l: 'Troca de nota' },
   'ENVIAR PARA LANÇAMENTO':              { bg: '#FFF0CC', fg: '#7A4E00', l: 'Enviar p/ lançamento' },
   'ENVIAR PARA LANÇAMENTO - SEM FÍSICO': { bg: '#FFF7E0', fg: '#7A4E00', l: 'Enviar sem físico' },
+  'VALIDAR RETORNO DA NF':               { bg: '#E0F2FE', fg: '#0B5C8A', l: 'Validar retorno da NF' },
   'AGENDAR REVERSA':                     { bg: '#FDE4E2', fg: '#A8261B', l: 'Agendar reversa' },
   'REVERSA AGENDADA':                    { bg: '#ECE7FA', fg: '#5B3FA8', l: 'Reversa agendada' },
   'RECUSADA SEFAZ':                      { bg: '#ECEDEF', fg: '#3F4650', l: 'Recusada SEFAZ' },
@@ -367,9 +393,10 @@ export default function DetalheDrawer({ id, user, onClose, onSaved, camada }) {
 
   const farol  = dev ? calcFarolProtheus(dev) : null;
   const stOp   = dev ? calcStatusOperacional(dev) : null;
-  const cfgOp  = STATUS_OP_CFG[stOp] || STATUS_OP_CFG['AGENDAR REVERSA'];
+  const cfgOp  = STATUS_OP_CFG[stOp] || STATUS_OP_CFG['VALIDAR RETORNO DA NF'];
   const cfgArea = AREA_CORES[dev?.area_responsavel] || { color: 'var(--text-3)', bg: 'var(--surface-3)' };
-  const nItens = Array.isArray(dev?.itens) ? dev.itens.length : 0;
+  const itensTela = montarItens(dev);
+  const nItens = itensTela.length;
 
   const ABAS = [
     { k: 'resumo',    l: 'Resumo' },
@@ -871,24 +898,29 @@ export default function DetalheDrawer({ id, user, onClose, onSaved, camada }) {
                 nItens > 0 ? (
                   <Bloco titulo={`Itens devolvidos`} acao={
                     <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-2)' }}>
-                      Total {fmtBRL(dev.itens.reduce((s, it) => s + (Number(it.valor_total) || 0), 0))}
+                      {itensTela.fonte === 'protheus' && <span style={{ fontWeight: 500, color: 'var(--text-3)', marginRight: 8 }}>itens do Protheus</span>}
+                      Total {fmtBRL(itensTela.reduce((s, it) => s + (Number(it.valor_total) || 0), 0))}
                     </span>
                   }>
                     <div style={{ overflowX: 'auto', marginTop: 4 }}>
                       <table className="items-table">
                         <thead>
                           <tr>
-                            <th>Código</th><th>Produto</th><th>CFOP</th>
+                            <th>Cód. Linea</th><th>Produto</th><th>CFOP</th>
                             <th style={{ textAlign: 'right' }}>Qtd</th>
                             <th style={{ textAlign: 'right' }}>Vl. unit.</th>
                             <th style={{ textAlign: 'right' }}>Total</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {dev.itens.map((it, i) => (
+                          {itensTela.map((it, i) => (
                             <tr key={i}>
-                              <td style={{ fontFamily: 'ui-monospace, monospace', fontSize: 11, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>{it.codigo || '—'}</td>
-                              <td style={{ fontWeight: 500 }} title={it.descricao}>{it.descricao}</td>
+                              <td style={{ fontFamily: 'ui-monospace, monospace', fontSize: 11.5, color: it.codLinea ? 'var(--text)' : 'var(--text-3)', fontWeight: it.codLinea ? 600 : 400, whiteSpace: 'nowrap' }}
+                                title={it.codLinea ? (it.descLinea || '') : 'Sem correspondência no lançamento do Protheus'}>{it.codLinea || '—'}</td>
+                              <td style={{ fontWeight: 500 }} title={it.descricao}>
+                                {it.descricao}
+                                {it.codigo && it.codigo !== it.codLinea && <div style={{ fontSize: 10.5, color: 'var(--text-3)', fontWeight: 400 }}>cód. do cliente {it.codigo}</div>}
+                              </td>
                               <td style={{ width: 54 }}>
                                 {it.cfop && <span style={{ background: 'var(--gold-dim)', color: 'var(--gold)', padding: '1px 6px', borderRadius: 4, fontSize: 10.5, fontWeight: 700 }}>{it.cfop}</span>}
                               </td>
@@ -906,7 +938,7 @@ export default function DetalheDrawer({ id, user, onClose, onSaved, camada }) {
                           <tr style={{ background: 'var(--surface-2)' }}>
                             <td colSpan={5} style={{ padding: '8px 10px', fontSize: 11.5, fontWeight: 700, color: 'var(--text-2)' }}>Total devolvido</td>
                             <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 800, fontVariantNumeric: 'tabular-nums', color: 'var(--blue)', fontSize: 13 }}>
-                              {fmtBRL(dev.itens.reduce((s, it) => s + (Number(it.valor_total) || 0), 0))}
+                              {fmtBRL(itensTela.reduce((s, it) => s + (Number(it.valor_total) || 0), 0))}
                             </td>
                           </tr>
                         </tfoot>

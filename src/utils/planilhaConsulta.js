@@ -20,7 +20,8 @@ export const STATUS_CORES = {
   'TROCA DE NOTA':                       { bg: 'E3ECFB', fg: '1E4DB7', desc: 'Devolução total já lançada no Protheus sem retorno do produto.' },
   'ENVIAR PARA LANÇAMENTO':              { bg: 'FFF0CC', fg: '7A4E00', desc: 'O produto chegou ao CD; falta lançar a nota no Protheus.' },
   'ENVIAR PARA LANÇAMENTO - SEM FÍSICO': { bg: 'FFF7E0', fg: '7A4E00', desc: 'Liberada para lançar no Protheus sem aguardar o produto.' },
-  'AGENDAR REVERSA':                     { bg: 'FDE4E2', fg: 'A8261B', desc: 'Produto ainda no cliente: é preciso agendar a coleta (reversa).' },
+  'VALIDAR RETORNO DA NF':               { bg: 'E0F2FE', fg: '0B5C8A', desc: 'Nota nova: a assistente precisa validar se o produto volta (agendar reversa) ou não (enviar para lançamento sem físico).' },
+  'AGENDAR REVERSA':                     { bg: 'FDE4E2', fg: 'A8261B', desc: 'Produto ainda no cliente: combinar com o transportador a data de retorno ao CD.' },
   'REVERSA AGENDADA':                    { bg: 'ECE7FA', fg: '5B3FA8', desc: 'Coleta do produto já agendada com o transportador.' },
   'RECUSADA SEFAZ':                      { bg: 'ECEDEF', fg: '3F4650', desc: 'Nota recusada na SEFAZ; aguardando correção pelo cliente.' },
 };

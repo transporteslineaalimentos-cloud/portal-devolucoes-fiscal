@@ -10,6 +10,14 @@ const REGRA = {
   'ENVIAR PARA LANÇAMENTO': 'O físico chegou ao CD e a nota ainda não foi lançada no Protheus.',
 };
 
+const GUIA = {
+  'VALIDAR RETORNO DA NF': 'Nota nova, ainda não validada. Se o produto vai voltar, marque AGENDAR REVERSA; se não vai voltar, marque ENVIAR PARA LANÇAMENTO - SEM FÍSICO.',
+  'AGENDAR REVERSA':       'O produto vai voltar: combine com o transportador a data de retorno ao CD e, depois, marque REVERSA AGENDADA.',
+  'REVERSA AGENDADA':      'Retorno ao CD já combinado com o transportador; aguardando o produto chegar.',
+  'ENVIAR PARA LANÇAMENTO - SEM FÍSICO': 'O produto não vai voltar: a nota pode ser lançada no Protheus sem esperar o físico.',
+  'RECUSADA SEFAZ':        'Nota recusada na SEFAZ; aguardando correção pelo cliente.',
+};
+
 export default function StatusOperacionalCard({ dev, user, onChanged }) {
   const atual = calcStatusOperacional(dev);
   const manual = STATUS_OP_MANUAIS.includes(atual);
@@ -47,7 +55,7 @@ export default function StatusOperacionalCard({ dev, user, onChanged }) {
       </div>
       <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 6, lineHeight: 1.5 }}>
         {manual
-          ? 'Nota ainda não lançada no Protheus e sem retorno ao CD: escolha a situação atual. Quando ela for lançada ou chegar ao CD, o status muda sozinho.'
+          ? (GUIA[atual] || 'Nota ainda não lançada no Protheus e sem retorno ao CD: escolha a situação atual.') + ' Quando ela for lançada ou chegar ao CD, o status muda sozinho.'
           : `Definido automaticamente: ${REGRA[atual]}`}
         {dev.status_operacional_por && manual && (
           <> · Última alteração por {dev.status_operacional_por}{dev.status_operacional_em ? ` em ${fmtDateTime(dev.status_operacional_em)}` : ''}</>
