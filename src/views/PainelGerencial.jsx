@@ -213,6 +213,98 @@ function TabelaMensal({ meses, ini, fim, onDrill, ano }) {
   );
 }
 
+/* ─── Lançamento no Protheus: lançadas × pendentes por mês ─── */
+const COR_LANC = '#2F855A';
+const COR_PEND = '#D97706';
+const FAIXAS_PRAZO = [
+  { k: 'vencido',  l: 'Prazo de 90 dias vencido', cor: '#C2413B' },
+  { k: 'vence_15', l: 'Vence em até 15 dias',     cor: '#D97706' },
+  { k: 'no_prazo', l: 'Dentro do prazo',          cor: '#6B7280' },
+];
+function GraficoProtheus({ protheus, prazo, ini, fim, onDrill, altura }) {
+  const wrapRef = useRef(null);
+  const [w, setW] = useState(900);
+  const [hover, setHover] = useState(null);
+  useEffect(() => {
+    const el = wrapRef.current; if (!el) return;
+    const ro = new ResizeObserver(([e]) => setW(Math.max(320, e.contentRect.width)));
+    ro.observe(el); return () => ro.disconnect();
+  }, []);
+  const dados = (protheus || []).slice(ini - 1, fim).map(d => ({ ...d, lancadas: Number(d.lancadas) || 0, pendentes: Number(d.pendentes) || 0 }));
+  const tot = dados.reduce((a, d) => ({ l: a.l + d.lancadas, p: a.p + d.pendentes, ql: a.ql + (d.qtd_lancadas || 0), qp: a.qp + (d.qtd_pendentes || 0) }), { l: 0, p: 0, ql: 0, qp: 0 });
+  const H = altura || 230, padL = 56, padR = 12, padT = 12, padB = 28;
+  const max = Math.max(1, ...dados.map(d => d.lancadas + d.pendentes));
+  const niceMax = (() => { const p = Math.pow(10, Math.floor(Math.log10(max))); return Math.ceil(max / p) * p; })();
+  const slot = (w - padL - padR) / Math.max(1, dados.length);
+  const bw = Math.min(46, slot * 0.6);
+  const y = (v) => padT + (H - padT - padB) * (1 - v / niceMax);
+  const ticks = [0, 0.25, 0.5, 0.75, 1].map(t => t * niceMax);
+  const faixa = (k) => (prazo || []).find(f => f.faixa === k) || { valor: 0, qtd: 0 };
+  const abrirMes = (d, qual) => onDrill?.({ titulo: `${qual === 'lancada' ? 'Lançadas' : 'Pendentes de lançamento'} no Protheus · ${MESES[d.mes - 1]}`, dim: 'protheus', valor: qual, mesIni: d.mes, mesFim: d.mes });
+  return (
+    <div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 10, marginBottom: 14 }}>
+        <Kpi label="Lançadas no Protheus" accent={COR_LANC} value={brl0(tot.l)} note={`${tot.ql} notas`} onClick={() => onDrill?.({ titulo: 'Lançadas no Protheus', dim: 'protheus', valor: 'lancada' })}/>
+        <Kpi label="Pendentes de lançamento" accent={COR_PEND} value={brl0(tot.p)} note={`${tot.qp} notas`} onClick={() => onDrill?.({ titulo: 'Pendentes de lançamento no Protheus', dim: 'protheus', valor: 'pendente' })}/>
+        <Kpi label="% lançado" value={pctFmt((tot.l + tot.p) ? tot.l / (tot.l + tot.p) : null)} note={`${pctFmt((tot.ql + tot.qp) ? tot.ql / (tot.ql + tot.qp) : null)} das notas`}/>
+      </div>
+      <div ref={wrapRef} style={{ position: 'relative' }}>
+        <svg width={w} height={H} role="img" aria-label="Notas lançadas e pendentes no Protheus por mês" style={{ display: 'block' }} onMouseLeave={() => setHover(null)}>
+          {ticks.map(t => (
+            <g key={t}>
+              <line x1={padL} x2={w - padR} y1={y(t)} y2={y(t)} stroke="var(--surface-3)" strokeWidth="1"/>
+              <text x={padL - 8} y={y(t) + 4} textAnchor="end" fontSize="10.5" fill="var(--text-3)">{brlK(t).replace('R$ ', '')}</text>
+            </g>
+          ))}
+          {dados.map((d, i) => {
+            const cx = padL + slot * i + slot / 2, x0 = cx - bw / 2;
+            const yl = y(d.lancadas), yt = y(d.lancadas + d.pendentes);
+            return (
+              <g key={d.mes} onMouseEnter={() => setHover(i)} style={{ cursor: onDrill ? 'pointer' : 'default' }}>
+                <rect x={cx - slot / 2} y={padT} width={slot} height={H - padT - padB} fill={hover === i ? 'var(--surface-2)' : 'transparent'}/>
+                {d.lancadas > 0 && <rect x={x0} y={yl} width={bw} height={Math.max(0, y(0) - yl)} fill={COR_LANC} rx="2" onClick={() => abrirMes(d, 'lancada')}/>}
+                {d.pendentes > 0 && <rect x={x0} y={yt} width={bw} height={Math.max(0, yl - yt)} fill={COR_PEND} rx="2" onClick={() => abrirMes(d, 'pendente')}/>}
+                <text x={cx} y={H - 8} textAnchor="middle" fontSize="11" fill="var(--text-3)">{MESES[d.mes - 1]}</text>
+              </g>
+            );
+          })}
+        </svg>
+        {hover != null && dados[hover] && (() => {
+          const d = dados[hover];
+          const left = Math.min(Math.max(padL + slot * hover + slot / 2 + 12, 0), w - 220);
+          const t = d.lancadas + d.pendentes;
+          return (
+            <div style={{ position: 'absolute', top: 6, left, width: 206, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, boxShadow: 'var(--shadow-sm)', padding: '8px 10px', fontSize: 11.5, pointerEvents: 'none', fontVariantNumeric: 'tabular-nums' }}>
+              <div style={{ fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>{MESES[d.mes - 1]}</div>
+              <Row cor={COR_LANC} label={`Lançadas (${d.qtd_lancadas})`} valor={brl0(d.lancadas)}/>
+              <Row cor={COR_PEND} label={`Pendentes (${d.qtd_pendentes})`} valor={brl0(d.pendentes)}/>
+              <div style={{ borderTop: '1px solid var(--border)', marginTop: 4, paddingTop: 4, display: 'flex', justifyContent: 'space-between', color: 'var(--text-2)' }}>
+                <span>% lançado</span><b style={{ color: 'var(--text)' }}>{pctFmt(t ? d.lancadas / t : null)}</b>
+              </div>
+              {onDrill && <div style={{ marginTop: 5, fontSize: 10.5, color: 'var(--text-3)' }}>Clique na barra para ver as notas</div>}
+            </div>
+          );
+        })()}
+      </div>
+      <div style={{ marginTop: 14 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-2)', marginBottom: 8 }}>Pendentes pelo prazo de 90 dias</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 8 }}>
+          {FAIXAS_PRAZO.map(f => {
+            const v = faixa(f.k);
+            return (
+              <button key={f.k} type="button" className="drill-row" onClick={() => onDrill?.({ titulo: `Pendentes no Protheus · ${f.l}`, dim: 'protheus', valor: f.k })}
+                style={{ textAlign: 'left', border: '1px solid var(--border)', borderLeft: `4px solid ${f.cor}`, borderRadius: 8, padding: '8px 12px', background: 'var(--surface)', cursor: 'pointer' }}>
+                <div style={{ fontSize: 11.5, color: 'var(--text-2)' }}>{f.l}</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>{brl0(v.valor)} <span style={{ fontSize: 11.5, fontWeight: 400, color: 'var(--text-3)' }}>· {v.qtd} NF{Number(v.qtd) === 1 ? '' : 's'}</span></div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ─── Tabela de calor (Área / Motivo / Canal × mês) ────────── */
 function TabelaCalor({ linhas, ini, fim, fatMesVig, fatPeriodo, limite, rotuloDim, dimKey, onDrill }) {
   const dr = (valor, mi, mf, rot) => onDrill ? () => onDrill({ titulo: `${rotuloDim}: ${valor}${rot ? ' · ' + rot : ''}`, dim: dimKey, valor, mesIni: mi, mesFim: mf }) : undefined;
@@ -473,6 +565,8 @@ export default function PainelGerencial({ onGoTo, user }) {
             <TabelaMensal meses={meses} ini={ini} fim={fim} onDrill={abrir} ano={ano}/></div>
         </div>
       ) },
+    { id: 'protheus', titulo: `Lançamento no Protheus · ${periodoTxt}`,
+      corpo: <GraficoProtheus protheus={data.protheus} prazo={data.protheus_prazo} ini={ini} fim={fim} onDrill={abrir} altura={alturaSlide - 230}/> },
     { id: 'area', titulo: 'Abertura por área de responsabilidade',
       corpo: <TabelaCalor linhas={data.area} ini={ini} fim={fim} fatMesVig={fatMesVig} fatPeriodo={tot.f} rotuloDim="Área" dimKey="area" onDrill={abrir}/> },
     { id: 'motivo', titulo: 'Abertura por motivo',
@@ -560,6 +654,12 @@ export default function PainelGerencial({ onGoTo, user }) {
             right={<Legend items={[{ label: 'Devolução parcial', color: COR_PARCIAL }, { label: 'Devolução total', color: COR_TOTAL }]}/>}>
             <LinhaMensal meses={meses} ini={ini} fim={fim} onDrill={abrir}/>
             <TabelaMensal meses={meses} ini={ini} fim={fim} onDrill={abrir} ano={ano}/>
+          </Card>
+
+          <Card title={`Lançamento no Protheus · ${periodoTxt}`}
+            sub="Notas lançadas e pendentes de lançamento, pelo mês de referência da devolução"
+            right={<Legend items={[{ label: 'Lançadas', color: COR_LANC }, { label: 'Pendentes', color: COR_PEND }]}/>}>
+            <GraficoProtheus protheus={data.protheus} prazo={data.protheus_prazo} ini={ini} fim={fim} onDrill={abrir}/>
           </Card>
 
           <Card title="Abertura por área de responsabilidade" sub="Quanto mais forte a cor, maior o valor no mês">
