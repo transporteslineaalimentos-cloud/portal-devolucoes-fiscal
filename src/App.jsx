@@ -2,24 +2,18 @@ import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import Login from './views/Login';
 import Sidebar from './components/Sidebar';
-import Dashboard from './views/Dashboard';
 import { dbGetCobrancasCount, dbGetPendencias } from './config/supabase';
 
 const Devolucoes = lazy(() => import('./views/Devolucoes'));
 const Cobrancas  = lazy(() => import('./views/Cobrancas'));
-const Protheus   = lazy(() => import('./views/Protheus'));
-const Historico  = lazy(() => import('./views/Historico'));
 const PainelGerencial = lazy(() => import('./views/PainelGerencial'));
 const CustosFrete = lazy(() => import('./views/CustosFrete'));
 
 const PAGE_META = {
-  dashboard:  { title: 'Dashboard',          sub: null },
   painel:     { title: 'Painel Gerencial',   sub: 'Geração de retorno e devolução · atualizado em tempo real' },
   devolucoes: { title: 'Devoluções Fiscais',  sub: 'NF-e recebidas classificadas por CFOP · sincronizado a cada hora' },
   cobrancas:  { title: 'Cobranças',          sub: 'Devoluções com responsabilidade do transportador já lançadas no Protheus' },
-  protheus:   { title: 'Controle Protheus',  sub: 'Todos os lançamentos de devolução escriturados no Protheus via GoBi' },
   fretes:     { title: 'Custos de Frete',    sub: 'CT-es e NFs de venda recebidos do Active · atualizado a cada 30 min' },
-  historico:  { title: 'Histórico',          sub: 'Registro de todas as alterações feitas no portal, por usuário' },
 };
 
 function Fallback() {
@@ -41,7 +35,7 @@ import { abaPermitida, somenteLeitura } from './lib/permissoes.js';
 
 function Portal() {
   const { user, logout } = useAuth();
-  const [tab, setTab] = useState(() => (abaPermitida(user, 'dashboard') ? 'dashboard' : 'painel'));
+  const [tab, setTab] = useState('painel');
   const leitura = somenteLeitura(user);
   const [tabFilters, setTabFilters] = useState({});
   const [counts, setCounts] = useState({});
@@ -246,7 +240,6 @@ function Portal() {
 
         {/* Conteúdo */}
         <main className="app-content">
-          {tab === 'dashboard' && abaPermitida(user, 'dashboard') && <Dashboard onGoTo={changeTab} />}
           {tab === 'painel' && (
             <Suspense fallback={<Fallback />}>
               <PainelGerencial onGoTo={changeTab} user={user} />
@@ -263,19 +256,9 @@ function Portal() {
                 onChanged={refreshCounts} />
             </Suspense>
           )}
-          {tab === 'protheus' && (
-            <Suspense fallback={<Fallback />}>
-              <Protheus user={user} />
-            </Suspense>
-          )}
           {tab === 'fretes' && (
             <Suspense fallback={<Fallback />}>
               <CustosFrete user={user} />
-            </Suspense>
-          )}
-          {tab === 'historico' && user?.role === 'admin' && (
-            <Suspense fallback={<Fallback />}>
-              <Historico />
             </Suspense>
           )}
         </main>
