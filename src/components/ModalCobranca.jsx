@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
-import {
-  dbRegistrarCobranca, dbIsentarCobranca, dbReabrirCobranca,
-  dbGetDevolucaoDetail, dbGetXmlUrl,
-} from '../config/supabase';
+import { dbCobrancaAcao, dbGetDevolucaoDetail, dbGetXmlUrl } from '../config/supabase';
+import { somenteLeitura } from '../lib/permissoes.js';
+import { SITUACAO_TXT, valorACobrar } from '../utils/espelhoCobranca.js';
 import { fmtBRL, fmtDate, fmtCNPJ, fmtDateTime, BadgeCobranca } from '../utils.jsx';
 import RetornoCDSection from './RetornoCDSection.jsx';
 
@@ -46,10 +45,11 @@ export default function ModalCobranca({ row, user, onClose, onSaved }) {
   const [saving, setSaving]     = useState(false);
   const [err, setErr]           = useState('');
   const [mode, setMode]         = useState(null); // 'cobrar' | 'isentar'
+  const [valor, setValor]       = useState(row.valor_sugerido != null ? Number(row.valor_sugerido).toFixed(2) : '');
+  const leitura = somenteLeitura(user);
   const [detail, setDetail]     = useState(null);
   const [loading, setLoading]   = useState(true);
 
-  const userName = user?.name || user?.email || '';
   const isPendente = row.status_cobranca === 'pendente_cobranca_transportador';
 
   useEffect(() => {
@@ -75,17 +75,20 @@ export default function ModalCobranca({ row, user, onClose, onSaved }) {
     if (!nfDebito.trim()) { setErr('Informe o número da NF de débito.'); return; }
     setSaving(true); setErr('');
     try {
-      await dbRegistrarCobranca(row.id, { nf_debito: nfDebito.trim(), obs_cobranca: obs, userName });
-      onSaved?.(); onClose();
+      const n = Number(String(valor).replace(',', '.'));
+      await dbCobrancaAcao([row.id], 'cobrar', { nf_debito: nfDebito.trim(), obs: obs.trim() || null,
+        valores: valor !== '' && Number.isFinite(n) ? { [row.id]: n } : {} });
+      onSaved?.(`NF ${row.nf_numero} cobrada na NF de débito ${nfDebito.trim()}.`);
     } catch (e) { setErr(e.message); }
     finally { setSaving(false); }
   };
 
   const handleIsentar = async () => {
+    if (!obs.trim()) { setErr('Informe o motivo da isenção.'); return; }
     setSaving(true); setErr('');
     try {
-      await dbIsentarCobranca(row.id, { obs_cobranca: obs, userName });
-      onSaved?.(); onClose();
+      await dbCobrancaAcao([row.id], 'isentar', { obs: obs.trim() });
+      onSaved?.(`NF ${row.nf_numero} isenta de cobrança.`);
     } catch (e) { setErr(e.message); }
     finally { setSaving(false); }
   };
@@ -93,8 +96,8 @@ export default function ModalCobranca({ row, user, onClose, onSaved }) {
   const handleReabrir = async () => {
     setSaving(true); setErr('');
     try {
-      await dbReabrirCobranca(row.id);
-      onSaved?.(); onClose();
+      await dbCobrancaAcao([row.id], 'reabrir');
+      onSaved?.(`NF ${row.nf_numero} reaberta.`);
     } catch (e) { setErr(e.message); }
     finally { setSaving(false); }
   };
@@ -131,8 +134,11 @@ export default function ModalCobranca({ row, user, onClose, onSaved }) {
           {/* KPIs */}
           <div className="dd-kpis" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
             <div className="dd-kpi">
-              <span className="dd-kpi-label">Valor a cobrar</span>
-              <span className="dd-kpi-value" style={{ color: '#fff' }}>{fmtBRL(dev.valor)}</span>
+              <span className="dd-kpi-label">{row.status_cobranca === 'cobrado' ? 'Valor cobrado' : 'Valor a cobrar'}</span>
+              <span className="dd-kpi-value" style={{ color: '#fff' }}>
+                {row.situacao && row.situacao !== 'cobrado' && row.valor_sugerido == null ? 'a definir' : fmtBRL(row.situacao ? valorACobrar(row) : dev.valor)}
+              </span>
+              <span style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.55)' }}>nota de {fmtBRL(dev.valor)}</span>
             </div>
             <div className="dd-kpi">
               <span className="dd-kpi-label">Motivo</span>
@@ -159,6 +165,17 @@ export default function ModalCobranca({ row, user, onClose, onSaved }) {
         </div>
 
         <div className="drawer-body" style={{ padding: '18px 22px 28px' }}>
+
+          {row.situacao && SITUACAO_TXT[row.situacao] && (
+            <div style={{ fontSize: 12.5, color: 'var(--text-2)', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 14px', marginBottom: 12, lineHeight: 1.5 }}>
+              <strong style={{ color: 'var(--text)' }}>{SITUACAO_TXT[row.situacao]}.</strong>{' '}
+              {row.situacao === 'cobrar_integral' && 'O produto não voltou ao CD, então o valor sugerido é o valor da nota.'}
+              {row.situacao === 'cobrar_parcial' && 'O valor sugerido é só o dos itens que o CD conferiu como avaria, falta ou impróprio (veja abaixo em Retorno ao CD).'}
+              {row.situacao === 'conferir_cd' && 'Consta retorno ao CD, mas sem a conferência dos itens. Importe a planilha do CD ou informe o valor ao cobrar.'}
+              {row.situacao === 'isentar' && 'Todos os itens voltaram em bom estado: não há o que cobrar.'}
+              {row.situacao === 'sem_transportador' && 'Vincule o transportador na nota (aba Devoluções) antes de cobrar.'}
+            </div>
+          )}
 
           {/* ── Transportador responsável ── */}
           <SectionCard title="Transportador responsável" icon="M3 6h13l3 5v6h-3m-7 0H3V6zm10 11a2 2 0 104 0 2 2 0 00-4 0zM7 17a2 2 0 104 0 2 2 0 00-4 0z" color="var(--gold)">
@@ -257,20 +274,23 @@ export default function ModalCobranca({ row, user, onClose, onSaved }) {
               {row.nf_debito && (
                 <DataItem label="NF de débito" value={<span style={{ fontWeight: 700 }}>{row.nf_debito}</span>}/>
               )}
+              {row.status_cobranca === 'cobrado' && (
+                <DataItem label="Valor cobrado" value={row.valor_cobrado != null ? fmtBRL(row.valor_cobrado) : `${fmtBRL(dev.valor)} (valor da nota; cobrança registrada antes de existir o campo)`}/>
+              )}
               {row.obs_cobranca && <DataItem label="Observação" value={row.obs_cobranca} full/>}
               {row.data_cobranca && (
                 <DataItem label="Registrado por" value={`${row.cobrado_por ? row.cobrado_por + ' · ' : ''}${fmtDateTime(row.data_cobranca)}`} full/>
               )}
-              <div style={{ paddingTop: 10 }}>
+              {!leitura && <div style={{ paddingTop: 10 }}>
                 <button onClick={handleReabrir} disabled={saving} className="btn btn-outline btn-sm">
                   Reabrir cobrança
                 </button>
-              </div>
+              </div>}
             </SectionCard>
           )}
 
           {/* ── Ações para pendente ── */}
-          {isPendente && (
+          {isPendente && !leitura && (
             <SectionCard title="Registrar cobrança" icon="M12 8v8m-4-4h8M21 12a9 9 0 11-18 0 9 9 0 0118 0z" color="var(--blue)">
               <div style={{ display: 'flex', gap: 8, margin: '6px 0 4px' }}>
                 <button onClick={() => { setMode('cobrar'); setErr(''); }} className={`btn btn-sm ${mode === 'cobrar' ? 'btn-primary' : 'btn-outline'}`} style={{ flex: 1 }}>
@@ -284,9 +304,15 @@ export default function ModalCobranca({ row, user, onClose, onSaved }) {
 
               {mode === 'cobrar' && (
                 <div style={{ background: 'var(--blue-dim)', border: '1px solid var(--blue-mid)', borderRadius: 10, padding: '14px 16px', marginTop: 10 }}>
-                  <div style={{ marginBottom: 10 }}>
-                    <label className="input-label">Número da NF de débito *</label>
-                    <input type="text" value={nfDebito} onChange={e => setNfDebito(e.target.value)} className="input" placeholder="Ex: 12345"/>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                    <div>
+                      <label className="input-label">Número da NF de débito *</label>
+                      <input type="text" value={nfDebito} onChange={e => setNfDebito(e.target.value)} className="input" placeholder="Ex: 12345" autoFocus/>
+                    </div>
+                    <div>
+                      <label className="input-label">Valor cobrado</label>
+                      <input type="text" inputMode="decimal" value={valor} onChange={e => setValor(e.target.value)} className="input" placeholder="0,00"/>
+                    </div>
                   </div>
                   <div style={{ marginBottom: 10 }}>
                     <label className="input-label">Observação (opcional)</label>

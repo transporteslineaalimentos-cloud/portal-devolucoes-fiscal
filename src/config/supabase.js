@@ -639,6 +639,24 @@ export async function dbListCobrancas({ page = 0, filters = {} }) {
   return { rows: data || [], total: count || 0, pageSize: PAGE_SIZE };
 }
 
+// Todas as cobranças com a situação calculada no banco (fila de trabalho e valor sugerido)
+export async function dbGetCobrancas() {
+  syncAuthToken();
+  const { data, error } = await supabase.rpc('get_cobrancas');
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+// Cobrar / isentar / reabrir uma ou várias notas de uma vez (grava o histórico de cada nota)
+export async function dbCobrancaAcao(ids, acao, { nf_debito = null, obs = null, valores = {} } = {}) {
+  syncAuthToken();
+  const { data, error } = await supabase.rpc('cobranca_acao', {
+    p_ids: ids, p_acao: acao, p_nf_debito: nf_debito, p_obs: obs, p_valores: valores,
+  });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
 // Registrar a baixa da cobrança ao transportador (NF de débito)
 export async function dbRegistrarCobranca(id, { nf_debito, obs_cobranca, userName }) {
   syncAuthToken();
