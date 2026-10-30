@@ -216,12 +216,7 @@ function TabelaMensal({ meses, ini, fim, onDrill, ano }) {
 /* ─── Lançamento no Protheus: lançadas × pendentes por mês ─── */
 const COR_LANC = '#2F855A';
 const COR_PEND = '#D97706';
-const FAIXAS_PRAZO = [
-  { k: 'vencido',  l: 'Prazo de 90 dias vencido', cor: '#C2413B' },
-  { k: 'vence_15', l: 'Vence em até 15 dias',     cor: '#D97706' },
-  { k: 'no_prazo', l: 'Dentro do prazo',          cor: '#6B7280' },
-];
-function GraficoProtheus({ protheus, prazo, ini, fim, onDrill, altura }) {
+function GraficoProtheus({ protheus, ini, fim, onDrill, altura }) {
   const wrapRef = useRef(null);
   const [w, setW] = useState(900);
   const [hover, setHover] = useState(null);
@@ -239,7 +234,6 @@ function GraficoProtheus({ protheus, prazo, ini, fim, onDrill, altura }) {
   const bw = Math.min(46, slot * 0.6);
   const y = (v) => padT + (H - padT - padB) * (1 - v / niceMax);
   const ticks = [0, 0.25, 0.5, 0.75, 1].map(t => t * niceMax);
-  const faixa = (k) => (prazo || []).find(f => f.faixa === k) || { valor: 0, qtd: 0 };
   const abrirMes = (d, qual) => onDrill?.({ titulo: `${qual === 'lancada' ? 'Lançadas' : 'Pendentes de lançamento'} no Protheus · ${MESES[d.mes - 1]}`, dim: 'protheus', valor: qual, mesIni: d.mes, mesFim: d.mes });
   return (
     <div>
@@ -285,21 +279,6 @@ function GraficoProtheus({ protheus, prazo, ini, fim, onDrill, altura }) {
             </div>
           );
         })()}
-      </div>
-      <div style={{ marginTop: 14 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-2)', marginBottom: 8 }}>Pendentes pelo prazo de 90 dias</div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 8 }}>
-          {FAIXAS_PRAZO.map(f => {
-            const v = faixa(f.k);
-            return (
-              <button key={f.k} type="button" className="drill-row" onClick={() => onDrill?.({ titulo: `Pendentes no Protheus · ${f.l}`, dim: 'protheus', valor: f.k })}
-                style={{ textAlign: 'left', border: '1px solid var(--border)', borderLeft: `4px solid ${f.cor}`, borderRadius: 8, padding: '8px 12px', background: 'var(--surface)', cursor: 'pointer' }}>
-                <div style={{ fontSize: 11.5, color: 'var(--text-2)' }}>{f.l}</div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>{brl0(v.valor)} <span style={{ fontSize: 11.5, fontWeight: 400, color: 'var(--text-3)' }}>· {v.qtd} NF{Number(v.qtd) === 1 ? '' : 's'}</span></div>
-              </button>
-            );
-          })}
-        </div>
       </div>
     </div>
   );
@@ -566,7 +545,7 @@ export default function PainelGerencial({ onGoTo, user }) {
         </div>
       ) },
     { id: 'protheus', titulo: `Lançamento no Protheus · ${periodoTxt}`,
-      corpo: <GraficoProtheus protheus={data.protheus} prazo={data.protheus_prazo} ini={ini} fim={fim} onDrill={abrir} altura={alturaSlide - 230}/> },
+      corpo: <GraficoProtheus protheus={data.protheus} ini={ini} fim={fim} onDrill={abrir} altura={alturaSlide - 230}/> },
     { id: 'area', titulo: 'Abertura por área de responsabilidade',
       corpo: <TabelaCalor linhas={data.area} ini={ini} fim={fim} fatMesVig={fatMesVig} fatPeriodo={tot.f} rotuloDim="Área" dimKey="area" onDrill={abrir}/> },
     { id: 'motivo', titulo: 'Abertura por motivo',
@@ -657,9 +636,9 @@ export default function PainelGerencial({ onGoTo, user }) {
           </Card>
 
           <Card title={`Lançamento no Protheus · ${periodoTxt}`}
-            sub="Notas lançadas e pendentes de lançamento, pelo mês de referência da devolução"
+            sub="Só notas do portal (devoluções de 2026), pelo mês de referência da devolução"
             right={<Legend items={[{ label: 'Lançadas', color: COR_LANC }, { label: 'Pendentes', color: COR_PEND }]}/>}>
-            <GraficoProtheus protheus={data.protheus} prazo={data.protheus_prazo} ini={ini} fim={fim} onDrill={abrir}/>
+            <GraficoProtheus protheus={data.protheus} ini={ini} fim={fim} onDrill={abrir}/>
           </Card>
 
           <Card title="Abertura por área de responsabilidade" sub="Quanto mais forte a cor, maior o valor no mês">
