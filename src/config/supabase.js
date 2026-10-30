@@ -8,11 +8,34 @@ export { SB_URL, SB_KEY };
 
 export const supabase = createClient(SB_URL, SB_KEY);
 
+// O login vive em dois lugares: o cliente do Supabase (que renova o token sozinho)
+// e o df_token/df_refresh do navegador. Antes, cada consulta reaplicava o df_token
+// antigo por cima do renovado; quando ele vencia, a consulta saía sem login.
+// Agora: toda renovação é copiada de volta para o df_*, e a sessão salva só é
+// reaplicada quando mudou (login novo ou renovação feita pelo useAuth).
+let tokenAplicado = null;
+supabase.auth.onAuthStateChange((evento, sessao) => {
+  try {
+    if (sessao?.access_token) {
+      tokenAplicado = sessao.access_token;
+      if (localStorage.getItem('df_token')) {
+        localStorage.setItem('df_token', sessao.access_token);
+        localStorage.setItem('df_refresh', sessao.refresh_token);
+      }
+    } else if (evento === 'SIGNED_OUT' && localStorage.getItem('df_user')) {
+      // a renovação falhou de vez: volta para a tela de login em vez de mostrar telas vazias
+      ['df_token', 'df_refresh', 'df_user'].forEach(k => localStorage.removeItem(k));
+      window.location.reload();
+    }
+  } catch { /* ignore */ }
+});
+
 export function syncAuthToken() {
   try {
     const token   = localStorage.getItem('df_token');
     const refresh = localStorage.getItem('df_refresh');
-    if (token && refresh) {
+    if (token && refresh && token !== tokenAplicado) {
+      tokenAplicado = token;
       supabase.auth.setSession({ access_token: token, refresh_token: refresh }).catch(() => {});
     }
   } catch { /* ignore */ }
