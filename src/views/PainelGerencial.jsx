@@ -216,6 +216,8 @@ function TabelaMensal({ meses, ini, fim, onDrill, ano }) {
 /* ─── Lançamento no Protheus: lançadas × pendentes por mês ─── */
 const COR_LANC = '#2F855A';
 const COR_PEND = '#D97706';
+const thP = { padding: '6px 8px', fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textAlign: 'right', whiteSpace: 'nowrap' };
+const tdP = { padding: '6px 8px', fontSize: 11.5, textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', borderTop: '1px solid var(--border)' };
 function GraficoProtheus({ protheus, ini, fim, onDrill, altura }) {
   const wrapRef = useRef(null);
   const [w, setW] = useState(900);
@@ -252,12 +254,16 @@ function GraficoProtheus({ protheus, ini, fim, onDrill, altura }) {
           ))}
           {dados.map((d, i) => {
             const cx = padL + slot * i + slot / 2, x0 = cx - bw / 2;
-            const yl = y(d.lancadas), yt = y(d.lancadas + d.pendentes);
+            // cada parte com pelo menos 5px, para mês com poucas pendentes continuar visível e clicável
+            const MIN = 5, base = y(0);
+            const hL = d.lancadas > 0 ? Math.max(MIN, base - y(d.lancadas)) : 0;
+            const hP = d.pendentes > 0 ? Math.max(MIN, y(d.lancadas) - y(d.lancadas + d.pendentes)) : 0;
+            const yl = base - hL, yt = yl - hP;
             return (
               <g key={d.mes} onMouseEnter={() => setHover(i)} style={{ cursor: onDrill ? 'pointer' : 'default' }}>
                 <rect x={cx - slot / 2} y={padT} width={slot} height={H - padT - padB} fill={hover === i ? 'var(--surface-2)' : 'transparent'}/>
-                {d.lancadas > 0 && <rect x={x0} y={yl} width={bw} height={Math.max(0, y(0) - yl)} fill={COR_LANC} rx="2" onClick={() => abrirMes(d, 'lancada')}/>}
-                {d.pendentes > 0 && <rect x={x0} y={yt} width={bw} height={Math.max(0, yl - yt)} fill={COR_PEND} rx="2" onClick={() => abrirMes(d, 'pendente')}/>}
+                {d.lancadas > 0 && <rect x={x0} y={yl} width={bw} height={hL} fill={COR_LANC} rx="2" onClick={() => abrirMes(d, 'lancada')}/>}
+                {d.pendentes > 0 && <rect x={x0} y={yt} width={bw} height={hP} fill={COR_PEND} rx="2" onClick={() => abrirMes(d, 'pendente')}/>}
                 <text x={cx} y={H - 8} textAnchor="middle" fontSize="11" fill="var(--text-3)">{MESES[d.mes - 1]}</text>
               </g>
             );
@@ -275,10 +281,44 @@ function GraficoProtheus({ protheus, ini, fim, onDrill, altura }) {
               <div style={{ borderTop: '1px solid var(--border)', marginTop: 4, paddingTop: 4, display: 'flex', justifyContent: 'space-between', color: 'var(--text-2)' }}>
                 <span>% lançado</span><b style={{ color: 'var(--text)' }}>{pctFmt(t ? d.lancadas / t : null)}</b>
               </div>
-              {onDrill && <div style={{ marginTop: 5, fontSize: 10.5, color: 'var(--text-3)' }}>Clique na barra para ver as notas</div>}
+              {onDrill && <div style={{ marginTop: 5, fontSize: 10.5, color: 'var(--text-3)' }}>Clique na cor da barra ou na tabela abaixo para ver as notas</div>}
             </div>
           );
         })()}
+      </div>
+      <div className="pg-tabela" style={{ overflowX: 'auto', marginTop: 10 }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead><tr>
+            <th style={{ ...thP, textAlign: 'left', position: 'sticky', left: 0, background: 'var(--surface)' }}/>
+            {dados.map(d => <th key={d.mes} style={thP}>{MESES[d.mes - 1]}</th>)}
+            <th style={{ ...thP, color: 'var(--text)', borderLeft: '1px solid var(--border)' }}>Período</th>
+          </tr></thead>
+          <tbody>
+            {[
+              { k: 'lancada', l: 'Lançadas', cor: COR_LANC, v: d => d.lancadas, q: d => d.qtd_lancadas, tv: tot.l, tq: tot.ql },
+              { k: 'pendente', l: 'Pendentes', cor: COR_PEND, v: d => d.pendentes, q: d => d.qtd_pendentes, tv: tot.p, tq: tot.qp },
+            ].map(r => (
+              <tr key={r.k}>
+                <td style={{ ...tdP, textAlign: 'left', color: 'var(--text)', fontWeight: 600, position: 'sticky', left: 0, background: 'var(--surface)' }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span style={{ width: 8, height: 8, borderRadius: 99, background: r.cor }}/>{r.l}</span>
+                </td>
+                {dados.map(d => {
+                  const q = Number(r.q(d)) || 0;
+                  return (
+                    <td key={d.mes} className={q && onDrill ? 'drill' : undefined} onClick={q && onDrill ? () => abrirMes(d, r.k) : undefined}
+                      title={q ? `${q} nota${q === 1 ? '' : 's'} · ${brl0(r.v(d))}` : undefined}
+                      style={{ ...tdP, color: q ? (r.k === 'pendente' ? COR_PEND : 'var(--text-2)') : 'var(--text-3)', fontWeight: r.k === 'pendente' && q ? 700 : 400 }}>
+                      {q ? `${q} · ${brlK(r.v(d))}` : '—'}
+                    </td>
+                  );
+                })}
+                <td className={r.tq && onDrill ? 'drill' : undefined}
+                  onClick={r.tq && onDrill ? () => onDrill({ titulo: r.k === 'lancada' ? 'Lançadas no Protheus' : 'Pendentes de lançamento no Protheus', dim: 'protheus', valor: r.k }) : undefined}
+                  style={{ ...tdP, fontWeight: 700, color: 'var(--text)', borderLeft: '1px solid var(--border)' }}>{r.tq} · {brlK(r.tv)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );
