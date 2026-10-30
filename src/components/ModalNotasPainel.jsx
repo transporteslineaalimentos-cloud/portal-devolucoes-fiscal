@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../config/supabase';
-import { STATUS_CORES, baixarPlanilhaConsulta } from '../utils/planilhaConsulta.js';
+import { STATUS_CORES } from '../utils/planilhaConsulta.js';
+import { baixarListaNotas } from '../utils/planilhaLista.js';
 import DetalheDrawer from './DetalheDrawer.jsx';
 
 /* ─────────────────────────────────────────────────────────────
@@ -42,6 +43,33 @@ const COLS = [
   { k: 'glpi',    t: 'Chamado GLPI',  w: 150, v: r => r.glpi_id ? `#${r.glpi_id} · ${r.glpi_status}` : 'Sem chamado', s: r => r.glpi_status || '' },
   { k: 'cd',      t: 'CD',            w: 44,  v: r => r.retornou_cd ? 'Sim' : 'Não', s: r => r.retornou_cd ? 1 : 0 },
   { k: 'transp',  t: 'Transportador', w: 170, v: r => r.transp_nome, s: r => r.transp_nome },
+];
+
+/* colunas do Excel: as mesmas da tela, com valores de verdade (número, data) */
+const COLS_EXCEL = [
+  { t: 'NF Dev.',            w: 11, v: r => r.lancamento_manual ? '' : r.nf_numero, fmt: 'int' },
+  { t: 'NF Venda',           w: 11, v: r => { const n = nfv(r.chave_nfe_referenciada); return n === '—' ? null : n; }, fmt: 'int' },
+  { t: 'Data ref.',          w: 11, v: r => r.dt_ref, fmt: 'data' },
+  { t: 'Tipo',               w: 9,  v: r => r.tipo_dev === 'total' ? 'Total' : 'Parcial' },
+  { t: 'Cliente',            w: 38, v: r => r.nome_emitente },
+  { t: 'CNPJ',               w: 17, v: r => r.cnpj_emitente },
+  { t: 'Vendedor',           w: 30, v: r => r.vendedor },
+  { t: 'UF',                 w: 5,  v: r => r.uf_emitente },
+  { t: 'Valor',              w: 14, v: r => r.valor, fmt: 'brl' },
+  { t: 'Motivo',             w: 30, v: r => r.motivo },
+  { t: 'Área',               w: 18, v: r => r.area },
+  { t: 'Canal',              w: 24, v: r => r.canal },
+  { t: 'Status operacional', w: 32, v: r => r.st_op },
+  { t: 'Prazo 90d',          w: 12, v: r => prazo(r).txt },
+  { t: 'Lançada no Protheus', w: 12, v: r => r.lancado_protheus ? 'Sim' : 'Não' },
+  { t: 'Data do lançamento', w: 12, v: r => r.lancado_protheus ? r.dt_lancamento_protheus : null, fmt: 'data' },
+  { t: 'Chamado GLPI',       w: 12, v: r => r.glpi_id ? r.glpi_id : 'Sem chamado' },
+  { t: 'Situação do chamado', w: 14, v: r => r.glpi_status || '' },
+  { t: 'Abertura do chamado', w: 13, v: r => r.glpi_abertura, fmt: 'data' },
+  { t: 'Solução do chamado', w: 13, v: r => r.glpi_solucao, fmt: 'data' },
+  { t: 'Retornou ao CD',     w: 10, v: r => r.retornou_cd ? 'Sim' : 'Não' },
+  { t: 'Transportador',      w: 30, v: r => r.transp_nome },
+  { t: 'Chave da NF',        w: 46, v: r => r.lancamento_manual ? '' : r.chave_nfe },
 ];
 
 export default function ModalNotasPainel({ filtro, titulo, user, onClose, onChanged }) {
@@ -92,7 +120,7 @@ export default function ModalNotasPainel({ filtro, titulo, user, onClose, onChan
 
   const baixar = async () => {
     setBaixando(true);
-    try { await baixarPlanilhaConsulta(visiveis, { periodoTxt: `${titulo} ${periodo}` }); }
+    try { await baixarListaNotas({ titulo, periodo, colunas: COLS_EXCEL, linhas: visiveis, filtroBusca: busca.trim() }); }
     catch (e) { alert('Erro ao gerar a planilha: ' + e.message); }
     setBaixando(false);
   };

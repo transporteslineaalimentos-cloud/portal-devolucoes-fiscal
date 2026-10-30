@@ -216,15 +216,9 @@ function TabelaMensal({ meses, ini, fim, onDrill, ano }) {
 /* ─── Lançamento no Protheus: lançadas × pendentes por mês ─── */
 const COR_LANC = '#2F855A';
 const COR_PEND = '#D97706';
-const SITUACOES_GLPI = [
-  { k: 'sem_chamado', l: 'Sem chamado aberto',              d: 'Falta abrir o chamado para o fiscal', cor: '#C2413B', v: 'pend_sem_chamado', q: 'qtd_pend_sem_chamado' },
-  { k: 'aberto',      l: 'Chamado aberto',                   d: 'Aguardando o fiscal',                 cor: '#1E4DB7', v: 'pend_aberto',      q: 'qtd_pend_aberto' },
-  { k: 'pendente',    l: 'Chamado pendente',                 d: 'O fiscal devolveu com pendência',     cor: '#D97706', v: 'pend_pendente',    q: 'qtd_pend_pendente' },
-  { k: 'solucionado', l: 'Chamado solucionado',              d: 'Mas ainda não consta no Protheus',     cor: '#6D4FC2', v: 'pend_solucionado', q: 'qtd_pend_solucionado' },
-];
 const thP = { padding: '6px 8px', fontSize: 11, fontWeight: 600, color: 'var(--text-3)', textAlign: 'right', whiteSpace: 'nowrap' };
 const tdP = { padding: '6px 8px', fontSize: 11.5, textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', borderTop: '1px solid var(--border)' };
-function GraficoProtheus({ protheus, glpiEm, ini, fim, onDrill, altura }) {
+function GraficoProtheus({ protheus, ini, fim, onDrill, altura }) {
   const wrapRef = useRef(null);
   const [w, setW] = useState(900);
   const [hover, setHover] = useState(null);
@@ -292,31 +286,6 @@ function GraficoProtheus({ protheus, glpiEm, ini, fim, onDrill, altura }) {
           );
         })()}
       </div>
-      <div style={{ marginTop: 12 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-2)', marginBottom: 8 }}>
-          Pendentes de lançamento · situação do chamado no GLPI
-          {glpiEm && <span style={{ fontWeight: 400, color: 'var(--text-3)', marginLeft: 8 }}>
-            chamados atualizados em {new Date(glpiEm).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
-          </span>}
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 8 }}>
-          {SITUACOES_GLPI.map(sg => {
-            const v = dados.reduce((a, d) => a + (Number(d[sg.v]) || 0), 0), q = dados.reduce((a, d) => a + (Number(d[sg.q]) || 0), 0);
-            return (
-              <button key={sg.k} type="button" className="drill-row" disabled={!q}
-                onClick={() => onDrill?.({ titulo: `Pendentes de lançamento · ${sg.l}`, dim: 'glpi', valor: sg.k })}
-                style={{ textAlign: 'left', border: '1px solid var(--border)', borderLeft: `4px solid ${sg.cor}`, borderRadius: 8, padding: '8px 12px',
-                  background: 'var(--surface)', cursor: q ? 'pointer' : 'default', opacity: q ? 1 : 0.6 }}>
-                <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--text)' }}>{sg.l}</div>
-                <div style={{ fontSize: 10.5, color: 'var(--text-3)', marginBottom: 3 }}>{sg.d}</div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>
-                  {q} NF{q === 1 ? '' : 's'} <span style={{ fontSize: 11.5, fontWeight: 400, color: 'var(--text-3)' }}>· {brl0(v)}</span>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </div>
       <div className="pg-tabela" style={{ overflowX: 'auto', marginTop: 10 }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead><tr>
@@ -328,31 +297,148 @@ function GraficoProtheus({ protheus, glpiEm, ini, fim, onDrill, altura }) {
             {[
               { k: 'lancada', l: 'Lançadas', cor: COR_LANC, v: d => d.lancadas, q: d => d.qtd_lancadas, tv: tot.l, tq: tot.ql },
               { k: 'pendente', l: 'Pendentes', cor: COR_PEND, v: d => d.pendentes, q: d => d.qtd_pendentes, tv: tot.p, tq: tot.qp },
-              ...SITUACOES_GLPI.map(sg => ({ k: sg.k, glpi: true, l: sg.l, cor: sg.cor, v: d => Number(d[sg.v]) || 0, q: d => Number(d[sg.q]) || 0,
-                tv: dados.reduce((a, d) => a + (Number(d[sg.v]) || 0), 0), tq: dados.reduce((a, d) => a + (Number(d[sg.q]) || 0), 0) })),
             ].map(r => (
               <tr key={r.k}>
-                <td style={{ ...tdP, textAlign: 'left', color: r.glpi ? 'var(--text-2)' : 'var(--text)', fontWeight: r.glpi ? 400 : 600, position: 'sticky', left: 0, background: 'var(--surface)', paddingLeft: r.glpi ? 22 : 8, fontSize: r.glpi ? 11 : 11.5 }}>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span style={{ width: r.glpi ? 6 : 8, height: r.glpi ? 6 : 8, borderRadius: 99, background: r.cor }}/>{r.glpi ? `↳ ${r.l}` : r.l}</span>
+                <td style={{ ...tdP, textAlign: 'left', color: 'var(--text)', fontWeight: 600, position: 'sticky', left: 0, background: 'var(--surface)' }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span style={{ width: 8, height: 8, borderRadius: 99, background: r.cor }}/>{r.l}</span>
                 </td>
                 {dados.map(d => {
                   const q = Number(r.q(d)) || 0;
                   return (
                     <td key={d.mes} className={q && onDrill ? 'drill' : undefined}
-                      onClick={q && onDrill ? () => (r.glpi
-                        ? onDrill({ titulo: `Pendentes · ${r.l} · ${MESES[d.mes - 1]}`, dim: 'glpi', valor: r.k, mesIni: d.mes, mesFim: d.mes })
-                        : abrirMes(d, r.k)) : undefined}
+                      onClick={q && onDrill ? () => abrirMes(d, r.k) : undefined}
                       title={q ? `${q} nota${q === 1 ? '' : 's'} · ${brl0(r.v(d))}` : undefined}
-                      style={{ ...tdP, color: q ? (r.k === 'pendente' ? COR_PEND : 'var(--text-2)') : 'var(--text-3)', fontWeight: r.k === 'pendente' && q ? 700 : 400, fontSize: r.glpi ? 11 : 11.5 }}>
+                      style={{ ...tdP, color: q ? (r.k === 'pendente' ? COR_PEND : 'var(--text-2)') : 'var(--text-3)', fontWeight: r.k === 'pendente' && q ? 700 : 400 }}>
                       {q ? `${q} · ${brlK(r.v(d))}` : '—'}
                     </td>
                   );
                 })}
                 <td className={r.tq && onDrill ? 'drill' : undefined}
-                  onClick={r.tq && onDrill ? () => onDrill(r.glpi
-                    ? { titulo: `Pendentes de lançamento · ${r.l}`, dim: 'glpi', valor: r.k }
-                    : { titulo: r.k === 'lancada' ? 'Lançadas no Protheus' : 'Pendentes de lançamento no Protheus', dim: 'protheus', valor: r.k }) : undefined}
+                  onClick={r.tq && onDrill ? () => onDrill({ titulo: r.k === 'lancada' ? 'Lançadas no Protheus' : 'Pendentes de lançamento no Protheus', dim: 'protheus', valor: r.k }) : undefined}
                   style={{ ...tdP, fontWeight: 700, color: 'var(--text)', borderLeft: '1px solid var(--border)' }}>{r.tq} · {brlK(r.tv)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Chamados de lançamento fiscal (GLPI) ─────────────────── */
+const SITUACOES_GLPI = [
+  { k: 'sem_chamado', l: 'Sem chamado',        d: 'Nenhum chamado aberto para a NF',  cor: '#C2413B' },
+  { k: 'aberto',      l: 'Em atendimento',     d: 'Chamado aberto, aguardando o fiscal', cor: '#1E4DB7' },
+  { k: 'pendente',    l: 'Pendente',           d: 'O fiscal devolveu com pendência',  cor: '#D97706' },
+  { k: 'solucionado', l: 'Concluído',          d: 'Chamado solucionado ou fechado',   cor: '#2F855A' },
+];
+function GraficoGlpi({ glpi, atualizadoEm, ini, fim, onDrill, altura }) {
+  const wrapRef = useRef(null);
+  const [w, setW] = useState(900);
+  const [hover, setHover] = useState(null);
+  useEffect(() => {
+    const el = wrapRef.current; if (!el) return;
+    const ro = new ResizeObserver(([e]) => setW(Math.max(320, e.contentRect.width)));
+    ro.observe(el); return () => ro.disconnect();
+  }, []);
+  const n = (v) => Number(v) || 0;
+  const dados = (glpi || []).slice(ini - 1, fim);
+  const qtdMes = (d) => SITUACOES_GLPI.reduce((a, sg) => a + n(d['qtd_' + sg.k]), 0);
+  const tot = Object.fromEntries(SITUACOES_GLPI.map(sg => [sg.k, {
+    q: dados.reduce((a, d) => a + n(d['qtd_' + sg.k]), 0), v: dados.reduce((a, d) => a + n(d[sg.k]), 0) }]));
+  const qTotal = SITUACOES_GLPI.reduce((a, sg) => a + tot[sg.k].q, 0);
+  const comSol = dados.reduce((a, d) => a + n(d.qtd_com_solucao), 0);
+  const media = comSol ? dados.reduce((a, d) => a + n(d.dias_solucao), 0) / comSol : null;
+  const abrir = (sg, d) => onDrill?.(d
+    ? { titulo: `Chamado GLPI · ${sg.l} · ${MESES[d.mes - 1]}`, dim: 'glpi', valor: sg.k, mesIni: d.mes, mesFim: d.mes }
+    : { titulo: `Chamado GLPI · ${sg.l}`, dim: 'glpi', valor: sg.k });
+
+  const H = altura || 210, padL = 40, padR = 12, padT = 12, padB = 28;
+  const max = Math.max(1, ...dados.map(qtdMes));
+  const niceMax = (() => { const p = Math.pow(10, Math.floor(Math.log10(max))); return Math.ceil(max / p) * p; })();
+  const slot = (w - padL - padR) / Math.max(1, dados.length);
+  const bw = Math.min(46, slot * 0.6);
+  const y = (v) => padT + (H - padT - padB) * (1 - v / niceMax);
+  const ticks = [0, 0.25, 0.5, 0.75, 1].map(t => Math.round(t * niceMax));
+
+  return (
+    <div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10, marginBottom: 14 }}>
+        {SITUACOES_GLPI.map(sg => (
+          <Kpi key={sg.k} label={sg.l} accent={sg.cor} value={`${tot[sg.k].q} NF${tot[sg.k].q === 1 ? '' : 's'}`}
+            note={`${brl0(tot[sg.k].v)} · ${pctFmt(qTotal ? tot[sg.k].q / qTotal : null)} das notas`}
+            onClick={tot[sg.k].q ? () => abrir(sg) : undefined}/>
+        ))}
+        <Kpi label="Tempo médio até a solução" value={media == null ? '—' : `${media.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} dias`}
+          note={`da abertura à solução · ${comSol} chamados`}/>
+      </div>
+      <div ref={wrapRef} style={{ position: 'relative' }}>
+        <svg width={w} height={H} role="img" aria-label="Notas por situação do chamado no GLPI, por mês" style={{ display: 'block' }} onMouseLeave={() => setHover(null)}>
+          {ticks.map(t => (
+            <g key={t}>
+              <line x1={padL} x2={w - padR} y1={y(t)} y2={y(t)} stroke="var(--surface-3)" strokeWidth="1"/>
+              <text x={padL - 8} y={y(t) + 4} textAnchor="end" fontSize="10.5" fill="var(--text-3)">{t}</text>
+            </g>
+          ))}
+          {dados.map((d, i) => {
+            const cx = padL + slot * i + slot / 2, x0 = cx - bw / 2;
+            let acc = 0;
+            return (
+              <g key={d.mes} onMouseEnter={() => setHover(i)} style={{ cursor: onDrill ? 'pointer' : 'default' }}>
+                <rect x={cx - slot / 2} y={padT} width={slot} height={H - padT - padB} fill={hover === i ? 'var(--surface-2)' : 'transparent'}/>
+                {[...SITUACOES_GLPI].reverse().map(sg => {
+                  const q = n(d['qtd_' + sg.k]); if (!q) return null;
+                  const y1 = y(acc), h = Math.max(4, y1 - y(acc + q)); acc += q;
+                  return <rect key={sg.k} x={x0} y={y1 - h} width={bw} height={h} fill={sg.cor} onClick={() => abrir(sg, d)}/>;
+                })}
+                <text x={cx} y={H - 8} textAnchor="middle" fontSize="11" fill="var(--text-3)">{MESES[d.mes - 1]}</text>
+              </g>
+            );
+          })}
+        </svg>
+        {hover != null && dados[hover] && (() => {
+          const d = dados[hover];
+          const left = Math.min(Math.max(padL + slot * hover + slot / 2 + 12, 0), w - 230);
+          return (
+            <div style={{ position: 'absolute', top: 6, left, width: 216, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, boxShadow: 'var(--shadow-sm)', padding: '8px 10px', fontSize: 11.5, pointerEvents: 'none', fontVariantNumeric: 'tabular-nums' }}>
+              <div style={{ fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>{MESES[d.mes - 1]} · {qtdMes(d)} NFs</div>
+              {SITUACOES_GLPI.map(sg => <Row key={sg.k} cor={sg.cor} label={`${sg.l} (${n(d['qtd_' + sg.k])})`} valor={brlK(d[sg.k])}/>)}
+              {onDrill && <div style={{ marginTop: 5, fontSize: 10.5, color: 'var(--text-3)' }}>Clique na cor da barra para ver as notas</div>}
+            </div>
+          );
+        })()}
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginTop: 6 }}>
+        <Legend items={SITUACOES_GLPI.map(sg => ({ label: sg.l, color: sg.cor }))}/>
+        {atualizadoEm && <span style={{ fontSize: 11, color: 'var(--text-3)' }}>
+          Chamados do GLPI atualizados em {new Date(atualizadoEm).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+        </span>}
+      </div>
+      <div className="pg-tabela" style={{ overflowX: 'auto', marginTop: 10 }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead><tr>
+            <th style={{ ...thP, textAlign: 'left', position: 'sticky', left: 0, background: 'var(--surface)' }}/>
+            {dados.map(d => <th key={d.mes} style={thP}>{MESES[d.mes - 1]}</th>)}
+            <th style={{ ...thP, color: 'var(--text)', borderLeft: '1px solid var(--border)' }}>Período</th>
+          </tr></thead>
+          <tbody>
+            {SITUACOES_GLPI.map(sg => (
+              <tr key={sg.k}>
+                <td style={{ ...tdP, textAlign: 'left', color: 'var(--text)', fontWeight: 600, position: 'sticky', left: 0, background: 'var(--surface)' }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span style={{ width: 8, height: 8, borderRadius: 99, background: sg.cor }}/>{sg.l}</span>
+                </td>
+                {dados.map(d => {
+                  const q = n(d['qtd_' + sg.k]);
+                  return (
+                    <td key={d.mes} className={q && onDrill ? 'drill' : undefined} onClick={q && onDrill ? () => abrir(sg, d) : undefined}
+                      title={q ? `${q} nota${q === 1 ? '' : 's'} · ${brl0(d[sg.k])}` : undefined}
+                      style={{ ...tdP, color: q ? 'var(--text-2)' : 'var(--text-3)' }}>
+                      {q ? `${q} · ${brlK(d[sg.k])}` : '—'}
+                    </td>
+                  );
+                })}
+                <td className={tot[sg.k].q && onDrill ? 'drill' : undefined} onClick={tot[sg.k].q && onDrill ? () => abrir(sg) : undefined}
+                  style={{ ...tdP, fontWeight: 700, color: 'var(--text)', borderLeft: '1px solid var(--border)' }}>{tot[sg.k].q} · {brlK(tot[sg.k].v)}</td>
               </tr>
             ))}
           </tbody>
@@ -623,7 +709,9 @@ export default function PainelGerencial({ onGoTo, user }) {
         </div>
       ) },
     { id: 'protheus', titulo: `Lançamento no Protheus · ${periodoTxt}`,
-      corpo: <GraficoProtheus protheus={data.protheus} glpiEm={data.glpi_atualizado_em} ini={ini} fim={fim} onDrill={abrir} altura={alturaSlide - 230}/> },
+      corpo: <GraficoProtheus protheus={data.protheus} ini={ini} fim={fim} onDrill={abrir} altura={alturaSlide - 230}/> },
+    { id: 'glpi', titulo: `Chamados de lançamento fiscal (GLPI) · ${periodoTxt}`,
+      corpo: <GraficoGlpi glpi={data.glpi} atualizadoEm={data.glpi_atualizado_em} ini={ini} fim={fim} onDrill={abrir} altura={alturaSlide - 300}/> },
     { id: 'area', titulo: 'Abertura por área de responsabilidade',
       corpo: <TabelaCalor linhas={data.area} ini={ini} fim={fim} fatMesVig={fatMesVig} fatPeriodo={tot.f} rotuloDim="Área" dimKey="area" onDrill={abrir}/> },
     { id: 'motivo', titulo: 'Abertura por motivo',
@@ -716,7 +804,12 @@ export default function PainelGerencial({ onGoTo, user }) {
           <Card title={`Lançamento no Protheus · ${periodoTxt}`}
             sub="Só notas do portal (devoluções de 2026), pelo mês de referência da devolução"
             right={<Legend items={[{ label: 'Lançadas', color: COR_LANC }, { label: 'Pendentes', color: COR_PEND }]}/>}>
-            <GraficoProtheus protheus={data.protheus} glpiEm={data.glpi_atualizado_em} ini={ini} fim={fim} onDrill={abrir}/>
+            <GraficoProtheus protheus={data.protheus} ini={ini} fim={fim} onDrill={abrir}/>
+          </Card>
+
+          <Card title={`Chamados de lançamento fiscal (GLPI) · ${periodoTxt}`}
+            sub="Situação do chamado aberto ao fiscal para cada NF do portal (sem as recusadas), pelo mês de referência da devolução">
+            <GraficoGlpi glpi={data.glpi} atualizadoEm={data.glpi_atualizado_em} ini={ini} fim={fim} onDrill={abrir}/>
           </Card>
 
           <Card title="Abertura por área de responsabilidade" sub="Quanto mais forte a cor, maior o valor no mês">
