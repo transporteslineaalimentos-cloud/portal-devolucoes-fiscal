@@ -327,7 +327,7 @@ function GraficoProtheus({ protheus, ini, fim, onDrill, altura }) {
 
 /* ─── Chamados de lançamento fiscal (GLPI) ─────────────────── */
 const SITUACOES_GLPI = [
-  { k: 'sem_chamado', l: 'Sem chamado',        d: 'Nenhum chamado aberto para a NF',  cor: '#C2413B' },
+  { k: 'sem_chamado', l: 'Sem chamado',        d: 'Não lançada e sem chamado aberto',  cor: '#C2413B' },
   { k: 'aberto',      l: 'Em atendimento',     d: 'Chamado aberto, aguardando o fiscal', cor: '#1E4DB7' },
   { k: 'pendente',    l: 'Pendente',           d: 'O fiscal devolveu com pendência',  cor: '#D97706' },
   { k: 'solucionado', l: 'Concluído',          d: 'Chamado solucionado ou fechado',   cor: '#2F855A' },
@@ -808,7 +808,7 @@ export default function PainelGerencial({ onGoTo, user }) {
           </Card>
 
           <Card title={`Chamados de lançamento fiscal (GLPI) · ${periodoTxt}`}
-            sub="Situação do chamado aberto ao fiscal para cada NF do portal (sem as recusadas), pelo mês de referência da devolução">
+            sub="Situação do chamado aberto ao fiscal para as NFs do portal, pelo mês de referência. Não entram: recusadas, troca de nota (não passa pelo GLPI) e notas já lançadas no Protheus sem chamado">
             <GraficoGlpi glpi={data.glpi} atualizadoEm={data.glpi_atualizado_em} ini={ini} fim={fim} onDrill={abrir}/>
           </Card>
 
