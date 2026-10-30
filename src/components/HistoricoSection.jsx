@@ -8,6 +8,7 @@ const TIPO_CFG = {
   centro_custo:  { label: 'Centro de custo',         color: '#0EA5E9',       icon: '▤' },
   cobranca:      { label: 'Cobrança registrada',     color: 'var(--green)',  icon: '$' },
   anexo:         { label: 'Anexo adicionado',        color: '#7C3AED',       icon: '⊕' },
+  anexo_removido:{ label: 'Anexo removido',          color: 'var(--red)',    icon: '⊖' },
   status_operacional: { label: 'Status operacional',  color: '#0F766E',       icon: '◆' },
   edicao_massa:  { label: 'Edição em massa',         color: 'var(--text-2)', icon: '≣' },
   retorno_cd:    { label: 'Retorno ao CD',           color: 'var(--green)',  icon: '↩' },

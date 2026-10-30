@@ -80,7 +80,8 @@ function periodoOr(ini, fim) {
 }
 
 function applyDevolucoesFilters(q, filters = {}) {
-  if (filters.status)         q = q.eq('status_portal', filters.status);
+  if (filters.status === 'sem_anexo') q = q.neq('status_portal', 'evidencia_anexada');
+  else if (filters.status)    q = q.eq('status_portal', filters.status);
   if (filters.cnpj_dest)      q = q.eq('cnpj_destinatario', filters.cnpj_dest);
   if (filters.cnpj_emitente)  q = q.eq('cnpj_emitente', filters.cnpj_emitente);
   if (filters.uf)             q = q.eq('uf_emitente', filters.uf);
@@ -117,8 +118,16 @@ function applyDevolucoesFilters(q, filters = {}) {
   if (filters.retornou_cd === 'sim')    q = q.eq('retornou_cd', true);
   if (filters.retornou_cd === 'nao')    q = q.or('retornou_cd.eq.false,retornou_cd.is.null');
   if (filters.retornou_cd === 'cobrar') q = q.eq('retornou_cd', true).eq('tem_itens_cobrar', true);
-  if (filters.centro_custo === 'sem')   q = q.is('centro_custo', null);
-  else if (filters.centro_custo)        q = q.eq('centro_custo', filters.centro_custo);
+  if (filters.centro_custo) {
+    // um ou vários, separados por "|"; "sem" = sem centro de custo
+    const partes = String(filters.centro_custo).split('|').filter(Boolean);
+    const sem = partes.includes('sem');
+    const vals = partes.filter(p => p !== 'sem');
+    if (sem && vals.length) q = q.or(`centro_custo.is.null,centro_custo.in.(${vals.map(v => `"${v}"`).join(',')})`);
+    else if (sem)            q = q.is('centro_custo', null);
+    else if (vals.length === 1) q = q.eq('centro_custo', vals[0]);
+    else if (vals.length)    q = q.in('centro_custo', vals);
+  }
 
   if (filters.transportador === '__sem__')    q = q.is('transportador_cobranca', null);
   else if (filters.transportador) {

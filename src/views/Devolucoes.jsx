@@ -119,6 +119,58 @@ const CaixaSel = ({ marcada }) => (
   </span>
 );
 
+/* Lista com várias opções marcáveis; valor guardado como "A|B|C". */
+function MultiOpcoes({ value, onChange, opcoes, rotuloTodos = 'Todos', plural = 'selecionados' }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const sel = value ? String(value).split('|').filter(Boolean) : [];
+  useEffect(() => {
+    if (!open) return;
+    const fora = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', fora);
+    return () => document.removeEventListener('mousedown', fora);
+  }, [open]);
+  const alterna = (v) => onChange((sel.includes(v) ? sel.filter(s => s !== v) : [...sel, v]).join('|'));
+  const rotulo = sel.length === 0 ? rotuloTodos
+    : sel.length === 1 ? (opcoes.find(o => o[0] === sel[0])?.[1] || sel[0])
+    : `${sel.length} ${plural}`;
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button type="button" onClick={() => setOpen(v => !v)} className="input" aria-expanded={open} aria-haspopup="listbox"
+        style={{ width: 186, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          gap: 8, cursor: 'pointer', fontSize: 12.5, textAlign: 'left',
+          background: sel.length ? 'var(--blue-dim)' : undefined, borderColor: sel.length ? 'var(--blue-mid)' : undefined,
+          color: sel.length ? 'var(--blue)' : undefined, fontWeight: sel.length ? 600 : 400 }}>
+        <span className="ellipsis">{rotulo}</span>
+        {sel.length > 0
+          ? <span role="button" tabIndex={0} aria-label="Limpar seleção"
+              onClick={e => { e.stopPropagation(); onChange(''); }}
+              onKeyDown={e => { if (e.key === 'Enter') { e.stopPropagation(); onChange(''); } }}
+              style={{ display: 'flex', flexShrink: 0 }}><Ic d={ICONES.x} size={11}/></span>
+          : <Ic d={ICONES.seta} size={11} color="var(--text-3)"/>}
+      </button>
+      {open && (
+        <div role="listbox" aria-multiselectable="true" style={{ position: 'absolute', top: 'calc(100% + 5px)', left: 0, zIndex: 300,
+          background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10,
+          boxShadow: 'var(--shadow-md)', width: 240, maxHeight: 300, overflowY: 'auto', padding: 4 }}>
+          {opcoes.map(([v, l]) => {
+            const marcada = sel.includes(v);
+            return (
+              <button key={v} type="button" role="option" aria-selected={marcada} onClick={() => alterna(v)}
+                style={{ display: 'flex', alignItems: 'center', gap: 9, width: '100%', padding: '7px 8px',
+                  border: 'none', borderRadius: 6, cursor: 'pointer', textAlign: 'left',
+                  background: marcada ? 'var(--blue-dim)' : 'transparent' }}>
+                <CaixaSel marcada={marcada}/>
+                <span className="ellipsis" style={{ fontSize: 12, color: v === 'sem' ? 'var(--text-2)' : 'var(--text)', fontWeight: marcada ? 600 : 400 }}>{l}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function TranspMultiSelect({ transportadoras, value, onChange }) {
   const [open, setOpen] = useState(false);
   const [busca, setBusca] = useState('');
@@ -357,7 +409,7 @@ export default function Devolucoes({ user, initialFilters = {} }) {
   if (filters.cnpj_emitente) chips.push({ k: 'cnpj_emitente', label: 'Cliente filtrado' });
   if (filters.cnpj_dest)     chips.push({ k: 'cnpj_dest', label: `Empresa: ${CNPJ_OPTIONS.find(o => o.v === filters.cnpj_dest)?.l || 'destino'}` });
   if (filters.linha_produto) chips.push({ k: 'linha_produto', label: `Linha: ${titulo(filters.linha_produto)}` });
-  if (filters.status)        chips.push({ k: 'status', label: filters.status === 'evidencia_anexada' ? 'Evidência anexada' : 'Evidência solicitada' });
+  if (filters.status)        chips.push({ k: 'status', label: { evidencia_anexada: 'Evidência anexada', evidencia_solicitada: 'Evidência solicitada', sem_anexo: 'Sem anexo' }[filters.status] || filters.status });
   if (filters.devolucao_total) chips.push({ k: 'devolucao_total', label: filters.devolucao_total === 'total' ? 'Somente total' : 'Somente parcial' });
   if (filters.lancado === 'sim') chips.push({ k: 'lancado', label: 'Lançada no Protheus' });
   if (filters.lancado === 'nao') chips.push({ k: 'lancado', label: 'Fora do Protheus' });
@@ -371,8 +423,11 @@ export default function Devolucoes({ user, initialFilters = {} }) {
   if (filters.flag_emissao === 'aguardando') chips.push({ k: 'flag_emissao', label: 'Aguardando entrega' });
   if (filters.nf_venda === 'nao_localizada') chips.push({ k: 'nf_venda', label: 'NF de venda não localizada' });
   if (filters.nf_venda === 'localizada')     chips.push({ k: 'nf_venda', label: 'NF de venda localizada' });
-  if (filters.centro_custo === 'sem') chips.push({ k: 'centro_custo', label: 'Sem centro de custo' });
-  else if (filters.centro_custo)      chips.push({ k: 'centro_custo', label: `Centro: ${titulo(filters.centro_custo)}` });
+  if (filters.centro_custo) {
+    const cc = filters.centro_custo.split('|').filter(Boolean);
+    chips.push({ k: 'centro_custo', label: cc.length > 1 ? `${cc.length} centros de custo`
+      : cc[0] === 'sem' ? 'Sem centro de custo' : `Centro: ${titulo(cc[0])}` });
+  }
   if (filters.retornou_cd === 'sim')    chips.push({ k: 'retornou_cd', label: 'Retornou ao CD' });
   if (filters.retornou_cd === 'cobrar') chips.push({ k: 'retornou_cd', label: 'CD com itens a cobrar' });
   if (filters.retornou_cd === 'nao')    chips.push({ k: 'retornou_cd', label: 'Não retornou ao CD' });
@@ -503,7 +558,7 @@ export default function Devolucoes({ user, initialFilters = {} }) {
                 </Campo>
                 <Campo label="Evidência">
                   <select value={filters.status} onChange={e => applyFilter({ status: e.target.value })} className="input">
-                    <Opcoes itens={[['', 'Todas'], ['evidencia_solicitada', 'Solicitada'], ['evidencia_anexada', 'Anexada']]}/>
+                    <Opcoes itens={[['', 'Todas'], ['sem_anexo', 'Sem anexo'], ['evidencia_solicitada', 'Solicitada'], ['evidencia_anexada', 'Anexada']]}/>
                   </select>
                 </Campo>
               </div>
@@ -518,11 +573,8 @@ export default function Devolucoes({ user, initialFilters = {} }) {
                   </select>
                 </Campo>
                 <Campo label="Centro de custo">
-                  <select value={filters.centro_custo} onChange={e => applyFilter({ centro_custo: e.target.value })} className="input">
-                    <option value="">Todos</option>
-                    <option value="sem">Sem centro de custo</option>
-                    {CENTROS.map(c => <option key={c} value={c}>{titulo(c)}</option>)}
-                  </select>
+                  <MultiOpcoes value={filters.centro_custo} onChange={v => applyFilter({ centro_custo: v })}
+                    opcoes={[['sem', 'Sem centro de custo'], ...CENTROS.map(c => [c, titulo(c)])]} rotuloTodos="Todos" plural="centros"/>
                 </Campo>
                 <Campo label="NF de venda">
                   <select value={filters.nf_venda} onChange={e => applyFilter({ nf_venda: e.target.value })} className="input">
