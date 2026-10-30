@@ -37,9 +37,12 @@ const Ic = ({ d, size = 14, color = 'currentColor' }) => (
   </svg>
 );
 
+import { abaPermitida, somenteLeitura } from './lib/permissoes.js';
+
 function Portal() {
   const { user, logout } = useAuth();
-  const [tab, setTab] = useState('dashboard');
+  const [tab, setTab] = useState(() => (abaPermitida(user, 'dashboard') ? 'dashboard' : 'painel'));
+  const leitura = somenteLeitura(user);
   const [tabFilters, setTabFilters] = useState({});
   const [counts, setCounts] = useState({});
   const [pendencias, setPendencias] = useState(null);
@@ -83,6 +86,7 @@ function Portal() {
   }, []);
 
   const changeTab = (id, filters = {}) => {
+    if (!abaPermitida(user, id)) return;
     setTab(id);
     if (Object.keys(filters).length)
       setTabFilters(prev => ({ ...prev, [id]: { ...filters, _ts: Date.now() } }));
@@ -147,7 +151,7 @@ function Portal() {
           </div>
 
           {/* Painel de pendências */}
-          <div ref={pendRef} style={{ position: 'relative' }}>
+          {!leitura && <div ref={pendRef} style={{ position: 'relative' }}>
             <button
               onClick={() => { setShowPendencias(v => !v); refreshPendencias(); }}
               style={{
@@ -222,7 +226,7 @@ function Portal() {
                 </div>
               </div>
             )}
-          </div>
+          </div>}
 
           {/* Usuário logado */}
           <div style={{
@@ -235,14 +239,14 @@ function Portal() {
               {user?.name?.split(' ')[0] || user?.email?.split('@')[0]}
             </span>
             <span style={{ fontSize: 9.5, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.06em' }}>
-              {user?.role}
+              {user?.role === 'visualizador' ? 'visualização' : user?.role}
             </span>
           </div>
         </header>
 
         {/* Conteúdo */}
         <main className="app-content">
-          {tab === 'dashboard' && <Dashboard onGoTo={changeTab} />}
+          {tab === 'dashboard' && abaPermitida(user, 'dashboard') && <Dashboard onGoTo={changeTab} />}
           {tab === 'painel' && (
             <Suspense fallback={<Fallback />}>
               <PainelGerencial onGoTo={changeTab} user={user} />
@@ -253,7 +257,7 @@ function Portal() {
               <Devolucoes user={user} initialFilters={tabFilters.devolucoes || {}} />
             </Suspense>
           )}
-          {tab === 'cobrancas' && (
+          {tab === 'cobrancas' && abaPermitida(user, 'cobrancas') && (
             <Suspense fallback={<Fallback />}>
               <Cobrancas user={user} initialFilters={tabFilters.cobrancas || {}}
                 onChanged={refreshCounts} />

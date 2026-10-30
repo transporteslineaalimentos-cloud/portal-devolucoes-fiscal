@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { dbSetStatusOperacional } from '../config/supabase';
 import { calcStatusOperacional, STATUS_OP_MANUAIS, fmtDateTime } from '../utils.jsx';
+import { somenteLeitura } from '../lib/permissoes.js';
 
 const REGRA = {
   'LANÇADA':                'Lançada no Protheus e o físico chegou ao CD.',
@@ -12,6 +13,7 @@ const REGRA = {
 export default function StatusOperacionalCard({ dev, user, onChanged }) {
   const atual = calcStatusOperacional(dev);
   const manual = STATUS_OP_MANUAIS.includes(atual);
+  const podeTrocar = manual && !somenteLeitura(user);
   const [valor, setValor] = useState(atual);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
@@ -32,7 +34,7 @@ export default function StatusOperacionalCard({ dev, user, onChanged }) {
           <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', marginBottom: 3 }}>Status operacional</div>
           <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>{atual}</div>
         </div>
-        {manual && (
+        {podeTrocar && (
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <select className="input" value={valor} onChange={e => setValor(e.target.value)} style={{ fontSize: 12, minWidth: 250 }}>
               {STATUS_OP_MANUAIS.map(s => <option key={s} value={s}>{s}</option>)}

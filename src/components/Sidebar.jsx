@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { abaPermitida } from '../lib/permissoes.js';
 
 const Ic = ({ d, size = 16 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
@@ -56,7 +57,7 @@ export default function Sidebar({ tab, onChange, counts = {}, user, onLogout }) 
       {/* Nav */}
       <nav className="sidebar-nav">
         {!collapsed && <div className="nav-section-label">Menu</div>}
-        {NAV.filter(item => !item.adminOnly || user?.role === 'admin').map(item => (
+        {NAV.filter(item => abaPermitida(user, item.id)).map(item => (
           <button key={item.id} onClick={() => onChange(item.id)}
             className={`nav-item ${tab === item.id ? 'active' : ''}`}
             title={collapsed ? item.label : undefined}>

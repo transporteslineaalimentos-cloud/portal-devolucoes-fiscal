@@ -23,7 +23,18 @@ export function AuthProvider({ children }) {
         localStorage.setItem('df_refresh', refreshed.refresh);
         syncAuthToken();
         const stored = localStorage.getItem('df_user');
-        if (stored) setUser(JSON.parse(stored));
+        if (stored) {
+          const u = JSON.parse(stored);
+          // perfil pode ter mudado desde o último login (ex.: virou só visualização)
+          const profile = await dbGetUser(u.email).catch(() => null);
+          if (!profile) {
+            ['df_token', 'df_refresh', 'df_user'].forEach(k => localStorage.removeItem(k));
+            return;
+          }
+          const atual = { ...u, name: profile.nome, role: profile.role };
+          localStorage.setItem('df_user', JSON.stringify(atual));
+          setUser(atual);
+        }
       } catch { /* ignore */ }
       finally { setLoading(false); }
     }

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { dbListAnexos, dbUploadAnexo, dbGetAnexoUrl, dbDeleteAnexo } from '../config/supabase';
+import { somenteLeitura } from '../lib/permissoes.js';
 
 const Ic = ({ d, size = 14, color = 'currentColor' }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
@@ -33,6 +34,7 @@ const ACCEPT = '.jpg,.jpeg,.png,.gif,.webp,.pdf,.xlsx,.xls,.txt';
 const MAX_SIZE = 20 * 1024 * 1024; // 20MB
 
 export default function AnexosSection({ devolucaoId, user, onCount }) {
+  const leitura = somenteLeitura(user);
   const [anexos, setAnexos]     = useState([]);
   const [loading, setLoading]   = useState(true);
   const [preview, setPreview]   = useState(null);
@@ -141,12 +143,12 @@ export default function AnexosSection({ devolucaoId, user, onCount }) {
           }}/>
 
         {/* Botão visível dentro da seção */}
-        <button onClick={() => fileRef.current?.click()}
+        {!leitura && <button onClick={() => fileRef.current?.click()}
           style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 5, fontSize: 11,
             background: 'none', border: '1px solid var(--border)', borderRadius: 6,
             padding: '4px 10px', cursor: 'pointer', color: 'var(--text-2)', fontWeight: 600 }}>
           <Ic d="M12 4v16m8-8H4" size={11}/> Adicionar
-        </button>
+        </button>}
       </div>
 
       {/* Input múltiplo — sempre montado */}
@@ -260,12 +262,12 @@ export default function AnexosSection({ devolucaoId, user, onCount }) {
                   style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--blue)', padding: 4, borderRadius: 6, display: 'flex', alignItems: 'center' }}>
                   <Ic d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" size={15}/>
                 </button>
-                <button onClick={() => handleDelete(a)} title="Remover"
+                {!leitura && <button onClick={() => handleDelete(a)} title="Remover"
                   style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: 4, borderRadius: 6, display: 'flex', alignItems: 'center' }}
                   onMouseEnter={e => e.currentTarget.style.color = 'var(--red)'}
                   onMouseLeave={e => e.currentTarget.style.color = 'var(--text-3)'}>
                   <Ic d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" size={15}/>
-                </button>
+                </button>}
               </div>
             ))}
           </div>

@@ -7,6 +7,7 @@ import Apresentacao from '../components/Apresentacao.jsx';
 import { gerarPainelDevolucoes } from '../lib/painelDevolucoes';
 import { RankingVendedor, TabelaVendedor } from '../components/PainelVendedor.jsx';
 import { usePivotVendedor } from '../lib/pivotVendedor.js';
+import { somenteLeitura } from '../lib/permissoes.js';
 import ModalImportVendedores from '../components/ModalImportVendedores.jsx';
 
 /* ─────────────────────────────────────────────────────────────
@@ -575,7 +576,7 @@ export default function PainelGerencial({ onGoTo, user }) {
 
           <Card title="Devolução comercial por vendedor"
             sub="Só devoluções com área responsável Comercial ou Customer Service · índice = valor devolvido ÷ valor faturado para os clientes do vendedor, no mesmo período"
-            right={
+            right={!somenteLeitura(user) &&
               <button className="btn btn-ghost btn-sm no-print" onClick={() => setImportVend(true)}
                 title={infoVend?.clientes ? `${infoVend.clientes.toLocaleString('pt-BR')} clientes · atualizado em ${new Date(infoVend.atualizado_em).toLocaleDateString('pt-BR')}` : 'Carregar o cadastro de vendedores'}>
                 Atualizar cadastro de vendedores

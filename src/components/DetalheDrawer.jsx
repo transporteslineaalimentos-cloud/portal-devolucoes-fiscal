@@ -6,6 +6,7 @@ import AnexosSection from './AnexosSection.jsx';
 import HistoricoSection from './HistoricoSection.jsx';
 import RetornoCDSection from './RetornoCDSection.jsx';
 import StatusOperacionalCard from './StatusOperacionalCard.jsx';
+import { somenteLeitura } from '../lib/permissoes.js';
 
 const AREA_CORES = {
   'COMERCIAL':         { color: 'var(--blue)',   bg: 'var(--blue-dim)' },
@@ -152,7 +153,8 @@ function Bloco({ titulo: t, acao, children, aberto }) {
     </section>
   );
 }
-function Linha({ label, children, onEditar, editarLabel = 'Editar' }) {
+function Linha({ label, children, onEditar: onEditarProp, editarLabel = 'Editar', leitura }) {
+  const onEditar = leitura ? null : onEditarProp;
   return (
     <div className="dd-linha">
       <dt>{label}</dt>
@@ -204,6 +206,7 @@ function ValoresNota({ dev }) {
 
 /* ═══ Componente principal ═════════════════════════════ */
 export default function DetalheDrawer({ id, user, onClose, onSaved }) {
+  const leitura = somenteLeitura(user);
   const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(true);
   const [aba, setAba]         = useState('resumo');
@@ -239,6 +242,7 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
   const editando = editStatus || editMotivo || editTransp || editCC;
   const fecharEditores = () => { setEdit(false); setEditMotivo(false); setEditTransp(false); setEditCC(false); };
   const abrirEditor = (qual) => {
+    if (leitura) return;
     fecharEditores(); setCcResult(null);
     if (qual === 'status') setEdit(true);
     if (qual === 'motivo') setEditMotivo(true);
@@ -668,7 +672,7 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
 
                   <Bloco titulo="Classificação">
                     <dl style={{ margin: 0 }}>
-                      <Linha label="Motivo" onEditar={() => abrirEditor('motivo')}
+                      <Linha leitura={leitura} label="Motivo" onEditar={() => abrirEditor('motivo')}
                         editarLabel={dev.motivo_devolucao ? 'Editar' : 'Classificar'}>
                         {dev.motivo_devolucao ? titulo(dev.motivo_devolucao) : <Vazio>Sem motivo classificado</Vazio>}
                       </Linha>
@@ -678,11 +682,11 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
                               padding: '2px 9px', borderRadius: 20 }}>{dev.area_responsavel}</span>
                           : <Vazio>Definida pelo motivo</Vazio>}
                       </Linha>
-                      <Linha label="Centro de custo" onEditar={() => abrirEditor('cc')}
+                      <Linha leitura={leitura} label="Centro de custo" onEditar={() => abrirEditor('cc')}
                         editarLabel={dev.centro_custo ? 'Mudar' : 'Vincular'}>
                         {dev.centro_custo ? titulo(dev.centro_custo) : <Vazio/>}
                       </Linha>
-                      <Linha label="Transportador" onEditar={() => abrirEditor('transp')}
+                      <Linha leitura={leitura} label="Transportador" onEditar={() => abrirEditor('transp')}
                         editarLabel={dev.transportador_cobranca ? 'Trocar' : 'Vincular'}>
                         {dev.transportador_cobranca
                           ? <span>{dev.transportador_cobranca}
@@ -701,7 +705,7 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
                             </span>
                           : <Vazio/>}
                       </Linha>
-                      <Linha label="Evidência" onEditar={() => abrirEditor('status')}
+                      <Linha leitura={leitura} label="Evidência" onEditar={() => abrirEditor('status')}
                         editarLabel={dev.status_portal ? 'Alterar' : 'Marcar'}>
                         {dev.status_portal ? <Badge status={dev.status_portal}/> : <Vazio>Nada marcado</Vazio>}
                       </Linha>
@@ -944,6 +948,7 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
 
             {/* ── Ações ────────────────────────────────── */}
             <div className="dd-rodape">
+              {!leitura && <>
               <button onClick={() => { setAba('anexos'); setTimeout(() => document.getElementById('btn-add-anexo')?.click(), 120); }}
                 className="btn btn-primary btn-sm">
                 <Ic d={ICO.clipe} size={13}/> Anexar evidência
@@ -951,7 +956,8 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
               <button onClick={() => abrirEditor('status')} className={`btn btn-sm ${editStatus ? 'btn-primary' : 'btn-outline'}`}>
                 <Ic d={ICO.alvo} size={13}/> {dev.status_portal ? 'Alterar evidência' : 'Marcar evidência'}
               </button>
-              {!dev.motivo_devolucao && (
+              </>}
+              {!leitura && !dev.motivo_devolucao && (
                 <button onClick={() => abrirEditor('motivo')} className={`btn btn-sm ${editMotivo ? 'btn-primary' : 'btn-outline'}`}>
                   <Ic d={ICO.etiqueta} size={13}/> Classificar motivo
                 </button>

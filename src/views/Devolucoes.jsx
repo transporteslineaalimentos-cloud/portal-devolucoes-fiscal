@@ -8,6 +8,7 @@ import RetornoCDTrabalho from '../components/RetornoCDTrabalho.jsx';
 import BarraSelecao from '../components/BarraSelecao.jsx';
 import { exportDevolucoesToExcel } from '../utils/exportExcel.js';
 import { baixarPlanilhaConsulta } from '../utils/planilhaConsulta.js';
+import { somenteLeitura } from '../lib/permissoes.js';
 
 const Ic = ({ d, size = 14, color = 'currentColor', w = 1.8 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
@@ -101,8 +102,10 @@ function MenuAcoes({ onImportar, onExcel, onConsulta, exportando, gerando }) {
         <div className="dv-menu" role="menu">
           {item(ICONES.baixar,   'Exportar Excel',       onExcel,    exportando && 'Exportando…')}
           {item(ICONES.planilha, 'Planilha de consulta', onConsulta, gerando && 'Gerando…')}
+          {onImportar && <>
           <div style={{ height: 1, background: 'var(--border)', margin: '4px 6px' }}/>
           {item(ICONES.subir,    'Importar Protheus',    onImportar)}
+          </>}
         </div>
       )}
     </div>
@@ -288,6 +291,7 @@ function Alertas({ row }) {
 
 /* ═══ Tela ═════════════════════════════════════════════ */
 export default function Devolucoes({ user, initialFilters = {} }) {
+  const leitura = somenteLeitura(user);
   const [modo, setModo] = useState('lista');        // lista | cd
   const [selMode, setSelMode] = useState(false);
   const [marcadas, setMarcadas] = useState(() => new Set());
@@ -517,6 +521,7 @@ export default function Devolucoes({ user, initialFilters = {} }) {
             <Ic d={ICONES.recarregar} size={13}/>
           </button>
 
+          {!leitura && <>
           <button onClick={() => setModo('cd')} className="btn btn-outline btn-sm" title="Conferir as notas que chegaram ao CD">
             Recebimento no CD
           </button>
@@ -525,14 +530,15 @@ export default function Devolucoes({ user, initialFilters = {} }) {
             className={`btn btn-sm ${selMode ? 'btn-primary' : 'btn-outline'}`} title="Marcar várias notas e alterar de uma vez">
             {selMode ? 'Sair da seleção' : 'Selecionar várias'}
           </button>
+          </>}
 
           <div className="dv-spacer"/>
 
-          <MenuAcoes onImportar={() => setShowImport(true)} onExcel={handleExport} onConsulta={handleConsulta}
+          <MenuAcoes onImportar={leitura ? null : () => setShowImport(true)} onExcel={handleExport} onConsulta={handleConsulta}
             exportando={exporting} gerando={gerandoConsulta}/>
-          <button onClick={() => setShowModal(true)} className="btn btn-primary btn-sm">
+          {!leitura && <button onClick={() => setShowModal(true)} className="btn btn-primary btn-sm">
             <Ic d={ICONES.mais} size={13}/> Lançar manual
-          </button>
+          </button>}
         </div>
 
         {/* ─ Filtros ─ */}
