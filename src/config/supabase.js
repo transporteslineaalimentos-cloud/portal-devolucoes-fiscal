@@ -392,7 +392,14 @@ export async function dbGetDevolucaoDetail(id) {
     }
   }
 
-  return { dev, nfVenda };
+  // chamados do GLPI ligados a esta nota (lançamento fiscal)
+  const chamados = await safeQuery(
+    supabase.from('glpi_chamados')
+      .select('id, status, data_abertura, data_solucao, data_fechamento, tecnico, requerente, motivo, formulario_proprio')
+      .eq('devolucao_id', id).order('data_abertura', { ascending: false }),
+    []
+  );
+  return { dev, nfVenda, chamados };
 }
 
 export async function dbUpdateStatus(id, newStatus, obs, userName) {

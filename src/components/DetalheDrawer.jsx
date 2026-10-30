@@ -752,6 +752,23 @@ export default function DetalheDrawer({ id, user, onClose, onSaved, camada }) {
                             </span>
                           : <Vazio>Ainda não lançada</Vazio>}
                       </Linha>
+                      <Linha label="Chamado no GLPI">
+                        {(data?.chamados || []).length === 0
+                          ? <Vazio>{dev.lancado_protheus ? 'Nenhum chamado encontrado' : 'Nenhum chamado aberto para o fiscal'}</Vazio>
+                          : <span style={{ display: 'inline-flex', flexDirection: 'column', gap: 3 }}>
+                              {data.chamados.map(c => (
+                                <span key={c.id}>
+                                  <b style={{ color: 'var(--text)' }}>#{c.id}</b>
+                                  <span style={{ fontWeight: 700, marginLeft: 6, color: c.status === 'Pendente' ? 'var(--yellow)' : ['Solucionado','Fechado'].includes(c.status) ? 'var(--green)' : 'var(--blue)' }}>{c.status}</span>
+                                  <span style={{ color: 'var(--text-3)' }}>
+                                    {' · aberto em '}{fmtDate(String(c.data_abertura).slice(0, 10))}
+                                    {c.data_solucao ? ` · solucionado em ${fmtDate(String(c.data_solucao).slice(0, 10))}` : ''}
+                                    {c.tecnico ? ` · ${c.tecnico}` : ''}
+                                  </span>
+                                </span>
+                              ))}
+                            </span>}
+                      </Linha>
                       {!dev.lancado_protheus && farol.cor !== 'sem_data' && (
                         <Linha label="Prazo de 90 dias">
                           <span className="dv-barra" style={{ width: 90 }}>

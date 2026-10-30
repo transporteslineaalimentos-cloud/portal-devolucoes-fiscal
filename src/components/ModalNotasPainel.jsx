@@ -39,6 +39,7 @@ const COLS = [
   { k: 'status',  t: 'Status operacional', w: 200, v: r => r.st_op, s: r => r.st_op },
   { k: 'prazo',   t: 'Prazo 90d',     w: 84,  v: r => prazo(r).txt, s: r => prazo(r).dias ?? 9999 },
   { k: 'lanc',    t: 'Protheus',      w: 76,  v: r => r.lancado_protheus ? dt(r.dt_lancamento_protheus) : 'Não', s: r => r.dt_lancamento_protheus || '' },
+  { k: 'glpi',    t: 'Chamado GLPI',  w: 150, v: r => r.glpi_id ? `#${r.glpi_id} · ${r.glpi_status}` : 'Sem chamado', s: r => r.glpi_status || '' },
   { k: 'cd',      t: 'CD',            w: 44,  v: r => r.retornou_cd ? 'Sim' : 'Não', s: r => r.retornou_cd ? 1 : 0 },
   { k: 'transp',  t: 'Transportador', w: 170, v: r => r.transp_nome, s: r => r.transp_nome },
 ];
