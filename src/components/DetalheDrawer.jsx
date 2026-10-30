@@ -205,7 +205,7 @@ function ValoresNota({ dev }) {
 }
 
 /* ═══ Componente principal ═════════════════════════════ */
-export default function DetalheDrawer({ id, user, onClose, onSaved }) {
+export default function DetalheDrawer({ id, user, onClose, onSaved, camada }) {
   const leitura = somenteLeitura(user);
   const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(true);
@@ -380,7 +380,7 @@ export default function DetalheDrawer({ id, user, onClose, onSaved }) {
   ];
 
   return (
-    <div className="drawer-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+    <div className="drawer-overlay" style={camada ? { zIndex: camada } : undefined} onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="drawer" style={{ width: 720 }} role="dialog" aria-label="Detalhe da devolução">
 
         {/* ── Cabeçalho ───────────────────────────────── */}

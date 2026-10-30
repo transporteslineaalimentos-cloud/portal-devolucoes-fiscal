@@ -166,7 +166,7 @@ export default function ModalNotasPainel({ filtro, titulo, user, onClose, onChan
       </div>
 
       {selId && (
-        <DetalheDrawer id={selId} user={user}
+        <DetalheDrawer id={selId} user={user} camada={700}
           onClose={() => setSelId(null)}
           onSaved={() => { setReload(x => x + 1); onChanged?.(); }}/>
       )}
