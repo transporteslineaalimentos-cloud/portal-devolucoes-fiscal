@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import * as XLSX from 'xlsx';
-import { dbImportarClientesVendedor } from '../config/supabase';
+import { dbImportarClientesVendedor, dbSyncVendedoresGobi, dbInfoClientesVendedor } from '../config/supabase';
 
 /* ─────────────────────────────────────────────────────────────
    Atualiza o cadastro cliente x vendedor a partir do relatório
@@ -83,6 +83,30 @@ export default function ModalImportVendedores({ info, onClose, onImportado }) {
   const [enviando, setEnviando] = useState(false);
   const [prog, setProg] = useState(null);
   const [res, setRes] = useState(null);
+  const [inf, setInf] = useState(info);
+  const [sinc, setSinc] = useState('');      // '', 'pedindo', 'rodando'
+  const [verPlanilha, setVerPlanilha] = useState(false);
+  useEffect(() => { setInf(info); }, [info]);
+
+  // enquanto o robô roda, consulta o andamento a cada 5 s
+  useEffect(() => {
+    if (sinc !== 'rodando') return;
+    const id = setInterval(async () => {
+      try {
+        const i = await dbInfoClientesVendedor();
+        setInf(i);
+        if (i?.sync?.terminado_em) { setSinc(''); if (!i.sync.erro) onImportado?.(); }
+      } catch { /* tenta de novo */ }
+    }, 5000);
+    return () => clearInterval(id);
+  }, [sinc, onImportado]);
+
+  const sincronizar = async () => {
+    setErro(''); setSinc('pedindo');
+    try { await dbSyncVendedoresGobi(); setSinc('rodando'); setInf(i => ({ ...i, sync: { iniciado_em: new Date().toISOString() } })); }
+    catch (x) { setErro(x.message); setSinc(''); }
+  };
+  const ult = inf?.sync;
 
   const escolher = async (e) => {
     const f = e.target.files?.[0];
@@ -110,13 +134,36 @@ export default function ModalImportVendedores({ info, onClose, onImportado }) {
         <div className="modal-header" style={{ padding: '16px 20px 12px', borderBottom: '1px solid var(--border)' }}>
           <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>Cadastro de clientes x vendedor</div>
           <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 3 }}>
-            {info?.clientes
-              ? `Hoje: ${n(info.clientes)} clientes e ${n(info.vendedores)} vendedores · atualizado em ${new Date(info.atualizado_em).toLocaleString('pt-BR')}${info.atualizado_por ? ' · ' + info.atualizado_por : ''}`
+            {inf?.clientes
+              ? `Hoje: ${n(inf.clientes)} clientes e ${n(inf.vendedores)} vendedores · última mudança em ${new Date(inf.atualizado_em).toLocaleString('pt-BR')}${inf.atualizado_por ? ' · ' + inf.atualizado_por : ''}`
               : 'Nenhum cadastro carregado ainda.'}
           </div>
         </div>
 
         <div className="modal-body" style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ border: '1px solid var(--border)', borderRadius: 10, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>Integração com o GoBI</div>
+            <div style={{ fontSize: 12.5, color: 'var(--text-2)', lineHeight: 1.5 }}>
+              O cadastro é atualizado sozinho todo dia de manhã pelo relatório de clientes do Protheus (GoBI 301).
+              Use o botão se acabou de mudar o vendedor de algum cliente.
+            </div>
+            {ult && (
+              <div style={{ fontSize: 12, lineHeight: 1.5, color: ult.erro ? 'var(--red)' : 'var(--text-3)' }}>
+                {!ult.terminado_em ? 'Atualizando pelo GoBI… (leva 1 a 2 minutos)'
+                  : ult.erro ? `Última tentativa (${new Date(ult.iniciado_em).toLocaleString('pt-BR')}) falhou: ${ult.erro}`
+                  : `Última atualização: ${new Date(ult.terminado_em).toLocaleString('pt-BR')} · ${n(ult.linhas_api)} clientes no GoBI · ${n(ult.novos)} novos · ${n(ult.vendedor_alterado)} mudaram de vendedor`}
+              </div>
+            )}
+            <button className="btn btn-primary btn-sm" style={{ alignSelf: 'flex-start' }} onClick={sincronizar}
+              disabled={!!sinc || (ult && !ult.terminado_em)}>
+              {sinc === 'pedindo' ? 'Pedindo…' : (sinc === 'rodando' || (ult && !ult.terminado_em)) ? 'Atualizando…' : 'Atualizar agora pelo GoBI'}
+            </button>
+          </div>
+
+          <button type="button" className="btn btn-ghost btn-xs" style={{ alignSelf: 'flex-start' }} onClick={() => setVerPlanilha(v => !v)}>
+            {verPlanilha ? '▾' : '▸'} Ou enviar uma planilha (se o GoBI estiver fora do ar)
+          </button>
+          {verPlanilha && <>
           <div style={{ fontSize: 12.5, color: 'var(--text-2)', lineHeight: 1.5 }}>
             Envie o relatório de clientes com vendedor do Protheus (.xlsx). Clientes novos entram, quem mudou de vendedor
             é atualizado e quem não veio na planilha continua com o último vendedor conhecido.
@@ -147,12 +194,14 @@ export default function ModalImportVendedores({ info, onClose, onImportado }) {
             </div>
           )}
 
+          </>}
+
           {erro && <div style={{ color: 'var(--red)', fontSize: 12.5 }}>{erro}</div>}
         </div>
 
         <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
           <button className="btn btn-ghost btn-sm" onClick={onClose} disabled={enviando}>{res ? 'Fechar' : 'Cancelar'}</button>
-          {!res && (
+          {!res && verPlanilha && (
             <button className="btn btn-primary btn-sm" onClick={enviar} disabled={!lido || !lido.linhas.length || enviando}>
               {enviando ? 'Atualizando…' : `Atualizar ${lido ? n(lido.linhas.length) + ' clientes' : ''}`}
             </button>

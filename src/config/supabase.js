@@ -1124,6 +1124,19 @@ export async function dbInfoClientesVendedor() {
   return data;
 }
 
+// Pede ao robô para puxar agora o cadastro do GoBI (relatório 301). Ele responde na hora e
+// termina em segundo plano (~1 a 2 min); acompanhe por dbInfoClientesVendedor().sync.
+export async function dbSyncVendedoresGobi() {
+  syncAuthToken();
+  const { data, error } = await supabase.functions.invoke('sync-vendedores', { body: {} });
+  if (error) {
+    let msg = error.message;
+    try { const b = await error.context?.json(); msg = b?.motivo || b?.error || msg; } catch { /* sem corpo */ }
+    throw new Error(msg);
+  }
+  return data;
+}
+
 // Envia em lotes para não estourar o tempo de uma chamada; soma os resultados.
 export async function dbImportarClientesVendedor(linhas, onProgresso) {
   syncAuthToken();
