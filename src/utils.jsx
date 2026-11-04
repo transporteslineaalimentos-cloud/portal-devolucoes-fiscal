@@ -103,12 +103,13 @@ export const STATUS_OP_MANUAIS = [
   'REVERSA AGENDADA',
   'RECUSADA SEFAZ',
   'ENVIAR PARA LANÇAMENTO - SEM FÍSICO',
+  'TROCA DE NOTA',
 ];
 export function calcStatusOperacional(dev) {
   if (!dev) return null;
   const lp = !!dev.lancado_protheus, cd = !!dev.retornou_cd, tot = !!dev.devolucao_total;
   if (lp && cd) return 'LANÇADA';
-  if (lp && tot) return 'TROCA DE NOTA';
+  if (lp && (tot || dev.status_operacional === 'TROCA DE NOTA')) return 'TROCA DE NOTA';
   if (lp) return 'LANÇADA SEM FÍSICO';
   if (cd) return 'ENVIAR PARA LANÇAMENTO';
   return STATUS_OP_MANUAIS.includes(dev.status_operacional) ? dev.status_operacional : 'VALIDAR RETORNO DA NF';

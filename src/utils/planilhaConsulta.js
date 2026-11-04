@@ -17,7 +17,7 @@ const ZEBRA = 'F7F8FA';
 export const STATUS_CORES = {
   'LANÇADA':                             { bg: 'DDF3E4', fg: '17663A', desc: 'Lançada no Protheus e o produto já voltou ao CD. Processo concluído.' },
   'LANÇADA SEM FÍSICO':                  { bg: 'DDF1EF', fg: '1F6F6A', desc: 'Lançada no Protheus, mas o produto não voltou ao CD.' },
-  'TROCA DE NOTA':                       { bg: 'E3ECFB', fg: '1E4DB7', desc: 'Devolução total já lançada no Protheus sem retorno do produto.' },
+  'TROCA DE NOTA':                       { bg: 'E3ECFB', fg: '1E4DB7', desc: 'Troca de nota: devolução sem retorno do produto (devolução total lançada sem físico, ou marcada como troca de nota).' },
   'ENVIAR PARA LANÇAMENTO':              { bg: 'FFF0CC', fg: '7A4E00', desc: 'O produto chegou ao CD; falta lançar a nota no Protheus.' },
   'ENVIAR PARA LANÇAMENTO - SEM FÍSICO': { bg: 'FFF7E0', fg: '7A4E00', desc: 'Liberada para lançar no Protheus sem aguardar o produto.' },
   'VALIDAR RETORNO DA NF':               { bg: 'E0F2FE', fg: '0B5C8A', desc: 'Nota nova: a assistente precisa validar se o produto volta (agendar reversa) ou não (enviar para lançamento sem físico).' },

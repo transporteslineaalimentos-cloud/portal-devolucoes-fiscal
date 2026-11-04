@@ -5,7 +5,7 @@ import { somenteLeitura } from '../lib/permissoes.js';
 
 const REGRA = {
   'LANÇADA':                'Lançada no Protheus e o físico chegou ao CD.',
-  'TROCA DE NOTA':          'Devolução total lançada no Protheus sem retorno físico.',
+  'TROCA DE NOTA':          'Lançada no Protheus como troca de nota (sem retorno físico).',
   'LANÇADA SEM FÍSICO':     'Lançada no Protheus, mas o físico não chegou ao CD.',
   'ENVIAR PARA LANÇAMENTO': 'O físico chegou ao CD e a nota ainda não foi lançada no Protheus.',
 };
@@ -16,11 +16,13 @@ const GUIA = {
   'REVERSA AGENDADA':      'Retorno ao CD já combinado com o transportador; aguardando o produto chegar.',
   'ENVIAR PARA LANÇAMENTO - SEM FÍSICO': 'O produto não vai voltar: a nota pode ser lançada no Protheus sem esperar o físico.',
   'RECUSADA SEFAZ':        'Nota recusada na SEFAZ; aguardando correção pelo cliente.',
+  'TROCA DE NOTA':         'Troca de nota: o produto não volta e a nota é refaturada. Depois de lançada no Protheus continua como troca de nota (a não ser que o produto chegue ao CD).',
 };
 
 export default function StatusOperacionalCard({ dev, user, onChanged }) {
   const atual = calcStatusOperacional(dev);
-  const manual = STATUS_OP_MANUAIS.includes(atual);
+  // só dá para escolher enquanto a nota não foi lançada nem chegou ao CD
+  const manual = !dev.lancado_protheus && !dev.retornou_cd && STATUS_OP_MANUAIS.includes(atual);
   const podeTrocar = manual && !somenteLeitura(user);
   const [valor, setValor] = useState(atual);
   const [saving, setSaving] = useState(false);
