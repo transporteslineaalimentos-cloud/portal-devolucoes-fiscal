@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { dbGetDevolucaoDetail, dbUpdateStatus, dbGetXmlUrl, dbUpdateMotivo, dbGetMotivos, dbUpdateTransportador, dbSetCentroCustoCliente, dbGetTransportadoras, dbSalvarTransportadora, dbRegistrarHistorico } from '../config/supabase';
+import { dbAlterarDataDevolucao, dbGetDevolucaoDetail, dbUpdateStatus, dbGetXmlUrl, dbUpdateMotivo, dbGetMotivos, dbUpdateTransportador, dbSetCentroCustoCliente, dbGetTransportadoras, dbSalvarTransportadora, dbRegistrarHistorico } from '../config/supabase';
 import { fmtBRL, fmtDate, fmtDateTime, fmtCNPJ, CNPJ_MAP, STATUS_CFG, Badge, calcFarolProtheus, calcStatusOperacional } from '../utils.jsx';
 import AnexosSection from './AnexosSection.jsx';
 import HistoricoSection from './HistoricoSection.jsx';
@@ -264,9 +264,14 @@ export default function DetalheDrawer({ id, user, onClose, onSaved, camada }) {
   const [ccErr, setCcErr]       = useState('');
   const [ccResult, setCcResult] = useState(null);
 
+  const [editData, setEditData]     = useState(false);
+  const [dataNova, setDataNova]     = useState('');
+  const [savingData, setSavingData] = useState(false);
+  const [dataErr, setDataErr]       = useState('');
+
   const editorRef = useRef(null);
   const editando = editStatus || editMotivo || editTransp || editCC;
-  const fecharEditores = () => { setEdit(false); setEditMotivo(false); setEditTransp(false); setEditCC(false); };
+  const fecharEditores = () => { setEdit(false); setEditMotivo(false); setEditTransp(false); setEditCC(false); setEditData(false); };
   const abrirEditor = (qual) => {
     if (leitura) return;
     fecharEditores(); setCcResult(null);
@@ -766,9 +771,28 @@ export default function DetalheDrawer({ id, user, onClose, onSaved, camada }) {
                           </span>
                         )}
                       </Linha>
-                      {dev.lancamento_manual && dev.dt_devolucao && (
-                        <Linha label="Data da devolução">
-                          <span style={{ fontWeight: 700, color: 'var(--blue)' }}>{fmtDate(dev.dt_devolucao)}</span>
+                      {dev.lancamento_manual && (
+                        <Linha label="Data da devolução" leitura={leitura || editData}
+                          onEditar={() => { setDataNova(dev.dt_devolucao ? String(dev.dt_devolucao).slice(0, 10) : ''); setDataErr(''); setEditData(true); }}>
+                          {editData ? (
+                            <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                              <input type="date" className="input" value={dataNova} max={new Date().toISOString().slice(0, 10)}
+                                onChange={e => setDataNova(e.target.value)} style={{ width: 150, padding: '3px 8px', fontSize: 12 }} autoFocus/>
+                              <button className="btn btn-primary btn-xs" disabled={savingData || !dataNova} onClick={async () => {
+                                setSavingData(true); setDataErr('');
+                                try {
+                                  await dbAlterarDataDevolucao(id, dataNova);
+                                  setData(d => ({ ...d, dev: { ...d.dev, dt_devolucao: dataNova } }));
+                                  setEditData(false); onSaved?.();
+                                } catch (e) { setDataErr(e.message); }
+                                setSavingData(false);
+                              }}>{savingData ? 'Salvando…' : 'Salvar'}</button>
+                              <button className="btn btn-ghost btn-xs" onClick={() => setEditData(false)} disabled={savingData}>Cancelar</button>
+                              {dataErr && <span style={{ color: 'var(--red)', fontSize: 11.5, width: '100%' }}>{dataErr}</span>}
+                            </span>
+                          ) : dev.dt_devolucao
+                            ? <span style={{ fontWeight: 700, color: 'var(--blue)' }}>{fmtDate(dev.dt_devolucao)}</span>
+                            : <Vazio>Sem data</Vazio>}
                         </Linha>
                       )}
                       <Linha label="Lançada no Protheus">

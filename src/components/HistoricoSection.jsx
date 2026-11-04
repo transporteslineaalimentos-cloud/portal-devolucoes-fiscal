@@ -12,6 +12,7 @@ const TIPO_CFG = {
   status_operacional: { label: 'Status operacional',  color: '#0F766E',       icon: '◆' },
   edicao_massa:  { label: 'Edição em massa',         color: 'var(--text-2)', icon: '≣' },
   retorno_cd:    { label: 'Retorno ao CD',           color: 'var(--green)',  icon: '↩' },
+  data_devolucao:{ label: 'Data da devolução alterada', color: 'var(--blue)', icon: '◷' },
 };
 
 function fmtDateTime(s) {

@@ -963,6 +963,14 @@ export async function dbGetPainelGerencial(ano, mesIni = 1, mesFim = 12) {
   return data;
 }
 
+// Data da devolução (só lançamento manual); o banco grava quem mudou no histórico da nota
+export async function dbAlterarDataDevolucao(id, data) {
+  syncAuthToken();
+  const { data: r, error } = await supabase.rpc('dev_alterar_data_devolucao', { p_id: id, p_data: data });
+  if (error) throw new Error(error.message);
+  return r;
+}
+
 export async function dbSetStatusOperacional(id, status, usuario) {
   syncAuthToken();
   const { error } = await supabase
