@@ -1124,16 +1124,13 @@ export async function dbInfoClientesVendedor() {
   return data;
 }
 
-// Pede ao robô para puxar agora o cadastro do GoBI (relatório 301). Ele responde na hora e
-// termina em segundo plano (~1 a 2 min); acompanhe por dbInfoClientesVendedor().sync.
+// Pede ao banco para puxar agora o cadastro do GoBI (relatório 301). O download leva 1 a 3 min
+// e é conferido a cada minuto; acompanhe por dbInfoClientesVendedor().sync.
 export async function dbSyncVendedoresGobi() {
   syncAuthToken();
-  const { data, error } = await supabase.functions.invoke('sync-vendedores', { body: {} });
-  if (error) {
-    let msg = error.message;
-    try { const b = await error.context?.json(); msg = b?.motivo || b?.error || msg; } catch { /* sem corpo */ }
-    throw new Error(msg);
-  }
+  const { data, error } = await supabase.rpc('gobi_vendedores_iniciar', {});
+  if (error) throw new Error(error.message);
+  if (data && data.ok === false) throw new Error(data.motivo || 'Não foi possível iniciar');
   return data;
 }
 

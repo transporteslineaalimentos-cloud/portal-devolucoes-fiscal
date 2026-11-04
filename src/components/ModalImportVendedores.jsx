@@ -149,7 +149,7 @@ export default function ModalImportVendedores({ info, onClose, onImportado }) {
             </div>
             {ult && (
               <div style={{ fontSize: 12, lineHeight: 1.5, color: ult.erro ? 'var(--red)' : 'var(--text-3)' }}>
-                {!ult.terminado_em ? 'Atualizando pelo GoBI… (leva 1 a 2 minutos)'
+                {!ult.terminado_em ? 'Atualizando pelo GoBI… (leva de 2 a 4 minutos; pode fechar esta janela)'
                   : ult.erro ? `Última tentativa (${new Date(ult.iniciado_em).toLocaleString('pt-BR')}) falhou: ${ult.erro}`
                   : `Última atualização: ${new Date(ult.terminado_em).toLocaleString('pt-BR')} · ${n(ult.linhas_api)} clientes no GoBI · ${n(ult.novos)} novos · ${n(ult.vendedor_alterado)} mudaram de vendedor`}
               </div>
