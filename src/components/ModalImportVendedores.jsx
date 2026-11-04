@@ -64,7 +64,7 @@ async function lerPlanilha(arquivo) {
   for (const r of rows) {
     const cnpj = documento(r[mapa.cnpj]);
     const vend = texto(r[mapa.vendedor_cod]);
-    if (![11, 14].includes(cnpj.length) || !vend) { semDoc++; continue; }
+    if (cnpj.length !== 14 || !vend) { semDoc++; continue; }   // só CNPJ: pessoa física não entra
     const l = { cnpj, vendedor_cod: vend };
     for (const campo of Object.keys(COLUNAS)) {
       if (campo === 'cnpj' || campo === 'vendedor_cod' || !mapa[campo]) continue;
@@ -177,8 +177,8 @@ export default function ModalImportVendedores({ info, onClose, onImportado }) {
           {lido && !res && (
             <div style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '10px 12px', fontSize: 12.5, color: 'var(--text-2)', lineHeight: 1.6 }}>
               <div style={{ fontWeight: 600, color: 'var(--text)' }}>{nomeArq}</div>
-              <div>{n(lido.linhas.length)} clientes com CNPJ/CPF · {n(lido.vendedores)} vendedores</div>
-              {lido.semDoc > 0 && <div style={{ color: 'var(--text-3)' }}>{n(lido.semDoc)} linha{lido.semDoc === 1 ? '' : 's'} sem CNPJ/CPF ou sem vendedor ficam de fora (ex.: clientes do exterior).</div>}
+              <div>{n(lido.linhas.length)} clientes com CNPJ · {n(lido.vendedores)} vendedores</div>
+              {lido.semDoc > 0 && <div style={{ color: 'var(--text-3)' }}>{n(lido.semDoc)} linha{lido.semDoc === 1 ? '' : 's'} com CPF, sem CNPJ ou sem vendedor ficam de fora (pessoa física, e-commerce, exterior).</div>}
             </div>
           )}
 
