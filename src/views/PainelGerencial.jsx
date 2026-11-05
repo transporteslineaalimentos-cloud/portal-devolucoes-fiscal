@@ -237,12 +237,12 @@ function GraficoProtheus({ protheus, ini, fim, onDrill, altura }) {
   const bw = Math.min(46, slot * 0.6);
   const y = (v) => padT + (H - padT - padB) * (1 - v / niceMax);
   const ticks = [0, 0.25, 0.5, 0.75, 1].map(t => t * niceMax);
-  const abrirMes = (d, qual) => onDrill?.({ titulo: `${qual === 'lancada' ? 'Lançadas' : 'Pendentes de lançamento'} no Protheus · ${MESES[d.mes - 1]}`, dim: 'protheus', valor: qual, mesIni: d.mes, mesFim: d.mes });
+  const abrirMes = (d, qual) => onDrill?.({ titulo: `${qual === 'lancada' ? 'Lançadas' : 'Não lançadas'} · ${MESES[d.mes - 1]}`, dim: 'protheus', valor: qual, mesIni: d.mes, mesFim: d.mes });
   return (
     <div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 10, marginBottom: 14 }}>
-        <Kpi label="Lançadas no Protheus" accent={COR_LANC} value={brl0(tot.l)} note={`${tot.ql} notas`} onClick={() => onDrill?.({ titulo: 'Lançadas no Protheus', dim: 'protheus', valor: 'lancada' })}/>
-        <Kpi label="Pendentes de lançamento" accent={COR_PEND} value={brl0(tot.p)} note={`${tot.qp} notas`} onClick={() => onDrill?.({ titulo: 'Pendentes de lançamento no Protheus', dim: 'protheus', valor: 'pendente' })}/>
+        <Kpi label="Lançadas" accent={COR_LANC} value={brl0(tot.l)} note={`${tot.ql} notas`} onClick={() => onDrill?.({ titulo: 'Lançadas', dim: 'protheus', valor: 'lancada' })}/>
+        <Kpi label="Não lançadas" accent={COR_PEND} value={brl0(tot.p)} note={`${tot.qp} notas`} onClick={() => onDrill?.({ titulo: 'Não lançadas', dim: 'protheus', valor: 'pendente' })}/>
         <Kpi label="% lançado" value={pctFmt((tot.l + tot.p) ? tot.l / (tot.l + tot.p) : null)} note={`${pctFmt((tot.ql + tot.qp) ? tot.ql / (tot.ql + tot.qp) : null)} das notas`}/>
       </div>
       <div ref={wrapRef} style={{ position: 'relative' }}>
@@ -278,7 +278,7 @@ function GraficoProtheus({ protheus, ini, fim, onDrill, altura }) {
             <div style={{ position: 'absolute', top: 6, left, width: 206, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, boxShadow: 'var(--shadow-sm)', padding: '8px 10px', fontSize: 11.5, pointerEvents: 'none', fontVariantNumeric: 'tabular-nums' }}>
               <div style={{ fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>{MESES[d.mes - 1]}</div>
               <Row cor={COR_LANC} label={`Lançadas (${d.qtd_lancadas})`} valor={brl0(d.lancadas)}/>
-              <Row cor={COR_PEND} label={`Pendentes (${d.qtd_pendentes})`} valor={brl0(d.pendentes)}/>
+              <Row cor={COR_PEND} label={`Não lançadas (${d.qtd_pendentes})`} valor={brl0(d.pendentes)}/>
               <div style={{ borderTop: '1px solid var(--border)', marginTop: 4, paddingTop: 4, display: 'flex', justifyContent: 'space-between', color: 'var(--text-2)' }}>
                 <span>% lançado</span><b style={{ color: 'var(--text)' }}>{pctFmt(t ? d.lancadas / t : null)}</b>
               </div>
@@ -297,7 +297,7 @@ function GraficoProtheus({ protheus, ini, fim, onDrill, altura }) {
           <tbody>
             {[
               { k: 'lancada', l: 'Lançadas', cor: COR_LANC, v: d => d.lancadas, q: d => d.qtd_lancadas, tv: tot.l, tq: tot.ql },
-              { k: 'pendente', l: 'Pendentes', cor: COR_PEND, v: d => d.pendentes, q: d => d.qtd_pendentes, tv: tot.p, tq: tot.qp },
+              { k: 'pendente', l: 'Não lançadas', cor: COR_PEND, v: d => d.pendentes, q: d => d.qtd_pendentes, tv: tot.p, tq: tot.qp },
             ].map(r => (
               <tr key={r.k}>
                 <td style={{ ...tdP, textAlign: 'left', color: 'var(--text)', fontWeight: 600, position: 'sticky', left: 0, background: 'var(--surface)' }}>
@@ -315,7 +315,7 @@ function GraficoProtheus({ protheus, ini, fim, onDrill, altura }) {
                   );
                 })}
                 <td className={r.tq && onDrill ? 'drill' : undefined}
-                  onClick={r.tq && onDrill ? () => onDrill({ titulo: r.k === 'lancada' ? 'Lançadas no Protheus' : 'Pendentes de lançamento no Protheus', dim: 'protheus', valor: r.k }) : undefined}
+                  onClick={r.tq && onDrill ? () => onDrill({ titulo: r.k === 'lancada' ? 'Lançadas' : 'Não lançadas', dim: 'protheus', valor: r.k }) : undefined}
                   style={{ ...tdP, fontWeight: 700, color: 'var(--text)', borderLeft: '1px solid var(--border)' }}>{r.tq} · {brlK(r.tv)}</td>
               </tr>
             ))}
@@ -326,34 +326,12 @@ function GraficoProtheus({ protheus, ini, fim, onDrill, altura }) {
   );
 }
 
-/* ─── Situação dos lançamentos: Protheus + cruzamento + GLPI ─── */
-const GRUPOS_LANC = [
-  { k: 'lancadas', l: 'Lançadas', cor: COR_LANC, itens: [
-    { k: 'protheus', l: 'No Protheus, mesmo número', d: 'O documento do Protheus é a própria NFD' },
-    { k: 'cruzada',  l: 'No Protheus, outro número', d: 'Achada pelo cliente + NF de venda (nota de entrada própria, troca de nota ou erro de digitação)' },
-    { k: 'glpi',     l: 'Só pelo chamado do GLPI',   d: 'Chamado solucionado, mas ainda não aparece na base do Protheus' },
-  ] },
-  { k: 'pendentes', l: 'Pendentes', cor: COR_PEND, itens: [
-    { k: 'chamado_aberto', l: 'Com chamado aberto', d: 'Já pedida ao fiscal pelo GLPI' },
-    { k: 'sem_chamado',    l: 'Sem chamado',        d: 'Validar retorno, reversa, enviar para lançamento…' },
-  ] },
-];
-function SituacaoLancamentos({ sit, ano, ini, fim, onDrill }) {
+/* ─── Lançados no Protheus que não acharam NFD no portal ─── */
+function ProtheusForaPortal({ sit, ano, ini, fim }) {
   const [baixando, setBaixando] = useState(false);
   const n = (v) => Number(v) || 0;
-  const meses = Array.from({ length: fim - ini + 1 }, (_, i) => ini + i);
-  const cel = {};
-  (sit?.meses || []).forEach(r => { if (r.mes >= ini && r.mes <= fim) cel[r.sit + '|' + r.mes] = { q: n(r.qtd), v: n(r.valor) }; });
-  const soma = (ks, m) => ks.reduce((a, k) => {
-    const lista = m ? [cel[k + '|' + m]] : meses.map(mm => cel[k + '|' + mm]);
-    lista.forEach(c => { if (c) { a.q += c.q; a.v += c.v; } });
-    return a;
-  }, { q: 0, v: 0 });
-  const kL = GRUPOS_LANC[0].itens.map(i => i.k), kP = GRUPOS_LANC[1].itens.map(i => i.k);
-  const tL = soma(kL), tP = soma(kP), tR = soma(['recusada']);
   const fora = sit?.protheus_fora || {};
-  const abrir = (k, l, m) => onDrill?.({ titulo: `Lançamento · ${l}${m ? ' · ' + MESES[m - 1] : ''}`, dim: 'lanc', valor: k, ...(m ? { mesIni: m, mesFim: m } : {}) });
-
+  if (!sit) return null;
   const baixarFora = async () => {
     setBaixando(true);
     try {
@@ -377,65 +355,17 @@ function SituacaoLancamentos({ sit, ano, ini, fim, onDrill }) {
     } catch (e) { alert('Erro ao gerar a planilha: ' + e.message); }
     setBaixando(false);
   };
-
-  const linha = (it, cor, bold) => (
-    <tr key={it.k}>
-      <td title={it.d} style={{ ...tdP, textAlign: 'left', color: 'var(--text)', fontWeight: bold ? 700 : 500, position: 'sticky', left: 0, background: 'var(--surface)', paddingLeft: bold ? 8 : 24 }}>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-          {bold && <span style={{ width: 8, height: 8, borderRadius: 99, background: cor }}/>}{it.l}
-        </span>
-      </td>
-      {meses.map(m => {
-        const c = soma(it.ks || [it.k], m);
-        return (
-          <td key={m} className={c.q && onDrill ? 'drill' : undefined} onClick={c.q && onDrill ? () => abrir(it.k, it.l, m) : undefined}
-            title={c.q ? `${c.q} nota${c.q === 1 ? '' : 's'} · ${brl0(c.v)}` : undefined}
-            style={{ ...tdP, fontWeight: bold ? 700 : 400, color: c.q ? (bold ? 'var(--text)' : 'var(--text-2)') : 'var(--text-3)' }}>
-            {c.q ? `${c.q} · ${brlK(c.v)}` : '—'}
-          </td>
-        );
-      })}
-      {(() => { const c = soma(it.ks || [it.k]); return (
-        <td className={c.q && onDrill ? 'drill' : undefined} onClick={c.q && onDrill ? () => abrir(it.k, it.l) : undefined}
-          style={{ ...tdP, fontWeight: 700, color: 'var(--text)', borderLeft: '1px solid var(--border)' }}>{c.q} · {brlK(c.v)}</td>
-      ); })()}
-    </tr>
-  );
-
   return (
-    <div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 10, marginBottom: 14 }}>
-        <Kpi label="Lançadas" accent={COR_LANC} value={brl0(tL.v)} note={`${tL.q} notas`} onClick={tL.q ? () => abrir('lancadas', 'Lançadas') : undefined}/>
-        <Kpi label="Pendentes de lançamento" accent={COR_PEND} value={brl0(tP.v)} note={`${tP.q} notas`} onClick={tP.q ? () => abrir('pendentes', 'Pendentes') : undefined}/>
-        <Kpi label="% lançado" value={pctFmt(tL.v + tP.v ? tL.v / (tL.v + tP.v) : null)} note={`${pctFmt(tL.q + tP.q ? tL.q / (tL.q + tP.q) : null)} das notas`}/>
-        <Kpi label="Recusadas Sefaz" value={brl0(tR.v)} note={`${tR.q} notas · fora da conta`} onClick={tR.q ? () => abrir('recusada', 'Recusadas Sefaz') : undefined}/>
+    <div style={{ marginTop: 14, padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--surface-2)', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', fontSize: 12, color: 'var(--text-2)' }}>
+      <div style={{ flex: 1, minWidth: 260 }}>
+        <b style={{ color: 'var(--text)' }}>No Protheus, sem NFD no portal:</b>{' '}
+        {n(fora.qtd)} lançamentos · {brl0(n(fora.valor))}, pela data de digitação.
+        {n(fora.qtd_antigas) > 0 && <> Desses, {n(fora.qtd_antigas)} ({brlK(n(fora.valor_antigas))}) são de NFD emitida antes de 2026, que não entram no portal.</>}
+        {' '}É essa parte que faz o total do Protheus ser diferente do portal.
       </div>
-      <div className="pg-tabela" style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead><tr>
-            <th style={{ ...thP, textAlign: 'left', position: 'sticky', left: 0, background: 'var(--surface)' }}/>
-            {meses.map(m => <th key={m} style={thP}>{MESES[m - 1]}</th>)}
-            <th style={{ ...thP, color: 'var(--text)', borderLeft: '1px solid var(--border)' }}>Período</th>
-          </tr></thead>
-          <tbody>
-            {GRUPOS_LANC.map(g => [
-              linha({ k: g.k, l: g.l, ks: g.itens.map(i => i.k) }, g.cor, true),
-              ...g.itens.map(it => linha(it, g.cor, false)),
-            ])}
-          </tbody>
-        </table>
-      </div>
-      <div style={{ marginTop: 14, padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--surface-2)', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', fontSize: 12, color: 'var(--text-2)' }}>
-        <div style={{ flex: 1, minWidth: 260 }}>
-          <b style={{ color: 'var(--text)' }}>No Protheus, sem NFD no portal:</b>{' '}
-          {n(fora.qtd)} lançamentos · {brl0(n(fora.valor))}, pela data de digitação.
-          {n(fora.qtd_antigas) > 0 && <> Desses, {n(fora.qtd_antigas)} ({brlK(n(fora.valor_antigas))}) são de NFD emitida antes de 2026, que não entram no portal.</>}
-          {' '}É essa parte que faz o total do Protheus ser diferente do portal.
-        </div>
-        <button className="btn btn-outline btn-sm no-print" onClick={baixarFora} disabled={baixando || !n(fora.qtd)}>
-          {baixando ? 'Gerando…' : 'Baixar lista (Excel)'}
-        </button>
-      </div>
+      <button className="btn btn-outline btn-sm no-print" onClick={baixarFora} disabled={baixando || !n(fora.qtd)}>
+        {baixando ? 'Gerando…' : 'Baixar lista (Excel)'}
+      </button>
     </div>
   );
 }
@@ -827,9 +757,7 @@ export default function PainelGerencial({ onGoTo, user }) {
             <TabelaMensal meses={meses} ini={ini} fim={fim} onDrill={abrir} ano={ano}/></div>
         </div>
       ) },
-    { id: 'situacao-lanc', titulo: `Situação dos lançamentos · ${periodoTxt}`,
-      corpo: <SituacaoLancamentos sit={sitLanc} ano={ano} ini={ini} fim={fim} onDrill={abrir}/> },
-    { id: 'protheus', titulo: `Lançamento no Protheus · ${periodoTxt}`,
+    { id: 'protheus', titulo: `Lançadas × não lançadas · ${periodoTxt}`,
       corpo: <GraficoProtheus protheus={data.protheus} ini={ini} fim={fim} onDrill={abrir} altura={alturaSlide - 230}/> },
     { id: 'glpi', titulo: `Chamados de lançamento fiscal (GLPI) · ${periodoTxt}`,
       corpo: <GraficoGlpi glpi={data.glpi} atualizadoEm={data.glpi_atualizado_em} ini={ini} fim={fim} onDrill={abrir} altura={alturaSlide - 300}/> },
@@ -922,18 +850,12 @@ export default function PainelGerencial({ onGoTo, user }) {
             <TabelaMensal meses={meses} ini={ini} fim={fim} onDrill={abrir} ano={ano}/>
           </Card>
 
-          {sitLanc && (
-            <Card title={`Situação dos lançamentos · ${periodoTxt}`}
-              sub="Junta tudo: lançada no Protheus (mesmo número ou achada pelo cliente + NF de venda), lançada pelo chamado do GLPI e pendentes. Pelo mês de referência da devolução"
-              right={<Legend items={[{ label: 'Lançadas', color: COR_LANC }, { label: 'Pendentes', color: COR_PEND }]}/>}>
-              <SituacaoLancamentos sit={sitLanc} ano={ano} ini={ini} fim={fim} onDrill={abrir}/>
-            </Card>
-          )}
 
-          <Card title={`Lançamento no Protheus · ${periodoTxt}`}
-            sub="Só notas do portal (devoluções de 2026), pelo mês de referência da devolução"
-            right={<Legend items={[{ label: 'Lançadas', color: COR_LANC }, { label: 'Pendentes', color: COR_PEND }]}/>}>
+          <Card title={`Lançadas × não lançadas · ${periodoTxt}`}
+            sub="Todas as NFs do portal pelo mês de referência. Conta como lançada: achada no Protheus (pelo número da NFD ou pelo cliente + NF de venda) ou com o chamado do GLPI solucionado/fechado. Recusadas Sefaz ficam de fora"
+            right={<Legend items={[{ label: 'Lançadas', color: COR_LANC }, { label: 'Não lançadas', color: COR_PEND }]}/>}>
             <GraficoProtheus protheus={data.protheus} ini={ini} fim={fim} onDrill={abrir}/>
+            <ProtheusForaPortal sit={sitLanc} ano={ano} ini={ini} fim={fim}/>
           </Card>
 
           <Card title={`Chamados de lançamento fiscal (GLPI) · ${periodoTxt}`}

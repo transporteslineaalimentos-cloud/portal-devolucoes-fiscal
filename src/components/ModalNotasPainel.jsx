@@ -46,15 +46,6 @@ const COLS = [
 ];
 
 /* colunas do Excel: as mesmas da tela, com valores de verdade (número, data) */
-export const SIT_LANC_TXT = {
-  protheus:       'Lançada no Protheus',
-  cruzada:        'Lançada no Protheus (outro nº de documento)',
-  glpi:           'Lançada pelo chamado do GLPI',
-  chamado_aberto: 'Pendente · chamado aberto',
-  sem_chamado:    'Pendente · sem chamado',
-  recusada:       'Recusada Sefaz',
-};
-
 const COLS_EXCEL = [
   { t: 'NF Dev.',            w: 11, v: r => r.lancamento_manual ? '' : r.nf_numero, fmt: 'int' },
   { t: 'NF Venda',           w: 11, v: r => { const n = nfv(r.chave_nfe_referenciada); return n === '—' ? null : n; }, fmt: 'int' },
@@ -70,9 +61,8 @@ const COLS_EXCEL = [
   { t: 'Canal',              w: 24, v: r => r.canal },
   { t: 'Status operacional', w: 32, v: r => r.st_op },
   { t: 'Prazo 90d',          w: 12, v: r => prazo(r).txt },
-  { t: 'Lançada no Protheus', w: 12, v: r => r.lancado_protheus ? 'Sim' : 'Não' },
+  { t: 'Lançada', w: 10, v: r => r.lancado_protheus ? 'Sim' : 'Não' },
   { t: 'Data do lançamento', w: 12, v: r => r.lancado_protheus ? r.dt_lancamento_protheus : null, fmt: 'data' },
-  { t: 'Situação do lançamento', w: 34, v: r => SIT_LANC_TXT[r.lanc_situacao] || '' },
   { t: 'Documento no Protheus', w: 14, v: r => r.doc_protheus || '' },
   { t: 'Chamado GLPI',       w: 12, v: r => r.glpi_id ? r.glpi_id : 'Sem chamado' },
   { t: 'Situação do chamado', w: 14, v: r => r.glpi_status || '' },
