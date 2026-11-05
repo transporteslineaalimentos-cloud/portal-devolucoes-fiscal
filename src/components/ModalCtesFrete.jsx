@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { dbGetCustosFreteCtes } from '../config/supabase';
+import { baixarExcelFrete } from '../utils/planilhaFrete.js';
 
 /* Lista dos CT-es por trás de um número da aba Custos de Frete.
    Recebe os mesmos filtros da aba já combinados com o recorte clicado
@@ -62,29 +63,8 @@ export default function ModalCtesFrete({ titulo: tit, sub, params, filtrar, onFi
      eles, para a tela não congelar em recortes grandes. */
   const baixar = async () => {
     setBaixando(true);
-    await new Promise(r => setTimeout(r, 30));
-    const cab = ['CT-e', 'Emissão do CT-e', 'Transportador', 'CNPJ transportador', 'Tipo', 'Operação', 'Destinatário', 'Cidade', 'UF',
-      'NF', 'Emissão da NF', 'Chave da NF', 'Valor da NF', 'Frete rateado para a NF',
-      'Valor total do CT-e', 'Frete considerado no painel', 'Valor das NFs do CT-e', 'Origem'];
-    const num = (v) => (Number(v) || 0).toFixed(2).replace('.', ',');
-    const esc = (v) => { const s = String(v ?? ''); return /[;"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
-    const out = [cab.join(';')];
-    let desde = Date.now();
-    for (const l of linhas) {
-      if (Date.now() - desde > 60) { await new Promise(r => setTimeout(r, 0)); desde = Date.now(); }
-      for (const n of (l.nfs || [])) {
-      out.push([l.cte_numero, dataBR(l.dt), l.transp_nome, fmtCnpj(l.transp_cnpj), l.tipo, OPERACAO[n.operacao] || n.operacao,
-        l.dest_nome, l.cidade, l.uf, n.nf, dataBR(n.dt), n.chave, num(n.valor_nf), num(n.rateio),
-        num(l.valor_cte), num(l.valor), num(l.valor_nfs),
-        l.origem === 'planilha' ? 'Planilha importada' : 'Recebimento automático'].map(esc).join(';'));
-      }
-    }
-    const blob = new Blob(['﻿' + out.join('\r\n')], { type: 'text/csv;charset=utf-8' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `CT-es ${tit}`.replace(/[\\/:*?"<>|]/g, '-').slice(0, 120) + '.csv';
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    try { await baixarExcelFrete(linhas, { titulo: `CT-es ${tit}`, sub: [sub, busca.trim() && `Busca: "${busca.trim()}"`].filter(Boolean).join(' · ') }); }
+    catch (e) { alert('Erro ao gerar o Excel: ' + e.message); }
     setBaixando(false);
   };
 
@@ -126,7 +106,7 @@ export default function ModalCtesFrete({ titulo: tit, sub, params, filtrar, onFi
               <option value="data">Mais recentes</option>
             </select>
             <button className="btn btn-outline btn-sm" style={{ height: 32 }} onClick={baixar} disabled={!linhas.length || baixando}>
-              {baixando ? 'Gerando…' : 'Baixar planilha'}
+              {baixando ? 'Gerando…' : 'Baixar Excel'}
             </button>
             {filtrar && onFiltrar && (
               <button className="btn btn-primary btn-sm" style={{ height: 32 }} onClick={() => { onFiltrar(); onClose(); }}>{filtrar}</button>

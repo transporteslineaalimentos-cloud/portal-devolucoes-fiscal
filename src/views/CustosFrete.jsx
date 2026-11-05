@@ -3,6 +3,7 @@ import { dbGetCustosFrete, dbGetCustosFreteCtes, dbRefreshCustosFrete } from '..
 import ModalCtesFrete from '../components/ModalCtesFrete.jsx';
 import Apresentacao from '../components/Apresentacao.jsx';
 import { gerarPainelFrete } from '../lib/painelFrete';
+import { baixarExcelFrete } from '../utils/planilhaFrete.js';
 
 /* ─────────────────────────────────────────────────────────────
    Custos de Frete — substitui o dash do Power BI.
@@ -402,6 +403,7 @@ export default function CustosFrete({ user }) {
   const [ufModo, setUfModo] = useState('valor');
   const [apresentar, setApresentar] = useState(false);
   const [exportando, setExportando] = useState(false);
+  const [baixandoXls, setBaixandoXls] = useState(false);
   const req = useRef(0);
   const cachePeriodo = useRef({ chave: '', dados: null });
 
@@ -505,6 +507,19 @@ export default function CustosFrete({ user }) {
   };
   const abrirKpi = (nome, tipo) => abrir(nome, tipo ? { tipo } : {});
   const verCtes = () => abrir(chips.length ? chips.map(c => c.l).join(' · ') : 'Todos os CT-es');
+
+  /* Excel com todos os CT-es do recorte da tela (filtros + mês clicado). */
+  const baixarExcel = async () => {
+    setBaixandoXls(true);
+    try {
+      const r = await dbGetCustosFreteCtes({ de: deEff, ate: ateEff, ...f, limite: 50000 });
+      const linhas = r?.linhas || [];
+      if (r?.qtd > linhas.length) alert(`O recorte tem ${r.qtd} CT-es; a planilha vai com os ${linhas.length} de maior valor. Use os filtros para dividir.`);
+      const rec = [deEff === de && ateEff === ate ? periodoTxt : `${dataBR(deEff)} a ${dataBR(ateEff)}`, ...chips.filter(c => c.k !== 'mes').map(c => c.l)];
+      await baixarExcelFrete(linhas, { titulo: 'Custos de frete', sub: rec.join(' · ') });
+    } catch (e) { alert('Erro ao gerar o Excel: ' + e.message); }
+    setBaixandoXls(false);
+  };
 
   /* Painel interativo: um .html que abre offline e continua clicável. */
   const exportarPainel = async () => {
@@ -671,6 +686,10 @@ export default function CustosFrete({ user }) {
         </button>
         <button className="btn btn-outline btn-sm" style={{ height: 32 }} onClick={atualizarAgora} disabled={atualizando}>
           {atualizando ? 'Recalculando… (até 2 min)' : 'Atualizar agora'}
+        </button>
+        <button className="btn btn-outline btn-sm" style={{ height: 32 }} onClick={baixarExcel} disabled={!data || baixandoXls}
+          title="Planilha com todos os CT-es e NFs do recorte da tela (filtros e mês clicado)">
+          {baixandoXls ? 'Gerando Excel…' : 'Baixar Excel'}
         </button>
         <button className="btn btn-primary btn-sm" style={{ height: 32 }} onClick={exportarPainel} disabled={!data || exportando}
           title="Gera um arquivo que abre sozinho e continua clicável, para enviar à diretoria">
