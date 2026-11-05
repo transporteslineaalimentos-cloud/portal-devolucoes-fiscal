@@ -963,6 +963,22 @@ export async function dbGetPainelGerencial(ano, mesIni = 1, mesFim = 12) {
   return data;
 }
 
+// Situação dos lançamentos: Protheus (mesmo número / cruzada), GLPI e pendentes
+export async function dbGetSituacaoLanc(ano, mesIni = 1, mesFim = 12) {
+  syncAuthToken();
+  const { data, error } = await supabase.rpc('get_painel_situacao_lanc', { p_ano: ano, p_mes_ini: mesIni, p_mes_fim: mesFim });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+// Lançamentos do Protheus que não acharam NFD no portal (pela data de digitação)
+export async function dbGetProtheusSemPortal(ano, mesIni = 1, mesFim = 12) {
+  syncAuthToken();
+  const { data, error } = await supabase.rpc('get_protheus_sem_portal', { p_ano: ano, p_mes_ini: mesIni, p_mes_fim: mesFim });
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
 // Data da devolução (só lançamento manual); o banco grava quem mudou no histórico da nota
 export async function dbAlterarDataDevolucao(id, data) {
   syncAuthToken();

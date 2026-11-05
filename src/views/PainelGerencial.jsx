@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { dbGetPainelGerencial, dbExportDevolucoes, dbInfoClientesVendedor } from '../config/supabase';
+import { dbGetPainelGerencial, dbExportDevolucoes, dbInfoClientesVendedor, dbGetSituacaoLanc, dbGetProtheusSemPortal } from '../config/supabase';
+import { baixarListaNotas } from '../utils/planilhaLista.js';
 import { exportPainelGerencialExcel } from '../utils/exportExcel.js';
 import { baixarPlanilhaConsulta } from '../utils/planilhaConsulta.js';
 import ModalNotasPainel from '../components/ModalNotasPainel.jsx';
@@ -325,6 +326,120 @@ function GraficoProtheus({ protheus, ini, fim, onDrill, altura }) {
   );
 }
 
+/* ─── Situação dos lançamentos: Protheus + cruzamento + GLPI ─── */
+const GRUPOS_LANC = [
+  { k: 'lancadas', l: 'Lançadas', cor: COR_LANC, itens: [
+    { k: 'protheus', l: 'No Protheus, mesmo número', d: 'O documento do Protheus é a própria NFD' },
+    { k: 'cruzada',  l: 'No Protheus, outro número', d: 'Achada pelo cliente + NF de venda (nota de entrada própria, troca de nota ou erro de digitação)' },
+    { k: 'glpi',     l: 'Só pelo chamado do GLPI',   d: 'Chamado solucionado, mas ainda não aparece na base do Protheus' },
+  ] },
+  { k: 'pendentes', l: 'Pendentes', cor: COR_PEND, itens: [
+    { k: 'chamado_aberto', l: 'Com chamado aberto', d: 'Já pedida ao fiscal pelo GLPI' },
+    { k: 'sem_chamado',    l: 'Sem chamado',        d: 'Validar retorno, reversa, enviar para lançamento…' },
+  ] },
+];
+function SituacaoLancamentos({ sit, ano, ini, fim, onDrill }) {
+  const [baixando, setBaixando] = useState(false);
+  const n = (v) => Number(v) || 0;
+  const meses = Array.from({ length: fim - ini + 1 }, (_, i) => ini + i);
+  const cel = {};
+  (sit?.meses || []).forEach(r => { if (r.mes >= ini && r.mes <= fim) cel[r.sit + '|' + r.mes] = { q: n(r.qtd), v: n(r.valor) }; });
+  const soma = (ks, m) => ks.reduce((a, k) => {
+    const lista = m ? [cel[k + '|' + m]] : meses.map(mm => cel[k + '|' + mm]);
+    lista.forEach(c => { if (c) { a.q += c.q; a.v += c.v; } });
+    return a;
+  }, { q: 0, v: 0 });
+  const kL = GRUPOS_LANC[0].itens.map(i => i.k), kP = GRUPOS_LANC[1].itens.map(i => i.k);
+  const tL = soma(kL), tP = soma(kP), tR = soma(['recusada']);
+  const fora = sit?.protheus_fora || {};
+  const abrir = (k, l, m) => onDrill?.({ titulo: `Lançamento · ${l}${m ? ' · ' + MESES[m - 1] : ''}`, dim: 'lanc', valor: k, ...(m ? { mesIni: m, mesFim: m } : {}) });
+
+  const baixarFora = async () => {
+    setBaixando(true);
+    try {
+      const linhas = await dbGetProtheusSemPortal(ano, ini, fim);
+      await baixarListaNotas({
+        titulo: 'Lançados no Protheus sem NFD no portal', periodo: `Digitação de ${MESES[ini - 1]} a ${MESES[fim - 1]}/${ano}`, linhas,
+        colunas: [
+          { t: 'Documento (Protheus)', w: 14, v: r => r.documento },
+          { t: 'NF de venda', w: 12, v: r => r.nf_venda },
+          { t: 'Filial', w: 8, v: r => r.filial },
+          { t: 'Emissão', w: 11, v: r => r.dt_emissao, fmt: 'data' },
+          { t: 'Digitação', w: 11, v: r => r.dt_digitacao, fmt: 'data' },
+          { t: 'NFD antes de 2026', w: 10, v: r => r.dt_emissao && r.dt_emissao < '2026-01-01' ? 'Sim' : 'Não' },
+          { t: 'Cliente', w: 40, v: r => r.cliente },
+          { t: 'CNPJ', w: 17, v: r => r.cnpj },
+          { t: 'Motivo', w: 34, v: r => r.motivo },
+          { t: 'Itens', w: 7, v: r => r.qtd_itens, fmt: 'int' },
+          { t: 'Valor', w: 14, v: r => r.valor, fmt: 'brl' },
+        ],
+      });
+    } catch (e) { alert('Erro ao gerar a planilha: ' + e.message); }
+    setBaixando(false);
+  };
+
+  const linha = (it, cor, bold) => (
+    <tr key={it.k}>
+      <td title={it.d} style={{ ...tdP, textAlign: 'left', color: 'var(--text)', fontWeight: bold ? 700 : 500, position: 'sticky', left: 0, background: 'var(--surface)', paddingLeft: bold ? 8 : 24 }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          {bold && <span style={{ width: 8, height: 8, borderRadius: 99, background: cor }}/>}{it.l}
+        </span>
+      </td>
+      {meses.map(m => {
+        const c = soma(it.ks || [it.k], m);
+        return (
+          <td key={m} className={c.q && onDrill ? 'drill' : undefined} onClick={c.q && onDrill ? () => abrir(it.k, it.l, m) : undefined}
+            title={c.q ? `${c.q} nota${c.q === 1 ? '' : 's'} · ${brl0(c.v)}` : undefined}
+            style={{ ...tdP, fontWeight: bold ? 700 : 400, color: c.q ? (bold ? 'var(--text)' : 'var(--text-2)') : 'var(--text-3)' }}>
+            {c.q ? `${c.q} · ${brlK(c.v)}` : '—'}
+          </td>
+        );
+      })}
+      {(() => { const c = soma(it.ks || [it.k]); return (
+        <td className={c.q && onDrill ? 'drill' : undefined} onClick={c.q && onDrill ? () => abrir(it.k, it.l) : undefined}
+          style={{ ...tdP, fontWeight: 700, color: 'var(--text)', borderLeft: '1px solid var(--border)' }}>{c.q} · {brlK(c.v)}</td>
+      ); })()}
+    </tr>
+  );
+
+  return (
+    <div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 10, marginBottom: 14 }}>
+        <Kpi label="Lançadas" accent={COR_LANC} value={brl0(tL.v)} note={`${tL.q} notas`} onClick={tL.q ? () => abrir('lancadas', 'Lançadas') : undefined}/>
+        <Kpi label="Pendentes de lançamento" accent={COR_PEND} value={brl0(tP.v)} note={`${tP.q} notas`} onClick={tP.q ? () => abrir('pendentes', 'Pendentes') : undefined}/>
+        <Kpi label="% lançado" value={pctFmt(tL.v + tP.v ? tL.v / (tL.v + tP.v) : null)} note={`${pctFmt(tL.q + tP.q ? tL.q / (tL.q + tP.q) : null)} das notas`}/>
+        <Kpi label="Recusadas Sefaz" value={brl0(tR.v)} note={`${tR.q} notas · fora da conta`} onClick={tR.q ? () => abrir('recusada', 'Recusadas Sefaz') : undefined}/>
+      </div>
+      <div className="pg-tabela" style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead><tr>
+            <th style={{ ...thP, textAlign: 'left', position: 'sticky', left: 0, background: 'var(--surface)' }}/>
+            {meses.map(m => <th key={m} style={thP}>{MESES[m - 1]}</th>)}
+            <th style={{ ...thP, color: 'var(--text)', borderLeft: '1px solid var(--border)' }}>Período</th>
+          </tr></thead>
+          <tbody>
+            {GRUPOS_LANC.map(g => [
+              linha({ k: g.k, l: g.l, ks: g.itens.map(i => i.k) }, g.cor, true),
+              ...g.itens.map(it => linha(it, g.cor, false)),
+            ])}
+          </tbody>
+        </table>
+      </div>
+      <div style={{ marginTop: 14, padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--surface-2)', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', fontSize: 12, color: 'var(--text-2)' }}>
+        <div style={{ flex: 1, minWidth: 260 }}>
+          <b style={{ color: 'var(--text)' }}>No Protheus, sem NFD no portal:</b>{' '}
+          {n(fora.qtd)} lançamentos · {brl0(n(fora.valor))}, pela data de digitação.
+          {n(fora.qtd_antigas) > 0 && <> Desses, {n(fora.qtd_antigas)} ({brlK(n(fora.valor_antigas))}) são de NFD emitida antes de 2026, que não entram no portal.</>}
+          {' '}É essa parte que faz o total do Protheus ser diferente do portal.
+        </div>
+        <button className="btn btn-outline btn-sm no-print" onClick={baixarFora} disabled={baixando || !n(fora.qtd)}>
+          {baixando ? 'Gerando…' : 'Baixar lista (Excel)'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /* ─── Chamados de lançamento fiscal (GLPI) ─────────────────── */
 const SITUACOES_GLPI = [
   { k: 'sem_chamado', l: 'Sem chamado',        d: 'Não lançada e sem chamado aberto',  cor: '#C2413B' },
@@ -617,6 +732,7 @@ export default function PainelGerencial({ onGoTo, user }) {
     setDrill({ titulo, filtro: { ano, mesIni: mesIni ?? ini, mesFim: mesFim ?? fim, dim, valor } });
   }, [ano, ini, fim]);
   const [data, setData] = useState(null);
+  const [sitLanc, setSitLanc] = useState(null);
   const [erro, setErro] = useState('');
   const [infoVend, setInfoVend] = useState(null);
   const [importVend, setImportVend] = useState(false);
@@ -626,7 +742,10 @@ export default function PainelGerencial({ onGoTo, user }) {
 
   const carregar = useCallback(async () => {
     setLoading(true); setErro('');
-    try { setData(await dbGetPainelGerencial(ano, ini, fim)); }
+    try {
+      const [d, s] = await Promise.all([dbGetPainelGerencial(ano, ini, fim), dbGetSituacaoLanc(ano, ini, fim).catch(() => null)]);
+      setData(d); setSitLanc(s);
+    }
     catch (e) { setErro(e.message); }
     setLoading(false);
   }, [ano, ini, fim]);
@@ -708,6 +827,8 @@ export default function PainelGerencial({ onGoTo, user }) {
             <TabelaMensal meses={meses} ini={ini} fim={fim} onDrill={abrir} ano={ano}/></div>
         </div>
       ) },
+    { id: 'situacao-lanc', titulo: `Situação dos lançamentos · ${periodoTxt}`,
+      corpo: <SituacaoLancamentos sit={sitLanc} ano={ano} ini={ini} fim={fim} onDrill={abrir}/> },
     { id: 'protheus', titulo: `Lançamento no Protheus · ${periodoTxt}`,
       corpo: <GraficoProtheus protheus={data.protheus} ini={ini} fim={fim} onDrill={abrir} altura={alturaSlide - 230}/> },
     { id: 'glpi', titulo: `Chamados de lançamento fiscal (GLPI) · ${periodoTxt}`,
@@ -800,6 +921,14 @@ export default function PainelGerencial({ onGoTo, user }) {
             <LinhaMensal meses={meses} ini={ini} fim={fim} onDrill={abrir}/>
             <TabelaMensal meses={meses} ini={ini} fim={fim} onDrill={abrir} ano={ano}/>
           </Card>
+
+          {sitLanc && (
+            <Card title={`Situação dos lançamentos · ${periodoTxt}`}
+              sub="Junta tudo: lançada no Protheus (mesmo número ou achada pelo cliente + NF de venda), lançada pelo chamado do GLPI e pendentes. Pelo mês de referência da devolução"
+              right={<Legend items={[{ label: 'Lançadas', color: COR_LANC }, { label: 'Pendentes', color: COR_PEND }]}/>}>
+              <SituacaoLancamentos sit={sitLanc} ano={ano} ini={ini} fim={fim} onDrill={abrir}/>
+            </Card>
+          )}
 
           <Card title={`Lançamento no Protheus · ${periodoTxt}`}
             sub="Só notas do portal (devoluções de 2026), pelo mês de referência da devolução"
