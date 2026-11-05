@@ -800,6 +800,10 @@ export default function DetalheDrawer({ id, user, onClose, onSaved, camada }) {
                           ? <span style={{ color: 'var(--green)', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 5 }}>
                               <Ic d={ICO.check} size={13} w={3}/>
                               {dev.dt_lancamento_protheus ? `Sim, em ${fmtDate(dev.dt_lancamento_protheus)}` : 'Sim'}
+                              {dev.lancado_via_glpi && (
+                                <span title="O chamado do GLPI foi solucionado, mas o lançamento ainda não apareceu na base do Protheus"
+                                  style={{ fontWeight: 600, color: 'var(--text-2)' }}>· pelo chamado do GLPI</span>
+                              )}
                             </span>
                           : <Vazio>Ainda não lançada</Vazio>}
                       </Linha>

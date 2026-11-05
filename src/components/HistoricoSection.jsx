@@ -13,6 +13,7 @@ const TIPO_CFG = {
   edicao_massa:  { label: 'Edição em massa',         color: 'var(--text-2)', icon: '≣' },
   retorno_cd:    { label: 'Retorno ao CD',           color: 'var(--green)',  icon: '↩' },
   data_devolucao:{ label: 'Data da devolução alterada', color: 'var(--blue)', icon: '◷' },
+  lancamento:    { label: 'Lançamento',              color: 'var(--green)',  icon: '✓' },
 };
 
 function fmtDateTime(s) {
