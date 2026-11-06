@@ -1068,6 +1068,22 @@ export async function dbGetCustosFrete({ de, ate, remetente = null, tipo = null,
   return data;
 }
 
+// CT-es complementares com o tipo de custo resolvido (observação / manual)
+export async function dbGetComplementares(de, ate) {
+  syncAuthToken();
+  const { data, error } = await supabase.rpc('get_cf_complementares', { p_de: de, p_ate: ate });
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+// Classifica à mão (tipo = null volta para a leitura automática); o banco grava quem mudou
+export async function dbClassificarComplementar(keys, tipo) {
+  syncAuthToken();
+  const { data, error } = await supabase.rpc('cf_classificar_complementar', { p_keys: keys, p_tipo: tipo });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
 // CT-es por trás de um número do painel (mesmos filtros + destinatário)
 export async function dbGetCustosFreteCtes({ de, ate, remetente = null, tipo = null, canal = null, uf = null, transportador = null, operacao = null, destinatario = null, limite = null }) {
   syncAuthToken();

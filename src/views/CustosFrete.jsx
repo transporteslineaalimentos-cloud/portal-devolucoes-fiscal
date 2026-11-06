@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { dbGetCustosFrete, dbGetCustosFreteCtes, dbRefreshCustosFrete } from '../config/supabase';
 import ModalCtesFrete from '../components/ModalCtesFrete.jsx';
+import ModalComplementares from '../components/ModalComplementares.jsx';
+import { somenteLeitura } from '../lib/permissoes';
 import Apresentacao from '../components/Apresentacao.jsx';
 import { gerarPainelFrete } from '../lib/painelFrete';
 import { baixarExcelFrete } from '../utils/planilhaFrete.js';
@@ -404,6 +406,7 @@ export default function CustosFrete({ user }) {
   const [apresentar, setApresentar] = useState(false);
   const [exportando, setExportando] = useState(false);
   const [baixandoXls, setBaixandoXls] = useState(false);
+  const [complementares, setComplementares] = useState(false);
   const req = useRef(0);
   const cachePeriodo = useRef({ chave: '', dados: null });
 
@@ -687,6 +690,10 @@ export default function CustosFrete({ user }) {
         <button className="btn btn-outline btn-sm" style={{ height: 32 }} onClick={atualizarAgora} disabled={atualizando}>
           {atualizando ? 'Recalculando… (até 2 min)' : 'Atualizar agora'}
         </button>
+        <button className="btn btn-outline btn-sm" style={{ height: 32 }} onClick={() => setComplementares(true)}
+          title="CT-es emitidos como complementar: o tipo de custo de verdade (dedicado, descarga, diária…)">
+          Complementares
+        </button>
         <button className="btn btn-outline btn-sm" style={{ height: 32 }} onClick={baixarExcel} disabled={!data || baixandoXls}
           title="Planilha com todos os CT-es e NFs do recorte da tela (filtros e mês clicado)">
           {baixandoXls ? 'Gerando Excel…' : 'Baixar Excel'}
@@ -752,6 +759,10 @@ export default function CustosFrete({ user }) {
         <Apresentacao titulo="Custos de Frete" periodo={periodoTxt} filtros={chips}
           slides={slides} onSair={sairApresentacao} onLimpar={limpar} onTirarChip={tirarChip}
           onVerCtes={verCtes} carregando={loading}/>
+      )}
+
+      {complementares && (
+        <ModalComplementares de={deEff} ate={ateEff} podeEditar={!somenteLeitura(user)} onClose={() => setComplementares(false)}/>
       )}
 
       {detalhe && (
