@@ -1068,6 +1068,20 @@ export async function dbGetCustosFrete({ de, ate, remetente = null, tipo = null,
   return data;
 }
 
+// Extrato de custos de frete por cliente (busca por CNPJ ou nome)
+export async function dbBuscarClienteFrete(q) {
+  syncAuthToken();
+  const { data, error } = await supabase.rpc('get_cf_cliente_busca', { p_q: q });
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+export async function dbGetClienteFrete({ de, ate, cnpj, rede = false, remetente = null }) {
+  syncAuthToken();
+  const { data, error } = await supabase.rpc('get_cf_cliente', { p_de: de, p_ate: ate, p_cnpj: cnpj, p_rede: rede, p_remetente: remetente || null });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
 // CT-es complementares com o tipo de custo resolvido (observação / manual)
 export async function dbGetComplementares(de, ate) {
   syncAuthToken();

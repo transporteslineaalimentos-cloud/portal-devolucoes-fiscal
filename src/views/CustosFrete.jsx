@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { dbGetCustosFrete, dbGetCustosFreteCtes, dbRefreshCustosFrete } from '../config/supabase';
 import ModalCtesFrete from '../components/ModalCtesFrete.jsx';
 import ModalComplementares from '../components/ModalComplementares.jsx';
+import ModalClienteFrete from '../components/ModalClienteFrete.jsx';
+import BuscaClienteFrete from '../components/BuscaClienteFrete.jsx';
 import { somenteLeitura } from '../lib/permissoes';
 import Apresentacao from '../components/Apresentacao.jsx';
 import { gerarPainelFrete } from '../lib/painelFrete';
@@ -407,6 +409,7 @@ export default function CustosFrete({ user }) {
   const [exportando, setExportando] = useState(false);
   const [baixandoXls, setBaixandoXls] = useState(false);
   const [complementares, setComplementares] = useState(false);
+  const [clienteSel, setClienteSel] = useState(null);
   const req = useRef(0);
   const cachePeriodo = useRef({ chave: '', dados: null });
 
@@ -679,6 +682,7 @@ export default function CustosFrete({ user }) {
           <option value="">Todos</option>
           {(op.transportadores || []).map(t => <option key={t.raiz} value={t.raiz}>{titulo(t.nome)}</option>)}
         </Filtro>
+        <BuscaClienteFrete onEscolher={setClienteSel} width={220}/>
         {chips.length > 0 && (
           <button className="btn btn-ghost btn-sm" style={{ height: 32 }} onClick={limpar}>Limpar filtros</button>
         )}
@@ -759,6 +763,11 @@ export default function CustosFrete({ user }) {
         <Apresentacao titulo="Custos de Frete" periodo={periodoTxt} filtros={chips}
           slides={slides} onSair={sairApresentacao} onLimpar={limpar} onTirarChip={tirarChip}
           onVerCtes={verCtes} carregando={loading}/>
+      )}
+
+      {clienteSel && (
+        <ModalClienteFrete cliente={clienteSel} de={deEff} ate={ateEff} remetente={f.remetente}
+          periodoTxt={deEff === de && ateEff === ate ? periodoTxt : `${dataBR(deEff)} a ${dataBR(ateEff)}`} onClose={() => setClienteSel(null)}/>
       )}
 
       {complementares && (
