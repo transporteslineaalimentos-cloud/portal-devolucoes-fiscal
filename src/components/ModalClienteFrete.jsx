@@ -106,12 +106,6 @@ async function baixarExtrato(r, periodo) {
     ...(r.rede ? [{ t: 'CNPJ da loja', w: 20, v: d => fmtCnpj(d.dest) }] : []),
     { t: 'Valor do CT-e', w: 15, v: d => n(d.valor_cte), f: 'brl' }, { t: 'Frete deste cliente', w: 16, v: d => n(d.valor), f: 'brl' }];
   cab(wc, colC, 1); linhas(wc, colC, r.ctes || [], 2);
-  const wn = wb.addWorksheet('NFs');
-  const colN = [{ t: 'NF', w: 11, v: d => d.nf }, { t: 'Emissão', w: 12, v: d => d.dt, f: 'data' }, ...(r.rede ? [{ t: 'CNPJ da loja', w: 20, v: d => fmtCnpj(d.cnpj) }] : []),
-    { t: 'Valor da NF', w: 15, v: d => n(d.valor), f: 'brl' }, { t: 'Frete venda', w: 14, v: d => n(d.frete_venda), f: 'brl' }, { t: 'Custo extra', w: 14, v: d => n(d.custo_extra), f: 'brl' },
-    { t: 'Frete total', w: 14, v: d => n(d.frete), f: 'brl' }, { t: '% frete', w: 9, v: d => n(d.valor) ? n(d.frete) / n(d.valor) : null, f: 'pct' }];
-  cab(wn, colN, 1); linhas(wn, colN, r.nfs || [], 2);
-
   const buf = await wb.xlsx.writeBuffer();
   const url = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
   const a = document.createElement('a'); a.href = url;
