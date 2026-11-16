@@ -47,9 +47,15 @@ export async function login(email, password) {
     headers: { 'apikey': SB_KEY, 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password }),
   });
-  const d = await res.json();
-  if (d.error) throw new Error(d.error_description || d.error);
-  if (!d.access_token) throw new Error('Resposta inválida');
+  const d = await res.json().catch(() => ({}));
+  if (!d.access_token) {
+    // o Supabase devolve o erro em formatos diferentes conforme a versão (error/error_description ou error_code/msg)
+    const cod = d.error_code || d.error || '';
+    if (cod === 'invalid_credentials' || cod === 'invalid_grant') throw new Error('E-mail ou senha incorretos');
+    if (cod === 'email_not_confirmed') throw new Error('E-mail ainda não confirmado');
+    if (cod === 'over_request_rate_limit' || res.status === 429) throw new Error('Muitas tentativas seguidas. Aguarde alguns minutos e tente de novo');
+    throw new Error(d.msg || d.error_description || d.message || `Não foi possível entrar (erro ${res.status})`);
+  }
   return { token: d.access_token, refresh: d.refresh_token, user: d.user };
 }
 
