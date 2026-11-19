@@ -588,8 +588,7 @@ const RAPIDOS = [
 
 function ListaLotes({ lotes, onAbrir, onAviso }) {
   const temMinhas = (lotes || []).some(l => l.meu);
-  const [quem, setQuem] = useState(null);           // 'minhas' | 'todas'
-  const escopo = quem ?? (temMinhas ? 'minhas' : 'todas');
+  const [escopo, setQuem] = useState('minhas');    // sempre abre em "Minhas NFs de débito"
   const [etapa, setEtapa] = useState('abertas');
   const [busca, setBusca] = useState('');
   const [sel, setSel] = useState(() => new Set());
