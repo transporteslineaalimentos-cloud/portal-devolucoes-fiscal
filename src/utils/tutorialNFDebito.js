@@ -1,7 +1,7 @@
 /* ─────────────────────────────────────────────────────────────
    Conteúdo do tutorial "Como emitir uma NF de débito" (aba Cobranças).
-   Mesmo passo a passo do POP-COB-001, gravado no Protheus em 19/11/2026.
-   Texto com **negrito**; imagens em /public/tutorial.
+   Mesmo processo do POP-COB-001: portal + Protheus, na ordem em que se faz.
+   Texto aceita **negrito** e `código`; imagens em /public/tutorial.
 ───────────────────────────────────────────────────────────── */
 
 export const SISTEMA = {
@@ -11,36 +11,63 @@ export const SISTEMA = {
 };
 
 export const GRUPOS = [
-  { k: 'portal',   titulo: 'No portal' },
-  { k: 'pedido',   titulo: 'Pedido no Protheus' },
-  { k: 'nf',       titulo: 'Liberar e faturar' },
-  { k: 'envio',    titulo: 'Enviar' },
+  { k: 'inicio',     titulo: 'Antes de começar' },
+  { k: 'montar',     titulo: '1 · Montar no portal' },
+  { k: 'pedido',     titulo: '2 · Pedido no Protheus' },
+  { k: 'liberar',    titulo: '3 · Liberar e faturar' },
+  { k: 'registrar',  titulo: '4 · Registrar a NF' },
+  { k: 'pdf',        titulo: '5 · PDF da NF (DANFE)' },
+  { k: 'enviar',     titulo: '6 · Enviar' },
+  { k: 'acompanhar', titulo: 'Acompanhar no portal' },
 ];
 
 const img = (arq, legenda) => ({ src: `/tutorial/${arq}.webp`, legenda });
 
 export const PASSOS = [
+  /* ── Antes de começar ── */
   {
-    grupo: 'portal', sistema: 'portal', onde: 'Cobranças › Notas a cobrar',
-    titulo: 'Escolha as notas que vão na mesma NF de débito',
+    id: 'visao', grupo: 'inicio', sistema: 'portal', onde: 'Visão geral',
+    titulo: 'Como funciona a NF de débito',
     texto: [
-      'Na lista da esquerda, clique no transportador. Marque **até 3 notas** do **mesmo transportador, mesma filial e mesmo motivo**. Clientes diferentes podem ir juntos.',
-      'Use o filtro **Canais**, no alto, para ver só os canais que você atende. A escolha fica salva no seu usuário.',
+      'A NF de débito cobra do transportador os produtos de uma devolução que foi responsabilidade dele (avaria, falta, inversão, erro de carregamento). Cobramos **só o valor dos produtos**, pelo mesmo preço da NF de venda.',
+      'O caminho é sempre este, e o portal guarda cada número para nenhuma nota ser cobrada duas vezes:',
     ],
-    imagens: [img('11-portal-notas', 'Nota marcada e o botão Montar NF de débito na barra de baixo.')],
+    lista: [
+      '**Portal:** junte até 3 notas do mesmo transportador, filial e motivo.',
+      '**Protheus:** digite o pedido de venda e salve.',
+      '**Portal:** registre o nº do pedido.',
+      '**Protheus:** libere o pedido. Se cair em crédito, o **financeiro** libera. Depois gere a NF no Prep.doc.saída.',
+      '**Portal:** registre o nº da NF (uma ou várias de uma vez).',
+      '**Protheus:** baixe o PDF da NF (DANFE).',
+      '**Portal:** baixe a relação em Excel, envie ao transportador e marque como enviada.',
+    ],
+    atencao: 'É normal lançar vários pedidos num dia e registrar as NFs depois, conforme o financeiro libera. O portal mostra em que etapa cada uma está.',
+  },
+
+  /* ── 1 · Montar no portal ── */
+  {
+    id: 'notas', grupo: 'montar', sistema: 'portal', onde: 'Cobranças › Notas a cobrar',
+    titulo: 'Escolha as notas e clique em Montar NF de débito',
+    texto: [
+      'Use o filtro **Todos os transportadores** para ver as notas de um transportador só. Marque **até 3 notas** do **mesmo transportador, mesma filial e mesmo motivo** (clientes diferentes podem ir juntos).',
+      'Na barra escura que aparece embaixo, clique em **Montar NF de débito**.',
+    ],
+    imagens: [img('p-01-notas', 'Filtro de transportador, notas marcadas e o botão Montar NF de débito.')],
   },
   {
-    grupo: 'portal', sistema: 'portal', onde: 'Barra de baixo › Montar NF de débito',
-    titulo: 'Monte a NF de débito e deixe a tela aberta',
+    id: 'tela', grupo: 'montar', sistema: 'portal', onde: 'Tela da NF de débito',
+    titulo: 'Deixe a tela da NF de débito aberta',
     texto: [
-      'Clique em **Montar NF de débito**. Abre a tela com tudo o que vai ser digitado no Protheus, com o botão **copiar** em cada valor.',
+      'Ela traz tudo o que vai ser digitado no Protheus, com o botão **copiar** ao lado de cada valor: filial, CNPJ, operação, data de entrega, mensagem da nota e uma linha por produto.',
       'No quadro de notas, o número grande é a **NFD** (nota de devolução do cliente). A **NF de venda** aparece embaixo, em cinza.',
     ],
     atencao: 'Se aparecer o quadro amarelo "Atenção antes de salvar o pedido", resolva antes de ir ao Protheus.',
-    imagens: [img('12-portal-modal', 'Observação pronta, uma linha por produto e o campo do nº do pedido.')],
+    imagens: [img('p-02-modal', 'Tela da NF de débito com os campos para copiar.')],
   },
+
+  /* ── 2 · Pedido no Protheus ── */
   {
-    grupo: 'pedido', sistema: 'protheus', onde: 'Tela de abertura do Protheus',
+    id: 'filial', grupo: 'pedido', sistema: 'protheus', onde: 'Tela de abertura do Protheus',
     titulo: 'Entre na filial da NF de venda',
     texto: ['A filial aparece no topo da NF de débito do portal. Preencha **Grupo 01**, a filial e **Ambiente 05**, e clique em **Entrar**.'],
     campos: [
@@ -51,22 +78,22 @@ export const PASSOS = [
     imagens: [img('01-filial', 'Filial e Ambiente na abertura.')],
   },
   {
-    grupo: 'pedido', sistema: 'protheus', onde: 'Atualizações › Pedidos › Pedidos de Venda',
+    id: 'incluir', grupo: 'pedido', sistema: 'protheus', onde: 'Atualizações › Pedidos › Pedidos de Venda',
     titulo: 'Abra Pedidos de Venda e clique em Incluir',
-    texto: ['No menu da esquerda, abra **Pedidos** e depois **Pedidos de Venda**. Na tela que abrir, clique em **Incluir**.'],
+    texto: ['No menu da esquerda, abra **Pedidos** e depois **Pedidos de Venda**. Clique em **Incluir**.'],
     imagens: [img('02-menu', 'Pedidos de Venda no menu e o atalho Incluir.')],
   },
   {
-    grupo: 'pedido', sistema: 'protheus', onde: 'Pedido de venda › campo Cliente',
+    id: 'cliente', grupo: 'pedido', sistema: 'protheus', onde: 'Pedido de venda › campo Cliente',
     titulo: 'Busque o transportador pelo CNPJ',
     texto: [
-      'Clique na **lupa** do campo Cliente. Cole o CNPJ (copiado do portal, só números) em **Pesquisar**, clique na linha do transportador e em **OK**.',
-      'Nome, loja, condição de pagamento, tabela e tipo de frete se preenchem sozinhos. Não precisa mexer.',
+      'Clique na **lupa** do campo Cliente. Cole o CNPJ copiado do portal em **Pesquisar**, clique na linha do transportador e em **OK**.',
+      'Nome, loja, condição de pagamento, tabela e tipo de frete se preenchem sozinhos.',
     ],
     imagens: [img('03-cliente', 'Consulta de cliente pesquisada pelo CNPJ.')],
   },
   {
-    grupo: 'pedido', sistema: 'protheus', onde: 'Pedido de venda › cabeçalho',
+    id: 'cabecalho', grupo: 'pedido', sistema: 'protheus', onde: 'Pedido de venda › cabeçalho',
     titulo: 'Preencha Operação e Dt. Entrega',
     campos: [
       ['Operacao', '50', 'Venda de mercadoria'],
@@ -75,20 +102,16 @@ export const PASSOS = [
     imagens: [img('04-cabecalho', 'Cabeçalho preenchido (laranja).')],
   },
   {
-    grupo: 'pedido', sistema: 'protheus', onde: 'Pedido de venda › Mens.p/ Nota',
+    id: 'mensagem', grupo: 'pedido', sistema: 'protheus', onde: 'Pedido de venda › Mens.p/ Nota',
     titulo: 'Cole a observação em Mens.p/ Nota',
-    texto: [
-      'Role os campos do cabeçalho até **Mens.p/ Nota** e cole o texto copiado do portal. Ele segue o padrão curto, porque o campo tem limite: `Ref Cob Avaria NFD 969576;1806008`.',
-    ],
+    texto: ['Role os campos do cabeçalho até **Mens.p/ Nota** e cole o texto copiado do portal, no padrão curto: `Ref Cob Avaria NFD 969576;1806008`.'],
     atencao: 'Não use o campo OBSERVACAO, que fica logo abaixo. A mensagem da nota fiscal é a Mens.p/ Nota.',
     imagens: [img('05-mensnota', 'Mens.p/ Nota preenchida; OBSERVACAO fica vazio.')],
   },
   {
-    grupo: 'pedido', sistema: 'protheus', onde: 'Pedido de venda › linhas',
+    id: 'linhas', grupo: 'pedido', sistema: 'protheus', onde: 'Pedido de venda › linhas',
     titulo: 'Inclua uma linha para cada produto',
-    texto: [
-      'Para cada linha do portal, digite **Produto**, **Quantidade** e **Prc Unitario**. Depois corrija três colunas que o Protheus preenche com outro valor:',
-    ],
+    texto: ['Para cada linha do portal, digite **Produto**, **Quantidade** e **Prc Unitario**. Depois corrija três colunas que o Protheus preenche com outro valor:'],
     campos: [
       ['Prc Lista', '0', 'Vem com o preço de tabela (ex.: 74,59). Apague'],
       ['Tipo Saida', '627', 'Vem 531. Troque'],
@@ -101,46 +124,156 @@ export const PASSOS = [
     ],
   },
   {
-    grupo: 'nf', sistema: 'portal', onde: 'Protheus › Salvar  →  Portal › Passo 3',
-    titulo: 'Salve o pedido e registre o número no portal',
-    texto: [
-      'No Protheus, clique em **Salvar** e anote o **Numero** do pedido (topo do cabeçalho).',
-      'No portal, no **Passo 3** da NF de débito, digite o número e clique em **Registrar pedido**.',
+    id: 'salvar', grupo: 'pedido', sistema: 'protheus', onde: 'Pedido de venda › Salvar',
+    titulo: 'Salve e anote o número do pedido',
+    texto: ['Clique em **Salvar** (canto superior direito). O número do pedido é o campo **Numero**, no topo do cabeçalho.'],
+    imagens: [img('13-salvar', 'Numero do pedido e o botão Salvar.')],
+  },
+  {
+    id: 'reg-pedido', grupo: 'pedido', sistema: 'portal', onde: 'Portal › NF de débito › passo 3',
+    titulo: 'Digite o número do pedido no portal',
+    texto: ['Volte à tela da NF de débito no portal. No passo **3**, digite o número do pedido e clique em **Registrar pedido**. A NF de débito passa para **Aguardando faturamento**.'],
+    imagens: [img('p-03-pedido', 'Número do pedido digitado e o botão Registrar pedido.')],
+  },
+
+  /* ── 3 · Liberar e faturar ── */
+  {
+    id: 'menu-liberacao', grupo: 'liberar', sistema: 'protheus', onde: 'Atualizações › Pedidos › Liberação de Pedidos de Venda',
+    titulo: 'Abra a Liberação de Pedidos de Venda',
+    texto: ['No menu da esquerda, em **Pedidos**, logo abaixo de Pedidos de Venda, clique em **Liberação de Pedidos de Venda**. Nos atalhos da direita, o mesmo bloco tem o link **Liberar**.'],
+    imagens: [img('14-menu-liberacao', 'Liberação de Pedidos de Venda no menu e o atalho Liberar.')],
+  },
+  {
+    id: 'liberar', grupo: 'liberar', sistema: 'protheus', onde: 'Liberação de Pedidos de Venda',
+    titulo: 'Pesquise o pedido, clique em Liberar e Salve',
+    texto: ['Digite o número do pedido na barra de pesquisa, clique na linha dele e em **Liberar**. Na tela que abrir, clique em **Salvar**.'],
+    imagens: [
+      img('07-liberacao', 'Barra de pesquisa e o botão Liberar.'),
+      img('15-liberar-salvar', 'Na tela de liberação, clique em Salvar.'),
     ],
   },
   {
-    grupo: 'nf', sistema: 'protheus', onde: 'Pedidos › Liberação de Pedidos de Venda',
-    titulo: 'Libere o pedido',
-    texto: ['Pesquise o número do pedido, clique na linha dele e em **Liberar**. Na tela que abrir, clique em **Salvar**.'],
-    imagens: [img('07-liberacao', 'Barra de pesquisa e o botão Liberar.')],
-  },
-  {
-    grupo: 'nf', sistema: 'financ', onde: 'Pedidos de Venda › Prep.doc.saída',
+    id: 'bolinha', grupo: 'liberar', sistema: 'financ', onde: 'Pedidos de Venda › cor da bolinha',
     titulo: 'Bolinha branca? Peça a liberação ao financeiro',
     texto: [
-      'Volte em **Pedidos de Venda** e procure o pedido. **Bolinha branca** = regra de crédito: peça ao financeiro para liberar.',
-      'Liberado, selecione o pedido e use **Prep.doc.saída**. Siga o assistente com **Avançar**. Ao final o Protheus gera o **número da NF**.',
+      'Volte em **Pedidos de Venda** e procure o pedido. **Bolinha branca** = o pedido caiu na regra de crédito e só o **financeiro** pode liberar. Peça e aguarde.',
+      'Enquanto isso, pode seguir com outras NFs de débito. No portal, o cartão **Com pedido, sem NF de débito** mostra há quantos dias cada uma espera.',
+    ],
+    imagens: [img('08-bolinha', 'Pedido com bolinha branca: aguardando o financeiro.')],
+  },
+  {
+    id: 'prepdoc', grupo: 'liberar', sistema: 'protheus', onde: 'Pedidos de Venda › Outras Ações › Prep.Doc.saída',
+    titulo: 'Gere a NF no Prep.Doc.saída',
+    texto: [
+      'Com o pedido liberado, clique na linha dele em **Pedidos de Venda**, depois em **Outras Ações** e **Prep.Doc.saída**.',
+      'No assistente, clique em **Avançar** até o fim. O Protheus gera o **número da NF de débito**. Anote.',
+    ],
+    atencao: 'Se o assistente listar itens bloqueados, o pedido ainda está em regra de crédito. Volte ao passo anterior.',
+    imagens: [
+      img('16-prepdoc', 'Pedido selecionado, Outras Ações e Prep.Doc.saída.'),
+      img('09-assistente', 'Assistente do Prep.Doc.saída: siga com Avançar.'),
+    ],
+  },
+
+  /* ── 4 · Registrar a NF ── */
+  {
+    id: 'reg-nf', grupo: 'registrar', sistema: 'portal', onde: 'Portal › NF de débito › passo 4',
+    titulo: 'Registre o número da NF de débito',
+    texto: ['Abra a NF de débito no portal (aba **NFs de débito**). No passo **4**, digite o número da NF e clique em **Registrar NF de débito**. As notas ficam como **cobradas**.'],
+    imagens: [img('p-05-nf', 'Número da NF digitado e o botão Registrar NF de débito.')],
+  },
+  {
+    id: 'reg-varias', grupo: 'registrar', sistema: 'portal', onde: 'NFs de débito › Com pedido, sem NF de débito',
+    titulo: 'Várias faturadas? Registre todas de uma vez',
+    texto: [
+      'Na aba **NFs de débito**, clique no cartão **Com pedido, sem NF de débito**. Marque as que o financeiro faturou e clique em **Registrar NFs de débito** na barra de baixo.',
+      'Abre uma lista com cada pedido: digite o número da NF ao lado de cada um e clique em **Registrar**. As que ficarem em branco continuam aguardando.',
     ],
     imagens: [
-      img('08-bolinha', 'Pedido com bolinha branca: aguardando o financeiro.'),
-      img('09-assistente', 'Assistente do Prep.doc.saída.'),
+      img('p-09-pedidos', 'Pedidos marcados e o botão Registrar NFs de débito.'),
+      img('p-09b-registrar', 'Um número de NF para cada pedido.'),
+    ],
+  },
+
+  /* ── 5 · PDF da NF ── */
+  {
+    id: 'menu-nfe', grupo: 'pdf', sistema: 'protheus', onde: 'Atualizações › Nf-e e Nfs-e › NF-e Sefaz',
+    titulo: 'Abra a NF-e Sefaz',
+    texto: ['No menu da esquerda, abra **Nf-e e Nfs-e** e depois **NF-e Sefaz** (tela Monitoramento SEFAZ). Procure a NF pelo número na barra de pesquisa e clique na linha dela.'],
+    imagens: [img('17-menu-nfe', 'Nf-e e Nfs-e no menu do Faturamento.')],
+  },
+  {
+    id: 'danfe', grupo: 'pdf', sistema: 'protheus', onde: 'NF-e Sefaz › Outras Ações › DANFE › Imp. Padrão',
+    titulo: 'Clique em Outras Ações › DANFE › Imp. Padrão',
+    texto: ['Na janela **Parâmetros**, preencha e clique em **OK**:'],
+    campos: [
+      ['Da Nota Fiscal', 'nº da NF', 'O número que o Protheus gerou'],
+      ['Até a Nota Fiscal', 'nº da NF', 'O mesmo número'],
+      ['Da Série', '2', ''],
+      ['Tipo de Operação', 'NF. Saída', ''],
+    ],
+    imagens: [
+      img('18-danfe-menu', 'Outras Ações › DANFE › Imp. Padrão.'),
+      img('19-parametros', 'Parâmetros: número da NF, série 2 e NF. Saída.'),
     ],
   },
   {
-    grupo: 'envio', sistema: 'protheus', onde: 'Nf-e e Nfs-e › NF-e Sefaz',
-    titulo: 'Registre a NF no portal e baixe o PDF',
-    texto: [
-      'No portal, **Passo 4**: digite o nº da NF de débito e clique em **Registrar NF de débito**. As notas ficam como cobradas.',
-      'No Protheus, abra **NF-e Sefaz**, pesquise a NF e abra o DANFE. Parâmetros: da nota / até a nota = número da NF, **Série 2**, **NF Saída**. Na janela DANFE, escolha **Microsoft Print to PDF** e destino **Local**, e salve o arquivo.',
+    id: 'pdf', grupo: 'pdf', sistema: 'protheus', onde: 'Janela DANFE',
+    titulo: 'Salve o PDF',
+    campos: [
+      ['Tipo de Impressão', 'Microsoft Print to PDF', ''],
+      ['Destino', 'Local', ''],
+      ['Orientação', 'Retrato', 'Clique em Retrato'],
     ],
-    imagens: [img('10-danfe', 'Janela DANFE: Microsoft Print to PDF e destino Local.')],
+    texto: ['Clique em **Ok**. Na janela de download, dê um nome ao arquivo (ex.: `NF debito 244606 - TECMAR`) e salve.'],
+    imagens: [img('20-danfe-janela', 'Microsoft Print to PDF, destino Local, orientação Retrato e Ok.')],
+  },
+
+  /* ── 6 · Enviar ── */
+  {
+    id: 'enviar', grupo: 'enviar', sistema: 'portal', onde: 'NFs de débito › NF de débito emitida',
+    titulo: 'Baixe a relação única e marque como enviadas',
+    texto: [
+      'Na aba **NFs de débito**, clique no cartão **NF de débito emitida**. Use **Marcar todas de [transportador]** e clique em **Baixar relação única (Excel)**: sai uma planilha só com todas as NFs dele.',
+      'Envie ao transportador o PDF de cada NF e a relação. Depois, na mesma barra, confira a data e clique em **Marcar todas como enviadas**. Pronto.',
+    ],
+    imagens: [img('p-07-enviar', 'Atalho por transportador, relação única e marcar como enviadas.')],
+  },
+
+  /* ── Acompanhar ── */
+  {
+    id: 'status', grupo: 'acompanhar', sistema: 'portal', onde: 'Cobranças › NFs de débito',
+    titulo: 'Veja em que etapa está cada NF de débito',
+    texto: [
+      'A aba **NFs de débito** sempre abre em **Minhas NFs de débito** (as que você criou). Em **De todos** você vê as dos colegas.',
+      'Os cartões filtram por etapa. Clique de novo no mesmo cartão para voltar a ver todas em andamento:',
+    ],
+    lista: [
+      '**Abertas, sem pedido:** montadas, falta digitar o pedido no Protheus.',
+      '**Com pedido, sem NF de débito:** aguardando liberação/faturamento.',
+      '**NF de débito emitida:** falta enviar ao transportador.',
+      '**Enviadas:** processo concluído.',
+    ],
+    imagens: [img('p-08-nfs', 'Minhas / De todos e os cartões de etapa.')],
   },
   {
-    grupo: 'envio', sistema: 'portal', onde: 'Cobranças › NFs de débito',
-    titulo: 'Envie ao transportador e marque como enviada',
-    texto: [
-      'Baixe a relação das notas em Excel: **Baixar relação só desta NF** (Passo 5) ou, para várias do mesmo transportador, marque todas em **NF de débito emitida** e clique em **Baixar relação única (Excel)**.',
-      'Envie o PDF de cada NF e a relação. Depois clique em **Marcar como enviada** (ou **Marcar todas como enviadas**). Pronto.',
+    id: 'canais', grupo: 'acompanhar', sistema: 'portal', onde: 'Cobranças › Canais',
+    titulo: 'Filtre pelos canais que você atende',
+    texto: ['O botão **Canais**, no alto à direita, filtra as notas pelo canal (centro de custo da NF de venda). Marque um ou mais e clique em **Salvar como meus canais**: o portal abre sempre com eles. **Ver todos** mostra tudo de novo.'],
+    imagens: [img('p-10-canais', 'Escolha dos canais e Salvar como meus canais.')],
+  },
+  {
+    id: 'corrigir', grupo: 'acompanhar', sistema: 'portal', onde: 'NF de débito › rodapé',
+    titulo: 'Corrigir, desfazer ou passar para outra pessoa',
+    lista: [
+      '**corrigir:** aparece ao lado do pedido ou da NF já registrados, para trocar um número digitado errado.',
+      '**Desfazer última etapa:** volta uma etapa (ex.: tira o registro da NF).',
+      '**Passar para outra pessoa:** a NF de débito vai para "Minhas NFs de débito" do colega.',
+      '**Cancelar NF de débito:** desiste da cobrança; as notas voltam para "Notas a cobrar".',
     ],
+    imagens: [img('p-11-rodape', 'Rodapé da NF de débito com as opções.')],
   },
 ];
+
+/** Índice de um passo pelo id (para abrir o tutorial direto nele). */
+export const passoPorId = (id) => Math.max(0, PASSOS.findIndex(p => p.id === id));

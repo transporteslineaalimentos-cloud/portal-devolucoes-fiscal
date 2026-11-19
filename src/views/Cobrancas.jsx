@@ -687,6 +687,8 @@ function ListaLotes({ lotes, onAbrir, onAviso, onRecarregar, leitura }) {
     catch (e) { alert(e.message); }
   };
   const aEnviar = marcados.filter(l => l.etapa === 'faturado');
+  const aFaturar = marcados.filter(l => l.etapa === 'pedido');
+  const [registrando, setRegistrando] = useState(false);
   const marcarEnviadas = async () => {
     if (!aEnviar.length) return;
     if (!window.confirm(`Marcar ${plural(aEnviar.length, 'NF de débito', 'NFs de débito')} como enviada${aEnviar.length > 1 ? 's' : ''} ao transportador em ${dtEnvio.split('-').reverse().join('/')}?`)) return;
@@ -725,6 +727,11 @@ function ListaLotes({ lotes, onAbrir, onAviso, onRecarregar, leitura }) {
           );
         })}
       </div>
+      {etapa === 'pedido' && lista.length > 0 && !leitura && (
+        <div className="cob-guia" style={{ borderLeftColor: ETAPA.pedido.cor }}>
+          <span><strong style={{ color: ETAPA.pedido.cor }}>O financeiro faturou vários?</strong> Marque as NFs de débito e clique em <b>Registrar NFs de débito</b> na barra de baixo para digitar todos os números de uma vez.</span>
+        </div>
+      )}
       {etapa === 'faturado' && lista.length > 0 && (
         <div className="cob-guia" style={{ borderLeftColor: ETAPA.faturado.cor }}>
           <span><strong style={{ color: ETAPA.faturado.cor }}>Para enviar ao transportador:</strong> marque as NFs de débito dele (ou use os atalhos abaixo), baixe <b>uma relação única em Excel</b> com todas e depois marque todas como enviadas.</span>
@@ -800,6 +807,7 @@ function ListaLotes({ lotes, onAbrir, onAviso, onRecarregar, leitura }) {
             </span>
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginLeft: 'auto', alignItems: 'center' }}>
+            {!leitura && aFaturar.length > 0 && <button className="btn btn-sm cob-btn-claro" onClick={() => setRegistrando(true)}>Registrar NFs de débito ({aFaturar.length})</button>}
             <button className="btn btn-sm cob-btn-claro" onClick={relacao}><Ic d={I.baixar} size={13}/> Baixar relação única (Excel)</button>
             {!leitura && aEnviar.length > 0 && <>
               <input type="date" className="input ld-data" value={dtEnvio} onChange={e => setDtEnvio(e.target.value)} aria-label="Data do envio"/>
@@ -810,6 +818,65 @@ function ListaLotes({ lotes, onAbrir, onAviso, onRecarregar, leitura }) {
             <button className="btn btn-sm cob-btn-escuro" onClick={() => setSel(new Set())} aria-label="Limpar seleção"><Ic d={I.x} size={13}/></button>
           </div>
         </div>, document.body)}
+      {registrando && <ModalRegistrarNFs lotes={aFaturar} onClose={() => setRegistrando(false)}
+        onFeito={(msg) => { setRegistrando(false); setSel(new Set()); onAviso(msg); onRecarregar?.(); }}/>}
     </>
   );
+}
+
+/* Registrar de uma vez o nº da NF de débito de vários pedidos que o financeiro já faturou. */
+function ModalRegistrarNFs({ lotes, onClose, onFeito }) {
+  const hoje = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  const [nums, setNums] = useState({});
+  const [data, setData] = useState(hoje);
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState('');
+  const preenchidos = lotes.filter(l => String(nums[l.id] || '').trim());
+  const salvar = async () => {
+    if (!preenchidos.length) { setErro('Digite o número de pelo menos uma NF de débito.'); return; }
+    setSalvando(true); setErro('');
+    let ok = 0; const falhas = [];
+    for (const l of preenchidos) {
+      try { await dbCobrancaLoteAcao(l.id, 'faturar', { numero: String(nums[l.id]).trim(), data }); ok++; }
+      catch (e) { falhas.push(`pedido ${l.pedido}: ${e.message}`); }
+    }
+    setSalvando(false);
+    if (falhas.length && !ok) { setErro('Não foi possível registrar: ' + falhas.join('; ')); return; }
+    onFeito(`${plural(ok, 'NF de débito registrada', 'NFs de débito registradas')}. As notas ficaram como cobradas.${falhas.length ? ' Falhou: ' + falhas.join('; ') : ''}`);
+  };
+  return createPortal(
+    <div className="modal-overlay" style={{ zIndex: 680 }} onClick={e => e.target === e.currentTarget && !salvando && onClose()}>
+      <div className="modal" role="dialog" aria-label="Registrar NFs de débito" style={{ maxWidth: 720 }}>
+        <div className="modal-header">
+          <div style={{ fontSize: 16, fontWeight: 700 }}>Registrar NFs de débito</div>
+          <div style={{ fontSize: 12.5, color: 'var(--text-2)', marginTop: 3 }}>Digite o nº da NF que o Protheus gerou para cada pedido. Os que ficarem em branco continuam aguardando.</div>
+        </div>
+        <div className="modal-body">
+          <div className="cob-mini-tabela" style={{ maxHeight: '52vh' }}>
+            <table>
+              <thead><tr><th>Pedido</th><th>Transportador</th><th style={{ textAlign: 'right' }}>Valor</th><th>Nº da NF de débito</th></tr></thead>
+              <tbody>{lotes.map((l, i) => (
+                <tr key={l.id}>
+                  <td><b>{l.pedido}</b><div className="cob-sub">lote {l.numero}</div></td>
+                  <td style={{ maxWidth: 220 }}><div className="ellipsis" title={l.transportador_nome}>{l.transportador_nome}</div></td>
+                  <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>{fmtBRL(l.valor_total)}</td>
+                  <td><input className="input" style={{ width: 140, padding: '5px 8px' }} value={nums[l.id] || ''} autoFocus={i === 0} inputMode="numeric"
+                    onChange={e => setNums(n => ({ ...n, [l.id]: e.target.value }))} placeholder="Ex.: 245310" aria-label={`NF de débito do pedido ${l.pedido}`}/></td>
+                </tr>
+              ))}</tbody>
+            </table>
+          </div>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, fontSize: 12.5, color: 'var(--text-2)' }}>
+            Emissão das NFs<input type="date" className="input" style={{ width: 160, padding: '5px 8px' }} value={data} onChange={e => setData(e.target.value)}/>
+          </label>
+          {erro && <div className="nd-erro" style={{ marginTop: 10 }}>{erro}</div>}
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-ghost btn-sm" onClick={onClose} disabled={salvando}>Cancelar</button>
+          <button className="btn btn-primary btn-sm" onClick={salvar} disabled={salvando || !preenchidos.length}>
+            {salvando ? 'Registrando…' : `Registrar ${preenchidos.length || ''} ${preenchidos.length === 1 ? 'NF' : 'NFs'}`}
+          </button>
+        </div>
+      </div>
+    </div>, document.body);
 }

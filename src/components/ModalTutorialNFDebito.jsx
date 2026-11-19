@@ -1,10 +1,10 @@
 import { Fragment, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { GRUPOS, PASSOS, SISTEMA } from '../utils/tutorialNFDebito.js';
+import { GRUPOS, PASSOS, SISTEMA, passoPorId } from '../utils/tutorialNFDebito.js';
 
 /* Tutorial "Como emitir uma NF de débito": portal + Protheus, um passo por tela. */
 
-const CHAVE = 'df_tutorial_nfd_passo';
+const CHAVE = 'df_tutorial_nfd_passo_v2';
 const lerPasso = () => { try { const n = Number(localStorage.getItem(CHAVE)); return n >= 0 && n < PASSOS.length ? n : 0; } catch { return 0; } };
 const gravarPasso = (n) => { try { localStorage.setItem(CHAVE, String(n)); } catch { /* sem armazenamento */ } };
 
@@ -17,7 +17,7 @@ function Rico({ t }) {
 }
 
 export default function ModalTutorialNFDebito({ onClose, inicio }) {
-  const [i, setI] = useState(() => inicio ?? lerPasso());
+  const [i, setI] = useState(() => inicio != null ? passoPorId(inicio) : lerPasso());
   const p = PASSOS[i];
   const sis = SISTEMA[p.sistema];
   const ultimo = i === PASSOS.length - 1;
@@ -31,7 +31,7 @@ export default function ModalTutorialNFDebito({ onClose, inicio }) {
     };
     window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);
   }, [i, onClose]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { document.querySelector('.tut-conteudo')?.scrollTo?.(0, 0); }, [i]);
+  useEffect(() => { document.querySelector('.tut-conteudo')?.scrollTo?.(0, 0); document.querySelector('.tut-item.on')?.scrollIntoView?.({ block: 'nearest' }); }, [i]);
 
   return createPortal(
     <div className="modal-overlay" style={{ zIndex: 720 }} onClick={e => e.target === e.currentTarget && onClose()}>
@@ -75,11 +75,13 @@ export default function ModalTutorialNFDebito({ onClose, inicio }) {
             <h2 className="tut-h">{p.titulo}</h2>
             {(p.texto || []).map((t, n) => <p key={n} className="tut-p"><Rico t={t}/></p>)}
 
+            {p.lista && <ul className="tut-lista">{p.lista.map((t, n) => <li key={n}><Rico t={t}/></li>)}</ul>}
+
             {p.campos && (
               <table className="tut-campos">
                 <thead><tr><th>Campo</th><th>Digite</th><th>Observação</th></tr></thead>
                 <tbody>{p.campos.map(([c, v, o]) => (
-                  <tr key={c}><td>{c}</td><td><span className="tut-valor">{v}</span></td><td>{o}</td></tr>
+                  <tr key={c}><td>{c}</td><td><span className="tut-valor">{v}</span></td><td>{o || '—'}</td></tr>
                 ))}</tbody>
               </table>
             )}
