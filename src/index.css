@@ -964,7 +964,7 @@ tr.drill-row:hover td { background: var(--blue-dim); }
 .cob-transps { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow-xs); overflow: hidden; position: sticky; top: 12px; }
 .cob-transps-tit { display: flex; align-items: center; justify-content: space-between; padding: 11px 14px; font-size: 12px; font-weight: 700; color: var(--text); border-bottom: 1px solid var(--border); }
 .cob-transps-lista { max-height: calc(100vh - 260px); overflow-y: auto; padding: 6px; }
-.cob-transp { all: unset; box-sizing: border-box; width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 8px; padding: 8px 9px; border-radius: 8px; cursor: pointer; transition: background 120ms; }
+.cob-transp { all: unset; box-sizing: border-box; width: 100%; display: grid; grid-template-columns: minmax(0, 1fr); gap: 3px 8px; padding: 8px 9px; border-radius: 8px; cursor: pointer; transition: background 120ms; }
 .cob-transp:hover { background: var(--surface-2); }
 .cob-transp.ativo { background: var(--blue-dim); box-shadow: inset 0 0 0 1px var(--blue-mid); }
 .cob-transp:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
@@ -1306,3 +1306,8 @@ tr.drill-row:hover td { background: var(--blue-dim); }
 .tut-lista { margin: 4px 0 10px; padding-left: 20px; max-width: 72ch; }
 .tut-lista li { font-size: 14px; line-height: 1.55; color: var(--text-2); margin-bottom: 4px; }
 .tut-lista li b { color: var(--text); }
+
+.tut.pagina { max-width: none; width: 100%; height: 100vh; max-height: 100vh; border: 0; border-radius: 0; box-shadow: none; }
+.tut.pagina .tut-topo .dd-close { display: none; }
+.tut-topo > div:first-child { flex: 1; min-width: 0; }
+.tut-topo { align-items: flex-start; }

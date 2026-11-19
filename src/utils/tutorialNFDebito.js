@@ -49,10 +49,11 @@ export const PASSOS = [
     id: 'notas', grupo: 'montar', sistema: 'portal', onde: 'Cobranças › Notas a cobrar',
     titulo: 'Escolha as notas e clique em Montar NF de débito',
     texto: [
-      'Use o filtro **Todos os transportadores** para ver as notas de um transportador só. Marque **até 3 notas** do **mesmo transportador, mesma filial e mesmo motivo** (clientes diferentes podem ir juntos).',
+      'Primeiro escolha o transportador: no monitor grande, clique no nome dele na lista **Transportadores**, à esquerda; no notebook, escolha o nome no filtro de transportador (o que começa mostrando "Todos os transportadores"). A lista passa a mostrar só as notas dele.',
+      'Marque **até 3 notas** da **mesma filial** e do **mesmo motivo** (clientes diferentes podem ir juntos).',
       'Na barra escura que aparece embaixo, clique em **Montar NF de débito**.',
     ],
-    imagens: [img('p-01-notas', 'Filtro de transportador, notas marcadas e o botão Montar NF de débito.')],
+    imagens: [img('p-01-notas', 'Transportador escolhido no filtro, notas marcadas e o botão Montar NF de débito.')],
   },
   {
     id: 'tela', grupo: 'montar', sistema: 'portal', onde: 'Tela da NF de débito',

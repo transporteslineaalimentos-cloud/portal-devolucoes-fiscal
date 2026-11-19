@@ -16,7 +16,26 @@ function Rico({ t }) {
       : <Fragment key={i}>{p}</Fragment>);
 }
 
-export default function ModalTutorialNFDebito({ onClose, inicio }) {
+/** Abre o tutorial numa janela separada do navegador (fica ao lado do portal e do Protheus).
+ *  Devolve false se o navegador bloquear a janela; aí quem chamou abre o tutorial dentro do portal. */
+export function abrirTutorialJanela(passo) {
+  const w = Math.min(980, window.screen.availWidth || 980), h = Math.min(960, (window.screen.availHeight || 960) - 40);
+  const left = Math.max(0, (window.screen.availWidth || w) - w);
+  const url = `/tutorial-nf-debito${passo ? `?passo=${encodeURIComponent(passo)}` : ''}`;
+  const jan = window.open(url, 'tutorial-nf-debito', `popup=yes,width=${w},height=${h},left=${left},top=0`);
+  if (!jan) return false;
+  try { jan.focus(); } catch { /* ok */ }
+  return true;
+}
+
+/** Página do tutorial aberta em janela própria (rota /tutorial-nf-debito, sem login). */
+export function TutorialPagina() {
+  const passo = new URLSearchParams(window.location.search).get('passo');
+  useEffect(() => { document.title = 'Como emitir uma NF de débito · Tutorial'; }, []);
+  return <ModalTutorialNFDebito pagina inicio={passo || undefined} onClose={() => window.close()}/>;
+}
+
+export default function ModalTutorialNFDebito({ onClose, inicio, pagina }) {
   const [i, setI] = useState(() => inicio != null ? passoPorId(inicio) : lerPasso());
   const p = PASSOS[i];
   const sis = SISTEMA[p.sistema];
@@ -25,7 +44,7 @@ export default function ModalTutorialNFDebito({ onClose, inicio }) {
 
   useEffect(() => {
     const k = (e) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape' && !pagina) onClose();
       else if (e.key === 'ArrowRight' && !e.target.closest?.('select')) ir(i + 1);
       else if (e.key === 'ArrowLeft' && !e.target.closest?.('select')) ir(i - 1);
     };
@@ -33,15 +52,15 @@ export default function ModalTutorialNFDebito({ onClose, inicio }) {
   }, [i, onClose]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { document.querySelector('.tut-conteudo')?.scrollTo?.(0, 0); document.querySelector('.tut-item.on')?.scrollIntoView?.({ block: 'nearest' }); }, [i]);
 
-  return createPortal(
-    <div className="modal-overlay" style={{ zIndex: 720 }} onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal tut" role="dialog" aria-label="Tutorial: como emitir uma NF de débito">
+  const corpo = (
+      <div className={`modal tut${pagina ? ' pagina' : ''}`} role={pagina ? 'main' : 'dialog'} aria-label="Tutorial: como emitir uma NF de débito">
         <div className="tut-topo">
           <div>
             <div className="tut-sobre">Tutorial · POP-COB-001</div>
             <div className="tut-titulo">Como emitir uma NF de débito</div>
-            <div className="tut-sub">Do portal ao Protheus, na ordem em que você faz. Use ← e → para navegar.</div>
+            <div className="tut-sub">{pagina ? 'Deixe esta janela ao lado do portal e do Protheus enquanto lança. Use ← e → para navegar.' : 'Do portal ao Protheus, na ordem em que você faz. Use ← e → para navegar.'}</div>
           </div>
+          {!pagina && <button className="btn btn-outline btn-sm" onClick={() => { if (abrirTutorialJanela(PASSOS[i].id)) onClose(); }} title="Abre o tutorial numa janela do navegador, separada do portal">Abrir em janela separada</button>}
           <button className="dd-close" onClick={onClose} aria-label="Fechar tutorial">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
           </button>
@@ -108,5 +127,8 @@ export default function ModalTutorialNFDebito({ onClose, inicio }) {
             : <button className="btn btn-primary btn-sm" onClick={() => ir(i + 1)}>Próximo →</button>}
         </div>
       </div>
-    </div>, document.body);
+  );
+  if (pagina) return corpo;
+  return createPortal(
+    <div className="modal-overlay" style={{ zIndex: 720 }} onClick={e => e.target === e.currentTarget && onClose()}>{corpo}</div>, document.body);
 }

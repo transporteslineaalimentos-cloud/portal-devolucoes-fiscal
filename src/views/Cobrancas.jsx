@@ -7,7 +7,7 @@ import ModalCobranca from '../components/ModalCobranca.jsx';
 import ModalImportRetornoCD from '../components/ModalImportRetornoCD.jsx';
 import { baixarEspelhoCobranca, valorACobrar } from '../utils/espelhoCobranca.js';
 import ModalLote from '../components/ModalLote.jsx';
-import ModalTutorialNFDebito from '../components/ModalTutorialNFDebito.jsx';
+import ModalTutorialNFDebito, { abrirTutorialJanela } from '../components/ModalTutorialNFDebito.jsx';
 import { ETAPA, ETAPAS, FILIAL_NOME, baixarRelacaoLotes, refNota } from '../utils/notaDebito.js';
 
 /* ─────────────────────────────────────────────────────────────
@@ -453,7 +453,7 @@ export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
         </button>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        <button className="btn btn-outline btn-sm cob-tutorial-btn" onClick={() => setTutorial(true)} title="Passo a passo do portal ao Protheus">
+        <button className="btn btn-outline btn-sm cob-tutorial-btn" onClick={() => abrirTutorialJanela() || setTutorial(true)} title="Abre o passo a passo numa janela separada, para usar ao lado do portal e do Protheus">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 4h6a4 4 0 014 4v13a3 3 0 00-3-3H2z"/><path d="M22 4h-6a4 4 0 00-4 4v13a3 3 0 013-3h7z"/></svg>
           Como lançar NF de débito
         </button>
@@ -478,12 +478,6 @@ export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
           );
         })}
       </div>
-      {fila === 'pendentes' && (
-        <div className="cob-guia cob-como">
-          <strong style={{ color: 'var(--text)' }}>Como emitir:</strong>&nbsp;marque até 3 notas do <b>mesmo transportador, filial e motivo</b> e clique em <b>Montar NF de débito</b>. A tela seguinte mostra o que digitar no Protheus.
-          <button className="cob-link" onClick={() => setTutorial(true)}>Ver o passo a passo com as telas →</button>
-        </div>
-      )}
       {sitAtual && (
         <div className="cob-guia" style={{ borderLeftColor: sitAtual.cor }}>
           <strong style={{ color: sitAtual.cor }}>O que fazer:</strong> {sitAtual.faz}
@@ -505,7 +499,6 @@ export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
               <button key={t.k} className={`cob-transp${transp === t.k ? ' ativo' : ''}`} onClick={() => { setTransp(transp === t.k ? null : t.k); setSelIds(new Set()); }}>
                 <span className="cob-transp-nome" title={t.nome}>{t.nome}</span>
                 <span className="cob-transp-num"><b>{fmtK(t.v)}</b> · {plural(t.q, 'nota', 'notas')}</span>
-                {ehPendenteFila(fila) && t.velha > 60 ? <span className="cob-transp-velha">mais antiga: {t.velha} d</span> : <span/>}
                 <span className="cob-transp-barra"><span style={{ width: `${Math.max(2, (t.v / maxT) * 100)}%` }}/></span>
               </button>
             ))}
@@ -522,7 +515,7 @@ export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
             </div>
             <select className="cob-filtro cob-transp-sel" value={transp || ''} onChange={e => { setTransp(e.target.value || null); setSelIds(new Set()); }} aria-label="Filtrar por transportador">
               <option value="">Todos os transportadores ({transportadores.length})</option>
-              {transportadores.map(t => <option key={t.k} value={t.k}>{t.nome} · {fmtK(t.v)} · {plural(t.q, 'nota', 'notas')}{ehPendenteFila(fila) && t.velha > 60 ? ` · mais antiga ${t.velha} d` : ''}</option>)}
+              {transportadores.map(t => <option key={t.k} value={t.k}>{t.nome} · {fmtK(t.v)} · {plural(t.q, 'nota', 'notas')}</option>)}
             </select>
             <select className="cob-filtro" value={fMotivo} onChange={e => setFMotivo(e.target.value)} aria-label="Filtrar por motivo">
               <option value="">Todos os motivos</option>

@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { dbGetCobrancaLotes, dbCobrancaLoteAcao, dbCobrancaLoteTransferir, dbGetUsuarios } from '../config/supabase';
 import { fmtBRL, fmtDate, fmtCNPJ } from '../utils.jsx';
 import { somenteLeitura } from '../lib/permissoes.js';
-import ModalTutorialNFDebito from './ModalTutorialNFDebito.jsx';
+import ModalTutorialNFDebito, { abrirTutorialJanela } from './ModalTutorialNFDebito.jsx';
 import { ETAPAS, ETAPA, FILIAL_NOME, FILIAL_PROTHEUS, PROTHEUS, dataEntregaProtheus, notasDoLote, textoObservacao, numProtheus, qtdTxt, refNota, baixarRelacaoLotes } from '../utils/notaDebito.js';
 
 /* ─────────────────────────────────────────────────────────────
@@ -201,7 +201,7 @@ export default function ModalLote({ loteId, user, onClose, onChanged }) {
           {/* ── Passo a passo ── */}
           <div className="nd-sec-tit nd-sec-tit-linha" style={{ marginTop: 6 }}>
             <span>Passo a passo no Protheus</span>
-            <button type="button" className="cob-link" onClick={() => setTutorial('filial')}>Ver o tutorial com as telas do Protheus →</button>
+            <button type="button" className="cob-link" onClick={() => abrirTutorialJanela('filial') || setTutorial('filial')}>Ver o tutorial com as telas do Protheus ↗</button>
           </div>
 
           <Passo n={1} titulo="Abra um pedido de venda e preencha o cabeçalho" estado={fase >= 1 ? 'feito' : 'atual'}
