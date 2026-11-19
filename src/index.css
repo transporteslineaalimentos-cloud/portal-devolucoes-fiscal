@@ -1183,3 +1183,6 @@ tr.drill-row:hover td { background: var(--blue-dim); }
 .ld-rapido-d { font-size: 11px; color: var(--text-3); }
 .ld-dono { font-size: 11.5px; color: var(--text-2); }
 .ld-dono.meu { color: #1E4DB7; font-weight: 650; }
+.usr-abas { display: flex; flex-wrap: wrap; gap: 6px; }
+.usr-aba { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; cursor: pointer; color: var(--text-2); }
+.usr-aba.on { border-color: var(--blue); background: var(--blue-dim); color: var(--text); font-weight: 600; }

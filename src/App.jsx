@@ -33,11 +33,11 @@ const Ic = ({ d, size = 14, color = 'currentColor' }) => (
   </svg>
 );
 
-import { abaPermitida, somenteLeitura } from './lib/permissoes.js';
+import { abaPermitida, primeiraAba, somenteLeitura } from './lib/permissoes.js';
 
 function Portal() {
   const { user, logout } = useAuth();
-  const [tab, setTab] = useState('painel');
+  const [tab, setTab] = useState(() => (abaPermitida(user, 'painel') ? 'painel' : primeiraAba(user)));
   const leitura = somenteLeitura(user);
   const [tabFilters, setTabFilters] = useState({});
   const [counts, setCounts] = useState({});
@@ -80,6 +80,11 @@ function Portal() {
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, []);
+
+  // a aba aberta precisa estar liberada para o usuário (ex.: logística sem Painel)
+  useEffect(() => {
+    if (user && !abaPermitida(user, tab)) setTab(primeiraAba(user));
+  }, [user, tab]);
 
   const changeTab = (id, filters = {}) => {
     if (!abaPermitida(user, id)) return;
@@ -242,12 +247,12 @@ function Portal() {
 
         {/* Conteúdo */}
         <main className="app-content">
-          {tab === 'painel' && (
+          {tab === 'painel' && abaPermitida(user, 'painel') && (
             <Suspense fallback={<Fallback />}>
               <PainelGerencial onGoTo={changeTab} user={user} />
             </Suspense>
           )}
-          {tab === 'devolucoes' && (
+          {tab === 'devolucoes' && abaPermitida(user, 'devolucoes') && (
             <Suspense fallback={<Fallback />}>
               <Devolucoes user={user} initialFilters={tabFilters.devolucoes || {}} />
             </Suspense>
@@ -258,7 +263,7 @@ function Portal() {
                 onChanged={refreshCounts} />
             </Suspense>
           )}
-          {tab === 'fretes' && (
+          {tab === 'fretes' && abaPermitida(user, 'fretes') && (
             <Suspense fallback={<Fallback />}>
               <CustosFrete user={user} />
             </Suspense>

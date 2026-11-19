@@ -31,7 +31,7 @@ export function AuthProvider({ children }) {
             ['df_token', 'df_refresh', 'df_user'].forEach(k => localStorage.removeItem(k));
             return;
           }
-          const atual = { ...u, name: profile.nome, role: profile.role };
+          const atual = { ...u, name: profile.nome, role: profile.role, abas: profile.abas || null };
           localStorage.setItem('df_user', JSON.stringify(atual));
           setUser(atual);
         }
@@ -62,6 +62,7 @@ export function AuthProvider({ children }) {
       email:  result.user.email,
       name:   profile.nome,
       role:   profile.role,
+      abas:   profile.abas || null,
       id:     result.user.id,
     };
     localStorage.setItem('df_user', JSON.stringify(userData));

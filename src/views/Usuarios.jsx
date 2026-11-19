@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { dbGetUsuarios, dbUsuariosAcao } from '../config/supabase';
 import { fmtDateTime } from '../utils.jsx';
+import { ABAS, abasPadrao } from '../lib/permissoes.js';
 
 /* ─────────────────────────────────────────────────────────────
    Usuários do portal (só administradores).
@@ -11,8 +12,8 @@ import { fmtDateTime } from '../utils.jsx';
 ───────────────────────────────────────────────────────────── */
 
 export const PERFIS = [
-  { v: 'analista',     l: 'Analista',       d: 'Trabalha nas devoluções e cobranças: lança, edita, monta NFs de débito.' },
-  { v: 'visualizador', l: 'Visualização',   d: 'Só consulta o Painel, as Devoluções e os Custos de Frete. Não altera nada.' },
+  { v: 'analista',     l: 'Analista',       d: 'Pode alterar: lança, edita, monta NFs de débito, nas abas liberadas para ele.' },
+  { v: 'visualizador', l: 'Visualização',   d: 'Só consulta as abas liberadas. Não altera nada.' },
   { v: 'admin',        l: 'Administrador',  d: 'Tudo o que o analista faz e ainda cadastra e gerencia usuários.' },
 ];
 const NOME_PERFIL = Object.fromEntries(PERFIS.map(p => [p.v, p.l]));
@@ -66,6 +67,21 @@ function EscolhaPerfil({ valor, onChange }) {
   );
 }
 
+function EscolhaAbas({ valor, onChange }) {
+  const alternar = (id) => onChange(valor.includes(id) ? valor.filter(x => x !== id) : [...valor, id]);
+  return (
+    <div className="usr-abas">
+      {ABAS.map(a => (
+        <label key={a.id} className={`usr-aba${valor.includes(a.id) ? ' on' : ''}`}>
+          <input type="checkbox" checked={valor.includes(a.id)} onChange={() => alternar(a.id)}/>{a.l}
+        </label>
+      ))}
+      {valor.length === 0 && <div className="usr-dica" style={{ color: '#B45309', width: '100%' }}>Marque pelo menos uma aba.</div>}
+    </div>
+  );
+}
+const ordenarAbas = (lista) => ABAS.map(a => a.id).filter(id => lista.includes(id));
+
 export default function Usuarios({ user }) {
   const [lista, setLista] = useState(null);
   const [erro, setErro] = useState('');
@@ -83,20 +99,20 @@ export default function Usuarios({ user }) {
 
   const abrir = (tipo, u = null) => {
     setErroModal('');
-    setF(tipo === 'novo' ? { nome: '', email: '', role: 'analista', senha: gerarSenha() }
-      : tipo === 'editar' ? { nome: u.nome, role: u.role, ativo: u.ativo } : { senha: gerarSenha() });
+    setF(tipo === 'novo' ? { nome: '', email: '', role: 'analista', senha: gerarSenha(), abas: abasPadrao('analista') }
+      : tipo === 'editar' ? { nome: u.nome, role: u.role, ativo: u.ativo, abas: u.abas?.length ? u.abas : abasPadrao(u.role) } : { senha: gerarSenha() });
     setModal({ tipo, u });
   };
   const salvar = async () => {
     setSalvando(true); setErroModal('');
     try {
       if (modal.tipo === 'novo') {
-        const r = await dbUsuariosAcao({ acao: 'criar', nome: f.nome, email: f.email, role: f.role, senha: f.senha });
+        const r = await dbUsuariosAcao({ acao: 'criar', nome: f.nome, email: f.email, role: f.role, senha: f.senha, abas: ordenarAbas(f.abas) });
         setAviso(r.ja_tinha_login
           ? `${f.nome} já tinha login em outro portal da Linea: ganhou acesso a este com a mesma senha de lá (a senha digitada não foi usada).`
           : `${f.nome} cadastrado. Passe o e-mail e a senha inicial para a pessoa.`);
       } else if (modal.tipo === 'editar') {
-        await dbUsuariosAcao({ acao: 'atualizar', email: modal.u.email, nome: f.nome, role: f.role, ativo: f.ativo });
+        await dbUsuariosAcao({ acao: 'atualizar', email: modal.u.email, nome: f.nome, role: f.role, ativo: f.ativo, abas: ordenarAbas(f.abas) });
         setAviso('Usuário atualizado.');
       } else {
         await dbUsuariosAcao({ acao: 'redefinir_senha', email: modal.u.email, senha: f.senha });
@@ -127,13 +143,14 @@ export default function Usuarios({ user }) {
         <div className="cob-toolbar"><div className="cob-toolbar-info">{lista ? `${ativos.length} ativos · ${lista.length - ativos.length} inativos` : 'Carregando…'}</div></div>
         <div className="cob-tabela-wrap">
           <table className="cob-tabela usr-tabela">
-            <thead><tr>{['Nome', 'E-mail', 'Perfil', 'Situação', 'Último acesso', ''].map(t => <th key={t}><button>{t}</button></th>)}</tr></thead>
+            <thead><tr>{['Nome', 'E-mail', 'Perfil', 'Abas liberadas', 'Situação', 'Último acesso', ''].map(t => <th key={t}><button>{t}</button></th>)}</tr></thead>
             <tbody>
               {(lista || []).map(u => (
                 <tr key={u.email} style={{ cursor: 'default', opacity: u.ativo ? 1 : 0.55 }}>
                   <td style={{ fontWeight: 600, color: 'var(--text)' }}>{u.nome}{u.email === String(user?.email || '').toLowerCase() && <span className="usr-voce">você</span>}</td>
                   <td>{u.email}</td>
                   <td><span className={`usr-badge ${u.role}`}>{NOME_PERFIL[u.role] || u.role}</span></td>
+                  <td style={{ fontSize: 11.5 }}>{ABAS.filter(a => (u.abas?.length ? u.abas : abasPadrao(u.role)).includes(a.id)).map(a => a.l).join(', ')}{u.role === 'admin' ? ', Usuários' : ''}</td>
                   <td>{u.ativo ? <span style={{ color: '#2F855A', fontWeight: 600 }}>Ativo</span> : 'Inativo'}</td>
                   <td>{u.ultimo_acesso ? fmtDateTime(u.ultimo_acesso) : <span style={{ color: 'var(--text-3)' }}>nunca entrou</span>}</td>
                   <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
@@ -152,10 +169,11 @@ export default function Usuarios({ user }) {
       {modal?.tipo === 'novo' && (
         <Modal titulo="Novo usuário" sub="A pessoa entra com o e-mail corporativo e a senha inicial" onClose={() => !salvando && setModal(null)}
           rodape={<><button className="btn btn-ghost btn-sm" onClick={() => setModal(null)} disabled={salvando}>Cancelar</button>
-            <button className="btn btn-primary btn-sm" onClick={salvar} disabled={salvando || !f.nome?.trim() || !f.email?.trim()}>{salvando ? 'Salvando…' : 'Cadastrar'}</button></>}>
+            <button className="btn btn-primary btn-sm" onClick={salvar} disabled={salvando || !f.nome?.trim() || !f.email?.trim() || !f.abas?.length}>{salvando ? 'Salvando…' : 'Cadastrar'}</button></>}>
           <div className="usr-campo"><label className="input-label">Nome</label><input className="input" value={f.nome} onChange={e => setF({ ...f, nome: e.target.value })} placeholder="Ex.: Maria Souza" autoFocus/></div>
           <div className="usr-campo"><label className="input-label">E-mail corporativo</label><input className="input" type="email" value={f.email} onChange={e => setF({ ...f, email: e.target.value })} placeholder="nome.sobrenome@lineaalimentos.com.br"/></div>
-          <div className="usr-campo"><label className="input-label">Perfil</label><EscolhaPerfil valor={f.role} onChange={v => setF({ ...f, role: v })}/></div>
+          <div className="usr-campo"><label className="input-label">Perfil</label><EscolhaPerfil valor={f.role} onChange={v => setF({ ...f, role: v, abas: abasPadrao(v) })}/></div>
+          <div className="usr-campo"><label className="input-label">Abas que a pessoa vê</label><EscolhaAbas valor={f.abas} onChange={v => setF({ ...f, abas: v })}/></div>
           <CampoSenha valor={f.senha} onChange={v => setF({ ...f, senha: v })}/>
           {erroModal && <div className="nd-erro">{erroModal}</div>}
         </Modal>
@@ -163,9 +181,10 @@ export default function Usuarios({ user }) {
       {modal?.tipo === 'editar' && (
         <Modal titulo={`Editar ${modal.u.nome}`} sub={modal.u.email} onClose={() => !salvando && setModal(null)}
           rodape={<><button className="btn btn-ghost btn-sm" onClick={() => setModal(null)} disabled={salvando}>Cancelar</button>
-            <button className="btn btn-primary btn-sm" onClick={salvar} disabled={salvando}>{salvando ? 'Salvando…' : 'Salvar'}</button></>}>
+            <button className="btn btn-primary btn-sm" onClick={salvar} disabled={salvando || !f.abas?.length}>{salvando ? 'Salvando…' : 'Salvar'}</button></>}>
           <div className="usr-campo"><label className="input-label">Nome</label><input className="input" value={f.nome} onChange={e => setF({ ...f, nome: e.target.value })}/></div>
           <div className="usr-campo"><label className="input-label">Perfil</label><EscolhaPerfil valor={f.role} onChange={v => setF({ ...f, role: v })}/></div>
+          <div className="usr-campo"><label className="input-label">Abas que a pessoa vê</label><EscolhaAbas valor={f.abas} onChange={v => setF({ ...f, abas: v })}/></div>
           <label className="usr-ativo"><input type="checkbox" checked={!!f.ativo} onChange={e => setF({ ...f, ativo: e.target.checked })}/> Acesso ativo <span>(desmarque para bloquear a entrada no portal sem apagar o histórico)</span></label>
           {erroModal && <div className="nd-erro">{erroModal}</div>}
         </Modal>
