@@ -14,6 +14,9 @@ export const ETAPAS = [
 export const ETAPA = Object.fromEntries(ETAPAS.map(e => [e.k, e]));
 export const FILIAL_NOME = { '05207076000297': 'Anápolis', '05207076000459': 'Extrema' };
 
+/** Campos fixos do pedido de venda da NF de débito no Protheus. */
+export const PROTHEUS = { operacao: '50', prcLista: '0', tipoSaida: '627', armazem: '50' };
+
 /** Número no formato do Protheus (vírgula decimal, sem separador de milhar), sem zeros à direita. */
 export function numProtheus(v, maxDec = 6) {
   const n = Number(v);

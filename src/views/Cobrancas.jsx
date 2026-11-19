@@ -402,8 +402,15 @@ export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
         })}
       </div>
       {fila === 'pendentes' && (
-        <div className="cob-guia" style={{ borderLeftColor: 'var(--text)' }}>
-          <span><strong style={{ color: 'var(--text)' }}>Como funciona:</strong> marque até 3 notas do mesmo transportador, filial e motivo e clique em <b>Montar NF de débito</b>. A tela seguinte mostra o CNPJ, a observação e os itens (código Linea, quantidade e valor unitário) para digitar o pedido no Protheus, e guarda o nº do pedido e, depois, o da NF de débito.</span>
+        <div className="cob-guia cob-como" style={{ borderLeftColor: 'var(--text)' }}>
+          <strong style={{ color: 'var(--text)' }}>Como emitir uma NF de débito</strong>
+          <ol>
+            <li>Marque até 3 notas do <b>mesmo transportador, filial e motivo</b>.</li>
+            <li>Clique em <b>Montar NF de débito</b>.</li>
+            <li>Siga o passo a passo da tela para digitar o pedido de venda no Protheus.</li>
+            <li>Registre o nº do pedido e, quando o financeiro faturar, o nº da NF de débito.</li>
+            <li>Envie ao transportador a NF de débito com a relação das notas (Excel).</li>
+          </ol>
         </div>
       )}
       {sitAtual && (
