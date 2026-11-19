@@ -1202,3 +1202,7 @@ tr.drill-row:hover td { background: var(--blue-dim); }
 .cob-canais-lista small { margin-left: auto; font-size: 11px; color: var(--text-3); font-weight: 500; }
 .cob-canais-acoes { display: flex; gap: 6px; align-items: center; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); flex-wrap: wrap; }
 .cob-canais-dica { font-size: 11px; color: var(--text-3); margin-top: 8px; line-height: 1.4; }
+.ld-atalhos { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.ld-barra { left: 16px; right: 16px; }
+@media (min-width: 900px) { .ld-barra { left: 260px; } }
+.ld-data { width: 150px; padding: 5px 8px; font-size: 12px; background: #fff; }

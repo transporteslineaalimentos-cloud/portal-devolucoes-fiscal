@@ -109,6 +109,25 @@ export async function baixarRelacaoLotes(lotes, nomeArquivo) {
   const ExcelJS = (await import('exceljs')).default;
   const wb = new ExcelJS.Workbook();
   wb.creator = 'Linea Alimentos';
+  lotes = [...lotes].sort((a, b) => String(a.transportador_nome).localeCompare(String(b.transportador_nome)) || String(a.nf_debito || '').localeCompare(String(b.nf_debito || ''), 'pt-BR', { numeric: true }));
+  // resumo: uma linha por NF de débito
+  const transpR = [...new Set(lotes.map(l => l.transportador_nome))];
+  const wr = wb.addWorksheet('Resumo', { views: [{ showGridLines: false }] });
+  wr.getCell(1, 1).value = 'NFs de débito enviadas';
+  wr.getCell(1, 1).font = { name: FONT, size: 14, bold: true };
+  wr.getCell(2, 1).value = `${transpR.length === 1 ? `${transpR[0]} · CNPJ ${fmtCnpj(lotes[0].transportador_cnpj)}  ·  ` : ''}${lotes.length} NFs de débito · Linea Alimentos · gerado em ${new Date().toLocaleDateString('pt-BR')}`;
+  wr.getCell(2, 1).font = { name: FONT, size: 10, color: { argb: 'FF5B6472' } };
+  const resumo = lotes.map(l => { const ns = notasDoLote(l); return { l, ns, total: ns.reduce((a, n) => a + (Number(n.valor_lote) || 0), 0) }; });
+  tabela(wr, 4, [
+    { t: 'NF de débito', w: 13, v: x => x.l.nf_debito || '(a faturar)' },
+    { t: 'Emissão', w: 12, v: x => x.l.dt_nf_debito, fmt: 'data' },
+    ...(transpR.length > 1 ? [{ t: 'Transportador', w: 34, v: x => x.l.transportador_nome }] : []),
+    { t: 'Motivo', w: 32, v: x => x.l.motivo },
+    { t: 'Qtd NFDs', w: 9, v: x => x.ns.length, fmt: 'qtd' },
+    { t: 'NFs de devolução cobradas', w: 44, v: x => x._total ? '' : x.ns.map(n => n.lancamento_manual || !n.nf_numero ? `venda ${n.nf_venda} (dev. total)` : n.nf_numero).join(', ') },
+    { t: 'Valor', w: 15, v: x => x.total, fmt: 'brl' },
+  ], [...resumo, { _total: true, l: { nf_debito: 'Total' }, ns: resumo.flatMap(x => x.ns), total: resumo.reduce((a, x) => a + x.total, 0) }]);
+
   const ws = wb.addWorksheet('Relação', { views: [{ showGridLines: false }] });
   ws.getCell(1, 1).value = 'Relação de devoluções cobradas por NF de débito';
   ws.getCell(1, 1).font = { name: FONT, size: 14, bold: true };
@@ -119,10 +138,10 @@ export async function baixarRelacaoLotes(lotes, nomeArquivo) {
   const linhas = [];
   lotes.forEach(l => notasDoLote(l).forEach(n => linhas.push({ l, n })));
   let r = tabela(ws, 4, [
-    { t: 'NF de débito', w: 13, v: x => x.l.nf_debito || '(a faturar)' },
+    { t: 'NF de débito', w: 13, v: x => x._total ? '' : (x.l.nf_debito || '(a faturar)') },
     { t: 'Emissão NF débito', w: 13, v: x => x.l.dt_nf_debito, fmt: 'data' },
     ...(transp.length > 1 ? [{ t: 'Transportador', w: 34, v: x => x.l.transportador_nome }] : []),
-    { t: 'NF de devolução', w: 14, v: x => x.n.lancamento_manual || !x.n.nf_numero ? 'Dev. total' : x.n.nf_numero },
+    { t: 'NF de devolução', w: 14, v: x => x._total ? '' : (x.n.lancamento_manual || !x.n.nf_numero ? 'Dev. total' : x.n.nf_numero) },
     { t: 'NF de venda', w: 12, v: x => x.n.nf_venda },
     { t: 'Cliente', w: 38, v: x => x.n.nome_emitente },
     { t: 'Chave da NFD', w: 47, v: x => x.n.chave_nfe },

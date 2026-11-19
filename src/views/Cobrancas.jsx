@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { dbGetCobrancas, dbCobrancaAcao, dbGetCobrancaLotes, dbCobrancaLoteCriar, dbGetMeusCanais, dbSalvarMeusCanais } from '../config/supabase';
+import { dbGetCobrancas, dbCobrancaAcao, dbGetCobrancaLotes, dbCobrancaLoteCriar, dbCobrancaLoteAcao, dbGetMeusCanais, dbSalvarMeusCanais } from '../config/supabase';
 import { fmtBRL, fmtDate } from '../utils.jsx';
 import { somenteLeitura } from '../lib/permissoes.js';
 import ModalCobranca from '../components/ModalCobranca.jsx';
@@ -451,7 +451,7 @@ export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
       <FiltroCanais canais={canaisDisp} sel={fCanais} salvos={canaisSalvos} onMudar={(c) => { setFCanais(c); setSelIds(new Set()); setTransp(null); }} onSalvar={salvarCanais} salvando={salvandoCanais}/>
       </div>
 
-      {modo === 'nfs' && <ListaLotes key={user?.email} lotes={lotes === null ? null : lotesFiltrados} onAbrir={setLoteAberto} onAviso={setAviso}/>}
+      {modo === 'nfs' && <ListaLotes key={user?.email} lotes={lotes === null ? null : lotesFiltrados} onAbrir={setLoteAberto} onAviso={setAviso} onRecarregar={() => { carregar(); onChanged?.(); }} leitura={leitura}/>}
 
       {modo === 'notas' && <>
       {/* ── Filas ── */}
@@ -654,7 +654,7 @@ const RAPIDOS = [
   { k: 'enviado',  l: 'Enviadas ao transportador',      d: 'Processo concluído' },
 ];
 
-function ListaLotes({ lotes, onAbrir, onAviso }) {
+function ListaLotes({ lotes, onAbrir, onAviso, onRecarregar, leitura }) {
   const temMinhas = (lotes || []).some(l => l.meu);
   const [escopo, setQuem] = useState('minhas');    // sempre abre em "Minhas NFs de débito"
   const [etapa, setEtapa] = useState('abertas');
@@ -670,10 +670,29 @@ function ListaLotes({ lotes, onAbrir, onAviso }) {
   }, [base, etapa, busca]);
   const conta = (k) => base.filter(l => naEtapa(l, k)).length;
   const marcados = (lotes || []).filter(l => sel.has(l.id));
+  const [dtEnvio, setDtEnvio] = useState(() => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10));
+  const [enviando, setEnviando] = useState(false);
   const relacao = async () => {
-    try { await baixarRelacaoLotes(marcados, `Relação NFs de débito - ${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}`); onAviso('Relação gerada.'); }
+    const ts = [...new Set(marcados.map(l => l.transportador_nome))];
+    const nome = `Relação NFs de débito - ${ts.length === 1 ? ts[0] + ' - ' : ''}${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}`;
+    try { await baixarRelacaoLotes(marcados, nome); onAviso(`Relação única gerada com ${plural(marcados.length, 'NF de débito', 'NFs de débito')}.`); }
     catch (e) { alert(e.message); }
   };
+  const aEnviar = marcados.filter(l => l.etapa === 'faturado');
+  const marcarEnviadas = async () => {
+    if (!aEnviar.length) return;
+    if (!window.confirm(`Marcar ${plural(aEnviar.length, 'NF de débito', 'NFs de débito')} como enviada${aEnviar.length > 1 ? 's' : ''} ao transportador em ${dtEnvio.split('-').reverse().join('/')}?`)) return;
+    setEnviando(true);
+    let ok = 0; const erros = [];
+    for (const l of aEnviar) {
+      try { await dbCobrancaLoteAcao(l.id, 'enviar', { data: dtEnvio }); ok++; }
+      catch (e) { erros.push(`NF ${l.nf_debito}: ${e.message}`); }
+    }
+    setEnviando(false); setSel(new Set());
+    onAviso(`${plural(ok, 'NF de débito marcada', 'NFs de débito marcadas')} como enviada${ok > 1 ? 's' : ''}.${erros.length ? ' Falhou: ' + erros.join('; ') : ''}`);
+    onRecarregar?.();
+  };
+  const selecionarTransp = (nome) => setSel(new Set(lista.filter(l => l.transportador_nome === nome).map(l => l.id)));
   const mudar = (k) => { setEtapa(etapa === k ? 'abertas' : k); setSel(new Set()); };
   return (
     <>
@@ -698,6 +717,18 @@ function ListaLotes({ lotes, onAbrir, onAviso }) {
           );
         })}
       </div>
+      {etapa === 'faturado' && lista.length > 0 && (
+        <div className="cob-guia" style={{ borderLeftColor: ETAPA.faturado.cor }}>
+          <span><strong style={{ color: ETAPA.faturado.cor }}>Para enviar ao transportador:</strong> marque as NFs de débito dele (ou use os atalhos abaixo), baixe <b>uma relação única em Excel</b> com todas e depois marque todas como enviadas.</span>
+          <div className="ld-atalhos">
+            {[...new Set(lista.map(l => l.transportador_nome))].map(t => (
+              <button key={t} className="btn btn-outline btn-xs" onClick={() => selecionarTransp(t)}>
+                Marcar todas de {t} ({lista.filter(l => l.transportador_nome === t).length})
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       <section className="cob-lista">
         <div className="cob-toolbar">
           <div className="cob-busca">
@@ -710,9 +741,7 @@ function ListaLotes({ lotes, onAbrir, onAviso }) {
           </div>
           <div style={{ display: 'flex', gap: 6, marginLeft: 'auto' }}>
             <button className={`btn btn-sm ${etapa === 'todas' ? 'btn-primary' : 'btn-outline'}`} onClick={() => mudar('todas')}>Ver todas as etapas</button>
-            <button className="btn btn-outline btn-sm" disabled={!marcados.length} onClick={relacao} title="Excel com qual NFD foi cobrada em qual NF de débito, com os itens">
-              <Ic d={I.baixar} size={13}/>Relação{marcados.length ? ` (${marcados.length})` : ''}
-            </button>
+
           </div>
         </div>
         <div className="cob-tabela-wrap">
@@ -754,6 +783,25 @@ function ListaLotes({ lotes, onAbrir, onAviso }) {
           </table>
         </div>
       </section>
+      {marcados.length > 0 && createPortal(
+        <div className="cob-barra ld-barra" role="region" aria-label="Ações nas NFs de débito marcadas">
+          <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+            <strong style={{ fontSize: 13 }}>{plural(marcados.length, 'NF de débito marcada', 'NFs de débito marcadas')}</strong>
+            <span style={{ fontSize: 11.5, opacity: 0.75 }}>
+              {fmtBRL(marcados.reduce((a, l) => a + (Number(l.valor_total) || 0), 0))} · {[...new Set(marcados.map(l => l.transportador_nome))].join(', ')}
+            </span>
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginLeft: 'auto', alignItems: 'center' }}>
+            <button className="btn btn-sm cob-btn-claro" onClick={relacao}><Ic d={I.baixar} size={13}/> Baixar relação única (Excel)</button>
+            {!leitura && aEnviar.length > 0 && <>
+              <input type="date" className="input ld-data" value={dtEnvio} onChange={e => setDtEnvio(e.target.value)} aria-label="Data do envio"/>
+              <button className="btn btn-sm cob-btn-escuro" disabled={enviando} onClick={marcarEnviadas}>
+                {enviando ? 'Marcando…' : `Marcar ${aEnviar.length === marcados.length ? 'todas' : aEnviar.length} como enviadas`}
+              </button>
+            </>}
+            <button className="btn btn-sm cob-btn-escuro" onClick={() => setSel(new Set())} aria-label="Limpar seleção"><Ic d={I.x} size={13}/></button>
+          </div>
+        </div>, document.body)}
     </>
   );
 }

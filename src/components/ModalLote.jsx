@@ -300,8 +300,9 @@ export default function ModalLote({ loteId, user, onClose, onChanged }) {
 
           <Passo n={5} titulo="Envie ao transportador a NF de débito com a relação das notas" estado={fase >= 3 ? 'feito' : fase === 2 ? 'atual' : 'depois'}
             resumo={lote.dt_envio ? `Enviada em ${fmtDate(lote.dt_envio)}` : null} aberto={fase >= 2}>
+            <div className="nd-nota-txt" style={{ marginTop: 0, marginBottom: 8 }}>Vai mandar várias NFs de débito juntas para o mesmo transportador? Na aba <b>NFs de débito</b>, filtre "NF de débito emitida", marque todas dele e baixe <b>uma relação única</b>.</div>
             <div className="nd-form">
-              <button className="btn btn-outline btn-sm" onClick={() => baixarRelacaoLotes([lote], nomeArq).catch(e => alert(e.message))}>Baixar relação das notas (Excel)</button>
+              <button className="btn btn-outline btn-sm" onClick={() => baixarRelacaoLotes([lote], nomeArq).catch(e => alert(e.message))}>Baixar relação só desta NF (Excel)</button>
               {fase === 2 && !leitura && <>
                 <label>Enviada em<input className="input" type="date" value={data} onChange={e => setData(e.target.value)}/></label>
                 <button className="btn btn-primary btn-sm" disabled={salvando} onClick={() => acao('enviar', { data }, 'Envio ao transportador registrado.')}>Marcar como enviada</button>
