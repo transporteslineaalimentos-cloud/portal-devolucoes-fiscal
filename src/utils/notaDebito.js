@@ -43,15 +43,28 @@ export function notasDoLote(lote) {
 export const refNota = (n) => n.lancamento_manual || !n.nf_numero ? `NF venda ${n.nf_venda || '—'} (devolução total)` : `NFD ${n.nf_numero}`;
 
 /** Observação do pedido: "Cobrança referente a avaria de transporte - NFD 185612, 255920". */
+/** Nome curto do motivo para a observação da NF (o campo do Protheus é limitado). */
+const MOTIVO_CURTO = {
+  'AVARIA DE TRANSPORTE': 'Avaria',
+  'FALTA DE PRODUTO NO ATO DA ENTREGA': 'Falta',
+  'ERRO OPERACIONAL TRANSPORTADOR': 'Erro Operacional',
+  'ERRO DE CARREGAMENTO': 'Erro Carregamento',
+  'INVERSÃO DE PRODUTO': 'Inversao',
+};
+const motivoCurto = (m) => MOTIVO_CURTO[String(m || '').toUpperCase().trim()]
+  || String(m || '').toLowerCase().split(/\s+/).filter(p => p.length > 2 && !['de', 'do', 'da', 'no', 'na'].includes(p)).slice(0, 2)
+    .map(p => p[0].toUpperCase() + p.slice(1)).join(' ');
+
+/** Observação do pedido, no padrão curto: "Ref Cob Avaria NFD 1132199;1132200;1132201". */
 export function textoObservacao(lote, notas) {
   const motivos = [...new Set(notas.map(n => n.motivo_devolucao).filter(Boolean))];
-  const motivo = motivos.length === 1 ? motivos[0].toLowerCase() : 'devoluções';
+  const motivo = motivos.length === 1 ? motivoCurto(motivos[0]) : '';
   const nfds = notas.filter(n => !(n.lancamento_manual || !n.nf_numero)).map(n => n.nf_numero);
   const totais = notas.filter(n => n.lancamento_manual || !n.nf_numero).map(n => n.nf_venda);
   const partes = [];
-  if (nfds.length) partes.push(`NFD ${nfds.join(', ')}`);
-  if (totais.length) partes.push(`devolução total da NF de venda ${totais.join(', ')}`);
-  return `Cobrança referente a ${motivo} - ${partes.join(' e ')}`;
+  if (nfds.length) partes.push(`NFD ${nfds.join(';')}`);
+  if (totais.length) partes.push(`NF Venda ${totais.join(';')}`);
+  return ['Ref Cob', motivo, partes.join(' ')].filter(Boolean).join(' ');
 }
 
 /** Linhas do pedido somadas por produto. */
