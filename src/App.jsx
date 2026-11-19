@@ -8,11 +8,13 @@ const Devolucoes = lazy(() => import('./views/Devolucoes'));
 const Cobrancas  = lazy(() => import('./views/Cobrancas'));
 const PainelGerencial = lazy(() => import('./views/PainelGerencial'));
 const CustosFrete = lazy(() => import('./views/CustosFrete'));
+const Usuarios = lazy(() => import('./views/Usuarios'));
 
 const PAGE_META = {
   painel:     { title: 'Painel Gerencial',   sub: 'Geração de retorno e devolução · atualizado em tempo real' },
   devolucoes: { title: 'Devoluções Fiscais',  sub: 'NF-e recebidas classificadas por CFOP · sincronizado a cada hora' },
   cobrancas:  { title: 'Cobranças',          sub: 'Devoluções com responsabilidade do transportador já lançadas no Protheus' },
+  usuarios:   { title: 'Usuários',           sub: 'Quem acessa o portal e com qual perfil' },
   fretes:     { title: 'Custos de Frete',    sub: 'CT-es e NFs de venda recebidos do Active · atualizado a cada 30 min' },
 };
 
@@ -259,6 +261,11 @@ function Portal() {
           {tab === 'fretes' && (
             <Suspense fallback={<Fallback />}>
               <CustosFrete user={user} />
+            </Suspense>
+          )}
+          {tab === 'usuarios' && abaPermitida(user, 'usuarios') && (
+            <Suspense fallback={<Fallback />}>
+              <Usuarios user={user} />
             </Suspense>
           )}
         </main>

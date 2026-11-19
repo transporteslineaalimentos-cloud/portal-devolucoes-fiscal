@@ -699,6 +699,49 @@ export async function dbCobrancaLoteAcao(lote, acao, { numero = null, data = nul
   return r;
 }
 
+export async function dbCobrancaLoteTransferir(lote, email) {
+  syncAuthToken();
+  const { error } = await supabase.rpc('cobranca_lote_transferir', { p_lote: lote, p_email: email });
+  if (error) throw new Error(error.message);
+}
+
+// ── Usuários do portal ─────────────────────────────────────
+export async function dbGetUsuarios() {
+  syncAuthToken();
+  const { data, error } = await supabase.rpc('get_dev_fiscal_usuarios');
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+/** Criar, editar ou redefinir senha (só admin; a checagem é feita no servidor). */
+export async function dbUsuariosAcao(corpo) {
+  const token = localStorage.getItem('df_token');
+  const res = await fetch(`${SB_URL}/functions/v1/dev-fiscal-usuarios`, {
+    method: 'POST',
+    headers: { apikey: SB_KEY, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(corpo),
+  });
+  const d = await res.json().catch(() => ({}));
+  if (!res.ok || d.error) throw new Error(d.error || d.message || `Erro ${res.status}`);
+  return d;
+}
+
+/** O próprio usuário troca a senha (vale para todos os portais da Linea, o login é o mesmo). */
+export async function dbTrocarMinhaSenha(senhaAtual, novaSenha) {
+  const u = JSON.parse(localStorage.getItem('df_user') || '{}');
+  // confirma a senha atual antes de trocar
+  await login(u.email, senhaAtual).catch(() => { throw new Error('Senha atual incorreta'); });
+  const token = localStorage.getItem('df_token');
+  const res = await fetch(`${SB_URL}/auth/v1/user`, {
+    method: 'PUT',
+    headers: { apikey: SB_KEY, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password: novaSenha }),
+  });
+  const d = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(d.msg || d.error_description || d.message || `Erro ${res.status}`);
+  return true;
+}
+
 // Registrar a baixa da cobrança ao transportador (NF de débito)
 export async function dbRegistrarCobranca(id, { nf_debito, obs_cobranca, userName }) {
   syncAuthToken();

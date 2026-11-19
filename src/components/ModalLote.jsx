@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { dbGetCobrancaLotes, dbCobrancaLoteAcao } from '../config/supabase';
+import { dbGetCobrancaLotes, dbCobrancaLoteAcao, dbCobrancaLoteTransferir, dbGetUsuarios } from '../config/supabase';
 import { fmtBRL, fmtDate, fmtCNPJ } from '../utils.jsx';
 import { somenteLeitura } from '../lib/permissoes.js';
 import { ETAPAS, ETAPA, FILIAL_NOME, PROTHEUS, notasDoLote, textoObservacao, numProtheus, qtdTxt, refNota, baixarRelacaoLotes } from '../utils/notaDebito.js';
@@ -73,6 +73,7 @@ export default function ModalLote({ loteId, user, onClose, onChanged }) {
   const [data, setData] = useState(hojeISO());
   const [editando, setEditando] = useState(null);   // 'pedido' | 'nf_debito'
   const [abertos, setAbertos] = useState({});        // passos já feitos que a pessoa reabriu
+  const [usuarios, setUsuarios] = useState(null);    // para passar a NF de débito para outra pessoa
 
   const carregar = useCallback(async () => {
     try {
@@ -164,6 +165,7 @@ export default function ModalLote({ loteId, user, onClose, onChanged }) {
               <span><em>Motivo</em>{lote.motivo || '—'}</span>
               <span><em>Notas</em>{notas.length}</span>
               <span><em>Total a cobrar</em><b>{fmtBRL(total)}</b></span>
+              <span><em>Criada por</em>{lote.meu ? 'Você' : (lote.criado_por || '—')}</span>
             </div>
           </div>
           <button className="dd-close nd-fechar" onClick={onClose} aria-label="Fechar">
@@ -313,6 +315,20 @@ export default function ModalLote({ loteId, user, onClose, onChanged }) {
         <div className="modal-footer nd-rodape">
           {!leitura && <button className="btn btn-ghost btn-sm nd-perigo" onClick={cancelar} disabled={salvando}>Cancelar NF de débito</button>}
           {!leitura && fase > 0 && <button className="btn btn-ghost btn-sm" onClick={voltar} disabled={salvando}>Desfazer última etapa</button>}
+          {!leitura && fase < 3 && (usuarios ? (
+            <select className="cob-filtro" defaultValue="" aria-label="Passar para outra pessoa" disabled={salvando}
+              onChange={async e => {
+                const u = usuarios.find(x => x.email === e.target.value); if (!u) return;
+                if (!window.confirm(`Passar esta NF de débito para ${u.nome}? Ela vai aparecer em "Minhas NFs de débito" de ${u.nome}.`)) { e.target.value = ''; return; }
+                setSalvando(true);
+                try { await dbCobrancaLoteTransferir(lote.id, u.email); onChanged?.(`NF de débito passada para ${u.nome}.`); await carregar(); setUsuarios(null); }
+                catch (er) { setErro(er.message); }
+                setSalvando(false);
+              }}>
+              <option value="">Passar para…</option>
+              {usuarios.filter(u => u.ativo && u.role !== 'visualizador' && u.email !== lote.criado_por_email).map(u => <option key={u.email} value={u.email}>{u.nome}</option>)}
+            </select>
+          ) : <button className="btn btn-ghost btn-sm" onClick={() => dbGetUsuarios().then(setUsuarios).catch(e => setErro(e.message))}>Passar para outra pessoa</button>)}
           <span style={{ flex: 1 }}/>
           <button className="btn btn-primary btn-sm" onClick={onClose}>Fechar</button>
         </div>

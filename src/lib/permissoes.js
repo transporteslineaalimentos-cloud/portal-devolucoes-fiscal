@@ -2,4 +2,5 @@
 // O bloqueio de verdade está no banco (dev_fiscal_pode_editar); aqui só escondemos os botões.
 export const ABAS_VISUALIZADOR = ['painel', 'devolucoes', 'fretes'];
 export const somenteLeitura = (user) => user?.role === 'visualizador';
-export const abaPermitida = (user, id) => !somenteLeitura(user) || ABAS_VISUALIZADOR.includes(id);
+export const ehAdmin = (user) => user?.role === 'admin';
+export const abaPermitida = (user, id) => id === 'usuarios' ? ehAdmin(user) : (!somenteLeitura(user) || ABAS_VISUALIZADOR.includes(id));

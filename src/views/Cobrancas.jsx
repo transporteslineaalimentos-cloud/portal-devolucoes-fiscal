@@ -359,7 +359,7 @@ export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
   const verSit = fila === 'pendentes' || fila === 'todas';
   const cols = verSit ? COLS : COLS.filter(c => c.k !== 'sit');
   const nomeTransp = transp ? transportadores.find(t => t.k === transp)?.nome : null;
-  const nLotesAbertos = (lotes || []).filter(l => l.etapa === 'montando' || l.etapa === 'pedido').length;
+  const nLotesAbertos = (lotes || []).filter(l => l.meu && ['montando', 'pedido', 'faturado'].includes(l.etapa)).length;
 
   return (
     <div className="cob" style={{ paddingBottom: sel.length ? 84 : 0 }}>
@@ -380,11 +380,11 @@ export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
       <div className="cob-modo" role="tablist" aria-label="Ver">
         <button role="tab" aria-selected={modo === 'notas'} className={modo === 'notas' ? 'on' : ''} onClick={() => setModo('notas')}>Notas a cobrar</button>
         <button role="tab" aria-selected={modo === 'nfs'} className={modo === 'nfs' ? 'on' : ''} onClick={() => setModo('nfs')}>
-          NFs de débito{nLotesAbertos > 0 && <span className="cob-fila-n">{nLotesAbertos} em aberto</span>}
+          NFs de débito{nLotesAbertos > 0 && <span className="cob-fila-n">{nLotesAbertos} {nLotesAbertos === 1 ? 'sua em andamento' : 'suas em andamento'}</span>}
         </button>
       </div>
 
-      {modo === 'nfs' && <ListaLotes lotes={lotes} onAbrir={setLoteAberto} onAviso={setAviso}/>}
+      {modo === 'nfs' && <ListaLotes key={user?.email} lotes={lotes} onAbrir={setLoteAberto} onAviso={setAviso}/>}
 
       {modo === 'notas' && <>
       {/* ── Filas ── */}
@@ -579,78 +579,114 @@ export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
 function ehPendenteFila(f) { return f === 'pendentes' || PENDENTES.includes(f); }
 
 /* ─── NFs de débito ────────────────────────────────────────── */
+const RAPIDOS = [
+  { k: 'montando', l: 'Abertas, sem pedido',            d: 'Montadas, falta digitar o pedido no Protheus' },
+  { k: 'pedido',   l: 'Com pedido, sem NF de débito',   d: 'Aguardando o financeiro faturar' },
+  { k: 'faturado', l: 'NF de débito emitida',           d: 'Falta enviar ao transportador' },
+  { k: 'enviado',  l: 'Enviadas ao transportador',      d: 'Processo concluído' },
+];
+
 function ListaLotes({ lotes, onAbrir, onAviso }) {
+  const temMinhas = (lotes || []).some(l => l.meu);
+  const [quem, setQuem] = useState(null);           // 'minhas' | 'todas'
+  const escopo = quem ?? (temMinhas ? 'minhas' : 'todas');
   const [etapa, setEtapa] = useState('abertas');
   const [busca, setBusca] = useState('');
   const [sel, setSel] = useState(() => new Set());
+  const base = useMemo(() => (lotes || []).filter(l => escopo === 'todas' || l.meu), [lotes, escopo]);
+  const naEtapa = (l, k) => k === 'todas' || (k === 'abertas' ? ['montando', 'pedido', 'faturado'].includes(l.etapa) : l.etapa === k);
   const lista = useMemo(() => {
     const q = busca.trim().toLowerCase();
-    return (lotes || []).filter(l => (etapa === 'todas' || (etapa === 'abertas' ? ['montando', 'pedido', 'faturado'].includes(l.etapa) : l.etapa === etapa))
-      && (!q || [l.transportador_nome, l.pedido, l.nf_debito, l.motivo, l.numero, ...(l.notas || []).flatMap(n => [n.nf_numero, n.nf_venda, n.nome_emitente])]
+    return base.filter(l => naEtapa(l, etapa)
+      && (!q || [l.transportador_nome, l.pedido, l.nf_debito, l.motivo, l.numero, l.criado_por, ...(l.notas || []).flatMap(n => [n.nf_numero, n.nf_venda, n.nome_emitente])]
         .some(v => String(v ?? '').toLowerCase().includes(q))));
-  }, [lotes, etapa, busca]);
-  const conta = (k) => (lotes || []).filter(l => k === 'todas' || (k === 'abertas' ? ['montando', 'pedido', 'faturado'].includes(l.etapa) : l.etapa === k)).length;
+  }, [base, etapa, busca]);
+  const conta = (k) => base.filter(l => naEtapa(l, k)).length;
   const marcados = (lotes || []).filter(l => sel.has(l.id));
   const relacao = async () => {
     try { await baixarRelacaoLotes(marcados, `Relação NFs de débito - ${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}`); onAviso('Relação gerada.'); }
     catch (e) { alert(e.message); }
   };
-  const ABAS = [{ k: 'abertas', l: 'Em andamento' }, ...ETAPAS.map(e => ({ k: e.k, l: e.l })), { k: 'todas', l: 'Todas' }];
+  const mudar = (k) => { setEtapa(etapa === k ? 'abertas' : k); setSel(new Set()); };
   return (
-    <section className="cob-lista">
-      <div className="cob-filas" role="tablist" aria-label="Etapa" style={{ padding: '0 8px' }}>
-        {ABAS.map(a => (
-          <button key={a.k} role="tab" aria-selected={etapa === a.k} className={`cob-fila${etapa === a.k ? ' ativa' : ''}`} onClick={() => { setEtapa(a.k); setSel(new Set()); }}
-            style={etapa === a.k && ETAPA[a.k] ? { boxShadow: `inset 0 -2px 0 ${ETAPA[a.k].cor}` } : undefined}>
-            {ETAPA[a.k] && <span className="cob-dot" style={{ background: ETAPA[a.k].cor }}/>}{a.l}<span className="cob-fila-n">{conta(a.k)}</span>
-          </button>
-        ))}
-      </div>
-      <div className="cob-toolbar">
-        <div className="cob-busca">
-          <Ic d={I.busca} size={14} color="var(--text-3)"/>
-          <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar transportador, pedido, NF de débito, NFD, cliente…" aria-label="Buscar NF de débito"/>
+    <>
+      <div className="ld-topo">
+        <div className="cob-modo" role="tablist" aria-label="De quem">
+          <button role="tab" aria-selected={escopo === 'minhas'} className={escopo === 'minhas' ? 'on' : ''} onClick={() => setQuem('minhas')}>Minhas NFs de débito</button>
+          <button role="tab" aria-selected={escopo === 'todas'} className={escopo === 'todas' ? 'on' : ''} onClick={() => setQuem('todas')}>De todos</button>
         </div>
-        <div className="cob-toolbar-info">{plural(lista.length, 'NF de débito', 'NFs de débito')} · <b>{fmtBRL(lista.reduce((a, l) => a + (Number(l.valor_total) || (l.notas || []).reduce((s, n) => s + (Number(n.valor_sugerido) || 0), 0)), 0))}</b></div>
-        <button className="btn btn-outline btn-sm" style={{ marginLeft: 'auto' }} disabled={!marcados.length} onClick={relacao} title="Excel com qual NFD foi cobrada em qual NF de débito, com os itens">
-          <Ic d={I.baixar} size={13}/>Relação para o transportador{marcados.length ? ` (${marcados.length})` : ''}
-        </button>
+        <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
+          {escopo === 'minhas' ? 'Só as que você criou. Os outros também conseguem ver o andamento delas.' : 'Todas as NFs de débito, de qualquer pessoa.'}
+        </span>
       </div>
-      <div className="cob-tabela-wrap">
-        <table className="cob-tabela">
-          <thead><tr>
-            <th style={{ width: 36 }}><input type="checkbox" aria-label="Marcar todas" checked={lista.length > 0 && lista.every(l => sel.has(l.id))}
-              onChange={() => setSel(s => lista.every(l => s.has(l.id)) ? new Set() : new Set(lista.map(l => l.id)))}/></th>
-            {['Lote', 'Transportador', 'Notas', 'Motivo', 'Valor', 'Etapa', 'Pedido', 'NF de débito', 'Na etapa há'].map((t, i) => <th key={t} className={i === 4 ? 'dir' : undefined}><button>{t}</button></th>)}
-          </tr></thead>
-          <tbody>
-            {lotes === null && <tr><td colSpan={10} className="cob-vazio"><Spinner/> Carregando…</td></tr>}
-            {lotes && lista.length === 0 && <tr><td colSpan={10} className="cob-vazio">Nenhuma NF de débito {etapa === 'abertas' ? 'em andamento' : 'nesta etapa'}. Monte uma em "Notas a cobrar".</td></tr>}
-            {lista.map(l => {
-              const e = ETAPA[l.etapa] || ETAPAS[0];
-              const valor = l.valor_total != null ? Number(l.valor_total) : (l.notas || []).reduce((s, n) => s + (Number(n.valor_sugerido) || 0), 0);
-              return (
-                <tr key={l.id} onClick={() => onAbrir(l.id)} style={{ '--cob-cor': e.cor }} className={sel.has(l.id) ? 'sel' : undefined}>
-                  <td onClick={ev => ev.stopPropagation()}><input type="checkbox" checked={sel.has(l.id)} aria-label={`Marcar lote ${l.numero}`}
-                    onChange={() => setSel(s => { const n = new Set(s); n.has(l.id) ? n.delete(l.id) : n.add(l.id); return n; })}/></td>
-                  <td><div className="cob-nf">{l.numero}</div><div className="cob-sub">{FILIAL_NOME[l.filial] || '—'}</div></td>
-                  <td style={{ maxWidth: 170 }}><div className="ellipsis" style={{ fontWeight: 500, color: 'var(--text)' }} title={l.transportador_nome}>{l.transportador_nome}</div></td>
-                  <td style={{ maxWidth: 180 }}>
-                    <div className="ellipsis" title={(l.notas || []).map(refNota).join(', ')}>{(l.notas || []).map(n => n.lancamento_manual ? `Venda ${n.nf_venda}` : n.nf_numero).join(', ')}</div>
-                    <div className="cob-sub ellipsis">{[...new Set((l.notas || []).map(n => n.nome_emitente))].join(', ')}</div>
-                  </td>
-                  <td style={{ maxWidth: 130 }}><div className="ellipsis" title={l.motivo}>{l.motivo}</div></td>
-                  <td className="dir" style={{ fontWeight: 700, color: 'var(--text)' }}>{fmtBRL(valor)}</td>
-                  <td><span className="cob-chip" style={{ color: e.cor, background: e.bg }}><span style={{ background: e.cor }}/>{e.curto}</span></td>
-                  <td>{l.pedido || <span style={{ color: 'var(--text-3)' }}>—</span>}{l.dt_pedido && <div className="cob-sub">{fmtDate(l.dt_pedido)}</div>}</td>
-                  <td>{l.nf_debito ? <b style={{ color: 'var(--text)' }}>{l.nf_debito}</b> : <span style={{ color: 'var(--text-3)' }}>—</span>}{l.dt_nf_debito && <div className="cob-sub">{fmtDate(l.dt_nf_debito)}</div>}</td>
-                  <td>{l.etapa === 'enviado' ? <span style={{ color: 'var(--text-3)' }}>—</span> : <Idade dias={l.dias_etapa}/>}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+      <div className="ld-rapidos">
+        {RAPIDOS.map(r => {
+          const e = ETAPA[r.k];
+          return (
+            <button key={r.k} className={`ld-rapido${etapa === r.k ? ' on' : ''}`} style={{ '--c': e.cor }} onClick={() => mudar(r.k)} aria-pressed={etapa === r.k}>
+              <span className="ld-rapido-rot"><i/>{r.l}</span>
+              <span className="ld-rapido-n">{conta(r.k)}</span>
+              <span className="ld-rapido-d">{r.d}</span>
+            </button>
+          );
+        })}
       </div>
-    </section>
+      <section className="cob-lista">
+        <div className="cob-toolbar">
+          <div className="cob-busca">
+            <Ic d={I.busca} size={14} color="var(--text-3)"/>
+            <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar transportador, pedido, NF de débito, NFD, cliente, quem criou…" aria-label="Buscar NF de débito"/>
+          </div>
+          <div className="cob-toolbar-info">
+            {etapa === 'abertas' ? 'Em andamento' : etapa === 'todas' ? 'Todas' : RAPIDOS.find(r => r.k === etapa)?.l} · {plural(lista.length, 'NF de débito', 'NFs de débito')}
+            {' · '}<b>{fmtBRL(lista.reduce((a, l) => a + (Number(l.valor_total) || (l.notas || []).reduce((s, n) => s + (Number(n.valor_sugerido) || 0), 0)), 0))}</b>
+          </div>
+          <div style={{ display: 'flex', gap: 6, marginLeft: 'auto' }}>
+            <button className={`btn btn-sm ${etapa === 'todas' ? 'btn-primary' : 'btn-outline'}`} onClick={() => mudar('todas')}>Ver todas as etapas</button>
+            <button className="btn btn-outline btn-sm" disabled={!marcados.length} onClick={relacao} title="Excel com qual NFD foi cobrada em qual NF de débito, com os itens">
+              <Ic d={I.baixar} size={13}/>Relação{marcados.length ? ` (${marcados.length})` : ''}
+            </button>
+          </div>
+        </div>
+        <div className="cob-tabela-wrap">
+          <table className="cob-tabela">
+            <thead><tr>
+              <th style={{ width: 36 }}><input type="checkbox" aria-label="Marcar todas" checked={lista.length > 0 && lista.every(l => sel.has(l.id))}
+                onChange={() => setSel(s => lista.every(l => s.has(l.id)) ? new Set() : new Set(lista.map(l => l.id)))}/></th>
+              {['Lote', 'Transportador', 'Notas', 'Valor', 'Etapa', 'Pedido', 'NF de débito', 'Na etapa há', 'Criada por'].map((t, i) => <th key={t} className={i === 3 ? 'dir' : undefined}><button>{t}</button></th>)}
+            </tr></thead>
+            <tbody>
+              {lotes === null && <tr><td colSpan={10} className="cob-vazio"><Spinner/> Carregando…</td></tr>}
+              {lotes && lista.length === 0 && <tr><td colSpan={10} className="cob-vazio">
+                {escopo === 'minhas' && !temMinhas ? 'Você ainda não criou nenhuma NF de débito. Monte uma em "Notas a cobrar".' : 'Nenhuma NF de débito neste filtro.'}
+              </td></tr>}
+              {lista.map(l => {
+                const e = ETAPA[l.etapa] || ETAPAS[0];
+                const valor = l.valor_total != null ? Number(l.valor_total) : (l.notas || []).reduce((s, n) => s + (Number(n.valor_sugerido) || 0), 0);
+                return (
+                  <tr key={l.id} onClick={() => onAbrir(l.id)} style={{ '--cob-cor': e.cor }} className={sel.has(l.id) ? 'sel' : undefined}>
+                    <td onClick={ev => ev.stopPropagation()}><input type="checkbox" checked={sel.has(l.id)} aria-label={`Marcar lote ${l.numero}`}
+                      onChange={() => setSel(s => { const n = new Set(s); n.has(l.id) ? n.delete(l.id) : n.add(l.id); return n; })}/></td>
+                    <td><div className="cob-nf">{l.numero}</div><div className="cob-sub">{FILIAL_NOME[l.filial] || '—'}</div></td>
+                    <td style={{ maxWidth: 170 }}><div className="ellipsis" style={{ fontWeight: 500, color: 'var(--text)' }} title={l.transportador_nome}>{l.transportador_nome}</div>
+                      <div className="cob-sub ellipsis" title={l.motivo}>{l.motivo}</div></td>
+                    <td style={{ maxWidth: 190 }}>
+                      <div className="ellipsis" title={(l.notas || []).map(refNota).join(', ')}>{(l.notas || []).map(n => n.lancamento_manual ? `Venda ${n.nf_venda}` : `NFD ${n.nf_numero}`).join(', ')}</div>
+                      <div className="cob-sub ellipsis">{[...new Set((l.notas || []).map(n => n.nome_emitente))].join(', ')}</div>
+                    </td>
+                    <td className="dir" style={{ fontWeight: 700, color: 'var(--text)' }}>{fmtBRL(valor)}</td>
+                    <td><span className="cob-chip" style={{ color: e.cor, background: e.bg }}><span style={{ background: e.cor }}/>{e.curto}</span></td>
+                    <td>{l.pedido || <span style={{ color: 'var(--text-3)' }}>—</span>}{l.dt_pedido && <div className="cob-sub">{fmtDate(l.dt_pedido)}</div>}</td>
+                    <td>{l.nf_debito ? <b style={{ color: 'var(--text)' }}>{l.nf_debito}</b> : <span style={{ color: 'var(--text-3)' }}>—</span>}{l.dt_nf_debito && <div className="cob-sub">{fmtDate(l.dt_nf_debito)}</div>}</td>
+                    <td>{l.etapa === 'enviado' ? <span style={{ color: 'var(--text-3)' }}>—</span> : <Idade dias={l.dias_etapa}/>}</td>
+                    <td><span className={`ld-dono${l.meu ? ' meu' : ''}`}>{l.meu ? 'Você' : (l.criado_por || '—')}</span></td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </>
   );
 }

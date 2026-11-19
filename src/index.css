@@ -1146,3 +1146,40 @@ tr.drill-row:hover td { background: var(--blue-dim); }
 .cob-como li { font-size: 12.5px; color: var(--text-2); }
 .cob-como li b { color: var(--text); }
 .nd-corpo > * { flex-shrink: 0; }
+
+/* ── Usuários ────────────────────────────────────────────────── */
+.usr { display: flex; flex-direction: column; gap: 14px; }
+.usr-topo { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.usr-tit { font-size: 17px; font-weight: 750; color: var(--text); }
+.usr-sub { font-size: 12.5px; color: var(--text-3); margin-top: 3px; }
+.usr-perfis-info { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+.usr-perfis-info div { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--text-2); }
+.usr-perfis-info b { font-size: 13px; color: var(--text); }
+.usr-badge { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 99px; background: var(--surface-3); color: var(--text-2); }
+.usr-badge.admin { background: #EDE7FB; color: #5B3FB0; }
+.usr-badge.analista { background: #E8EEFB; color: #1E4DB7; }
+.usr-voce { margin-left: 8px; font-size: 10px; font-weight: 700; color: var(--text-3); background: var(--surface-3); padding: 1px 6px; border-radius: 4px; }
+.usr-campo { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+.usr-dica { font-size: 11px; color: var(--text-3); line-height: 1.4; }
+.usr-perfis { display: flex; flex-direction: column; gap: 6px; }
+.usr-perfil { display: flex; gap: 10px; align-items: flex-start; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; }
+.usr-perfil.on { border-color: var(--blue); background: var(--blue-dim); }
+.usr-perfil input { margin-top: 3px; }
+.usr-perfil span { display: flex; flex-direction: column; gap: 1px; font-size: 13px; }
+.usr-perfil small { font-size: 11.5px; color: var(--text-3); }
+.usr-ativo { display: flex; gap: 8px; align-items: center; font-size: 13px; font-weight: 600; color: var(--text); }
+.usr-ativo span { font-weight: 400; font-size: 11.5px; color: var(--text-3); }
+
+/* ── NFs de débito: minhas / todas ──────────────────────────── */
+.ld-topo { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ld-rapidos { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
+.ld-rapido { all: unset; box-sizing: border-box; cursor: pointer; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 3px; }
+.ld-rapido:hover { border-color: var(--border-2); box-shadow: var(--shadow-sm); }
+.ld-rapido.on { border-color: var(--c); box-shadow: 0 0 0 2px color-mix(in srgb, var(--c) 25%, transparent); }
+.ld-rapido:focus-visible { outline: 2px solid var(--blue); }
+.ld-rapido-rot { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--text-2); }
+.ld-rapido-rot i { width: 8px; height: 8px; border-radius: 99px; background: var(--c); }
+.ld-rapido-n { font-size: 22px; font-weight: 750; color: var(--text); font-variant-numeric: tabular-nums; }
+.ld-rapido-d { font-size: 11px; color: var(--text-3); }
+.ld-dono { font-size: 11.5px; color: var(--text-2); }
+.ld-dono.meu { color: #1E4DB7; font-weight: 650; }
