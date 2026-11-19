@@ -22,6 +22,7 @@ export const SITUACAO_TXT = {
   conferir_cd:       'Voltou ao CD · falta conferência',
   isentar:           'Voltou em bom estado · nada a cobrar',
   sem_transportador: 'Sem transportador',
+  em_lote:           'Em NF de débito (aguardando faturamento)',
   cobrado:           'Cobrado',
   isento:            'Isento',
 };
@@ -121,33 +122,38 @@ export async function baixarEspelhoCobranca(rows, { nomeArquivo = 'Espelho de co
     { t: 'UF', w: 5, v: r => r.uf_emitente },
     { t: 'Emissão', w: 11, v: r => r.dt_emissao, fmt: 'data' },
     { t: 'Lançada no Protheus', w: 12, v: r => r.dt_lancamento_protheus, fmt: 'data' },
+    { t: 'Filial', w: 10, v: r => r.filial },
+    { t: 'Entregue em', w: 12, v: r => r.dt_entrega, fmt: 'data' },
     { t: 'Motivo', w: 28, v: r => r.motivo_devolucao },
     { t: 'Retorno ao CD', w: 12, v: r => r.retornou_cd ? 'Sim' : 'Não' },
     { t: 'Data retorno CD', w: 12, v: r => r.dt_recebimento_cd, fmt: 'data' },
     { t: 'Situação', w: 34, v: r => SITUACAO_TXT[r.situacao] || r.situacao },
     { t: 'Valor da nota', w: 15, v: r => r.valor, fmt: 'brl' },
+    { t: 'Valor dos produtos', w: 15, v: r => r.valor_produtos, fmt: 'brl' },
     { t: 'Valor a cobrar', w: 15, v: r => valorACobrar(r), fmt: 'brl' },
-    { t: 'NF de débito', w: 12, v: r => r.nf_debito },
+    { t: 'Pedido', w: 11, v: r => r.lote_pedido },
+    { t: 'NF de débito', w: 12, v: r => r.nf_debito || r.lote_nf_debito },
     { t: 'Observação', w: 40, v: r => r.obs_cobranca },
   ], rows);
 
-  // Itens do CD que entram na cobrança
+  // Itens que entram na cobrança: código Linea, quantidade e valor líquido da NF de venda (só produtos)
   const itens = [];
-  rows.forEach(r => (r.itens_cd || []).forEach(it => {
-    if (COBRAR.has(String(it.destino || '').toUpperCase())) itens.push({ r, it });
-  }));
+  rows.forEach(r => (r.itens_cobrar || []).forEach(it => itens.push({ r, it })));
   if (itens.length) {
     const wi = wb.addWorksheet('Itens a cobrar');
-    titulo(wi, 'Itens que voltaram ao CD com avaria, falta ou impróprios', gerado, 8);
+    titulo(wi, 'Itens a cobrar (código Linea e valor da NF de venda)', gerado, 11);
     tabela(wi, 4, [
-      { t: 'Transportador', w: 36, v: x => x.r.transportador_cobranca },
+      { t: 'Transportador', w: 34, v: x => x.r.transportador_cobranca },
       { t: 'NF Dev.', w: 11, v: x => x.r.lancamento_manual ? '' : x.r.nf_numero },
-      { t: 'Cliente', w: 34, v: x => x.r.nome_emitente },
+      { t: 'NF Venda', w: 11, v: x => x.r.nf_venda },
+      { t: 'Cliente', w: 32, v: x => x.r.nome_emitente },
       { t: 'Código', w: 12, v: x => x.it.codigo },
-      { t: 'Produto', w: 44, v: x => x.it.descricao },
-      { t: 'Lote', w: 10, v: x => x.it.lote },
-      { t: 'Qtd', w: 7, v: x => x.it.qtd, fmt: 'num', somar: true },
-      { t: 'Ocorrência', w: 12, v: x => x.it.destino },
+      { t: 'Produto', w: 40, v: x => x.it.descricao },
+      { t: 'Un', w: 6, v: x => x.it.unidade },
+      { t: 'Qtd', w: 9, v: x => x.it.qtd, fmt: 'num' },
+      { t: 'Valor unitário', w: 14, v: x => x.it.valor_unitario, fmt: 'num' },
+      { t: 'Valor total', w: 14, v: x => x.it.valor_total, fmt: 'brl' },
+      { t: 'Ocorrência', w: 18, v: x => x.it.motivo },
     ], itens);
   }
 

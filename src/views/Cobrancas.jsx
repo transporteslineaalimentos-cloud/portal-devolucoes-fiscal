@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { dbGetCobrancas, dbCobrancaAcao } from '../config/supabase';
+import { dbGetCobrancas, dbCobrancaAcao, dbGetCobrancaLotes, dbCobrancaLoteCriar } from '../config/supabase';
 import { fmtBRL, fmtDate } from '../utils.jsx';
 import { somenteLeitura } from '../lib/permissoes.js';
 import ModalCobranca from '../components/ModalCobranca.jsx';
 import ModalImportRetornoCD from '../components/ModalImportRetornoCD.jsx';
 import { baixarEspelhoCobranca, valorACobrar } from '../utils/espelhoCobranca.js';
+import ModalLote from '../components/ModalLote.jsx';
+import { ETAPA, ETAPAS, FILIAL_NOME, baixarRelacaoLotes, refNota } from '../utils/notaDebito.js';
 
 /* ─────────────────────────────────────────────────────────────
    Cobranças de transportador
@@ -13,6 +15,8 @@ import { baixarEspelhoCobranca, valorACobrar } from '../utils/espelhoCobranca.js
    já lançada no Protheus cai numa situação que diz o que fazer
    (cobrar a nota inteira, cobrar só o que voltou avariado, conferir
    o retorno, isentar). O valor sugerido vem do banco (get_cobrancas).
+   As notas cobradas juntas formam uma NF de débito (lote): pedido de
+   venda no Protheus → faturamento pelo financeiro → envio ao transportador.
 ───────────────────────────────────────────────────────────── */
 
 const Ic = ({ d, size = 14, color = 'currentColor', sw = 1.8 }) => (
@@ -53,12 +57,15 @@ const SIT = {
                        faz: 'Tudo voltou ao CD em bom estado. Não há o que cobrar: isente.' },
   sem_transportador: { l: 'Sem transportador',      curto: 'Sem transportador',      cor: '#6B7280', bg: '#F1F2F4',
                        faz: 'Não foi possível identificar o transportador pela NF de venda. Vincule o transportador na nota (aba Devoluções).' },
+  em_lote:           { l: 'Em NF de débito',        curto: 'Em NF de débito',        cor: '#6D4FC2', bg: '#F0EBFB',
+                       faz: 'Já estão numa NF de débito que ainda não foi faturada. Abra a NF de débito (aba NFs de débito) para registrar o pedido ou o faturamento.' },
   cobrado:           { l: 'Cobradas',               curto: 'Cobrado',                cor: '#2F855A', bg: '#E6F4EC', faz: 'Cobrança registrada com NF de débito.' },
   isento:            { l: 'Isentas',                curto: 'Isento',                 cor: '#6B7280', bg: '#F1F2F4', faz: 'Não serão cobradas do transportador.' },
 };
 const PENDENTES = ['cobrar_integral', 'cobrar_parcial', 'conferir_cd', 'isentar', 'sem_transportador'];
-const FILAS = [{ k: 'pendentes', l: 'Todas pendentes' }, ...PENDENTES.map(k => ({ k, l: SIT[k].l })), { k: 'cobrado', l: 'Cobradas' }, { k: 'isento', l: 'Isentas' }, { k: 'todas', l: 'Todas' }];
+const FILAS = [{ k: 'pendentes', l: 'Todas pendentes' }, ...PENDENTES.map(k => ({ k, l: SIT[k].l })), { k: 'em_lote', l: 'Em NF de débito' }, { k: 'cobrado', l: 'Cobradas' }, { k: 'isento', l: 'Isentas' }, { k: 'todas', l: 'Todas' }];
 const ehPendente = (r) => PENDENTES.includes(r.situacao);
+const aCobrarAinda = (r) => ehPendente(r) || r.situacao === 'em_lote';
 
 const MOTIVOS_ISENCAO = [
   'Produto voltou ao CD em bom estado',
@@ -121,85 +128,6 @@ function Spinner({ size = 16 }) {
 }
 
 /* ─── Modais de ação em lote ───────────────────────────────── */
-function ModalCobrar({ notas, onClose, onFeito }) {
-  const [nfDebito, setNfDebito] = useState('');
-  const [obs, setObs] = useState('');
-  const [valores, setValores] = useState(() => Object.fromEntries(notas.map(r => [r.id, r.valor_sugerido != null ? Number(r.valor_sugerido).toFixed(2) : ''])));
-  const [salvando, setSalvando] = useState(false);
-  const [erro, setErro] = useState('');
-  const transps = new Set(notas.map(chaveTransp));
-  const total = notas.reduce((a, r) => a + (Number(String(valores[r.id]).replace(',', '.')) || 0), 0);
-  const semValor = notas.filter(r => valores[r.id] === '' || valores[r.id] == null).length;
-
-  const confirmar = async () => {
-    if (!nfDebito.trim()) { setErro('Informe o número da NF de débito.'); return; }
-    setSalvando(true); setErro('');
-    try {
-      const v = {};
-      notas.forEach(r => { const n = Number(String(valores[r.id]).replace(',', '.')); if (valores[r.id] !== '' && Number.isFinite(n)) v[r.id] = n; });
-      await dbCobrancaAcao(notas.map(r => r.id), 'cobrar', { nf_debito: nfDebito.trim(), obs: obs.trim() || null, valores: v });
-      onFeito(`${plural(notas.length, 'nota cobrada', 'notas cobradas')} na NF de débito ${nfDebito.trim()}.`);
-    } catch (e) { setErro(e.message); setSalvando(false); }
-  };
-
-  return createPortal(
-    <div className="modal-overlay" style={{ zIndex: 650 }} onClick={e => e.target === e.currentTarget && !salvando && onClose()}>
-      <div className="modal" role="dialog" aria-label="Registrar cobrança" style={{ maxWidth: 720, width: '100%' }}>
-        <div className="modal-header">
-          <div style={{ fontSize: 16, fontWeight: 700 }}>Registrar cobrança</div>
-          <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 3 }}>{plural(notas.length, 'nota', 'notas')} · uma NF de débito para todas</div>
-        </div>
-        <div className="modal-body">
-          {transps.size > 1 && (
-            <div className="cob-aviso">
-              <Ic d={I.info} size={14} color="#B45309"/>
-              As notas selecionadas são de {transps.size} transportadores diferentes. Normalmente cada transportador recebe a sua NF de débito.
-            </div>
-          )}
-          <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: 12, marginBottom: 14 }}>
-            <div>
-              <label className="input-label" htmlFor="cob-nfd">NF de débito *</label>
-              <input id="cob-nfd" className="input" value={nfDebito} onChange={e => setNfDebito(e.target.value)} placeholder="Ex.: 12345" autoFocus/>
-            </div>
-            <div>
-              <label className="input-label" htmlFor="cob-obs">Observação</label>
-              <input id="cob-obs" className="input" value={obs} onChange={e => setObs(e.target.value)} placeholder="Opcional"/>
-            </div>
-          </div>
-          <div className="cob-mini-tabela">
-            <table>
-              <thead><tr><th>NF Dev.</th><th>Cliente</th><th>Situação</th><th style={{ textAlign: 'right' }}>Valor da nota</th><th style={{ textAlign: 'right', width: 150 }}>Valor a cobrar</th></tr></thead>
-              <tbody>
-                {notas.map(r => (
-                  <tr key={r.id}>
-                    <td style={{ fontWeight: 600 }}>{r.lancamento_manual ? `NF venda ${r.nf_venda || '—'}` : r.nf_numero}</td>
-                    <td className="ellipsis" style={{ maxWidth: 200 }} title={r.nome_emitente}>{r.nome_emitente}</td>
-                    <td><ChipSituacao s={r.situacao}/></td>
-                    <td style={{ textAlign: 'right', color: 'var(--text-2)' }}>{fmtBRL(r.valor)}</td>
-                    <td style={{ textAlign: 'right' }}>
-                      <input className="input" inputMode="decimal" aria-label={`Valor a cobrar da NF ${r.nf_numero}`}
-                        value={valores[r.id]} onChange={e => setValores(v => ({ ...v, [r.id]: e.target.value }))}
-                        style={{ textAlign: 'right', padding: '4px 8px', fontSize: 12 }} placeholder="Informe"/>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot><tr><td colSpan={4}>Total a cobrar</td><td style={{ textAlign: 'right' }}>{fmtBRL(total)}</td></tr></tfoot>
-            </table>
-          </div>
-          {semValor > 0 && <div style={{ fontSize: 11.5, color: 'var(--text-3)', marginTop: 8 }}>{plural(semValor, 'nota está', 'notas estão')} sem valor (retorno sem conferência). Informe o valor ou deixe em branco.</div>}
-          {erro && <div style={{ color: 'var(--red)', fontSize: 12, marginTop: 10 }}>{erro}</div>}
-        </div>
-        <div className="modal-footer">
-          <button className="btn btn-ghost btn-sm" onClick={onClose} disabled={salvando}>Cancelar</button>
-          <button className="btn btn-primary btn-sm" onClick={confirmar} disabled={salvando}>
-            {salvando ? 'Salvando…' : `Confirmar cobrança · ${fmtBRL(total)}`}
-          </button>
-        </div>
-      </div>
-    </div>, document.body);
-}
-
 function ModalIsentar({ notas, onClose, onFeito }) {
   const [obs, setObs] = useState(notas.every(r => r.situacao === 'isentar') ? MOTIVOS_ISENCAO[0] : '');
   const [salvando, setSalvando] = useState(false);
@@ -238,7 +166,7 @@ function ModalIsentar({ notas, onClose, onFeito }) {
 }
 
 /* ─── Barra de ações (presa no rodapé) ─────────────────────── */
-function BarraAcoes({ sel, onCobrar, onIsentar, onReabrir, onEspelho, onLimpar, leitura }) {
+function BarraAcoes({ sel, onMontar, onIsentar, onReabrir, onEspelho, onLimpar, leitura }) {
   const [pos, setPos] = useState(null);
   useEffect(() => {
     const medir = () => {
@@ -249,7 +177,7 @@ function BarraAcoes({ sel, onCobrar, onIsentar, onReabrir, onEspelho, onLimpar, 
     return () => window.removeEventListener('resize', medir);
   }, []);
   if (!pos) return null;
-  const pend = sel.filter(ehPendente), fech = sel.filter(r => !ehPendente(r));
+  const pend = sel.filter(ehPendente), fech = sel.filter(r => !ehPendente(r) && r.situacao !== 'em_lote');
   const aCobrar = pend.reduce((a, r) => a + (Number(r.valor_sugerido) || 0), 0);
   return createPortal(
     <div className="cob-barra" style={{ left: pos.left, right: pos.right }} role="region" aria-label="Ações nas notas selecionadas">
@@ -258,9 +186,9 @@ function BarraAcoes({ sel, onCobrar, onIsentar, onReabrir, onEspelho, onLimpar, 
         <span style={{ fontSize: 11.5, opacity: 0.75 }}>{pend.length ? `${fmtBRL(aCobrar)} a cobrar` : 'já cobradas ou isentas'}</span>
       </div>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginLeft: 'auto' }}>
-        {!leitura && pend.length > 0 && <button className="btn btn-sm cob-btn-claro" onClick={() => onCobrar(pend)}>Registrar cobrança{fech.length ? ` (${pend.length})` : ''}</button>}
+        {!leitura && pend.length > 0 && <button className="btn btn-sm cob-btn-claro" onClick={() => onMontar(pend)}>Montar NF de débito{fech.length ? ` (${pend.length})` : ''}</button>}
         {!leitura && pend.length > 0 && <button className="btn btn-sm cob-btn-escuro" onClick={() => onIsentar(pend)}>Isentar{fech.length ? ` (${pend.length})` : ''}</button>}
-        {!leitura && fech.length > 0 && <button className="btn btn-sm cob-btn-escuro" onClick={() => onReabrir(fech)}>Reabrir{pend.length ? ` (${fech.length})` : ''}</button>}
+        {!leitura && fech.filter(r => !r.lote_id).length > 0 && <button className="btn btn-sm cob-btn-escuro" onClick={() => onReabrir(fech.filter(r => !r.lote_id))}>Reabrir{pend.length ? ` (${fech.filter(r => !r.lote_id).length})` : ''}</button>}
         <button className="btn btn-sm cob-btn-escuro" onClick={() => onEspelho(sel)}><Ic d={I.baixar} size={13}/> Espelho (Excel)</button>
         <button className="btn btn-sm cob-btn-escuro" onClick={onLimpar} aria-label="Limpar seleção"><Ic d={I.x} size={13}/></button>
       </div>
@@ -272,9 +200,10 @@ const COLS = [
   { k: 'nf',     t: 'NF Dev.',        s: r => Number(r.nf_numero) || 0 },
   { k: 'cli',    t: 'Cliente',        s: r => r.nome_emitente || '' },
   { k: 'transp', t: 'Transportador · motivo', s: r => r.transportador_cobranca || '' },
+  { k: 'ent',    t: 'Entregue em',    s: r => r.dt_entrega || '' },
   { k: 'dias',   t: 'Lançada há',     s: r => r._dias ?? -1 },
   { k: 'cd',     t: 'Retorno ao CD',  s: r => (r.retornou_cd ? 1 : 0) + (r.conferido ? 1 : 0) },
-  { k: 'valor',  t: 'Valor da nota',  s: r => Number(r.valor) || 0, right: true },
+  { k: 'valor',  t: 'Valor produtos', s: r => Number(r.valor_produtos) || 0, right: true },
   { k: 'cobrar', t: 'A cobrar',       s: r => valorACobrar(r), right: true },
   { k: 'sit',    t: 'Situação',       s: r => r.situacao },
 ];
@@ -282,24 +211,31 @@ const COLS = [
 export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
   const leitura = somenteLeitura(user);
   const [rows, setRows] = useState(null);
+  const [lotes, setLotes] = useState(null);
   const [erro, setErro] = useState('');
+  const [modo, setModo] = useState('notas');   // 'notas' | 'nfs'
   const [fila, setFila] = useState('pendentes');
   const [transp, setTransp] = useState(null);
   const [busca, setBusca] = useState('');
+  const [fMotivo, setFMotivo] = useState('');
+  const [fFilial, setFFilial] = useState('');
   const [ord, setOrd] = useState({ k: 'dias', dir: -1 });
   const [selIds, setSelIds] = useState(() => new Set());
-  const [acao, setAcao] = useState(null);      // { tipo: 'cobrar'|'isentar', notas }
+  const [acao, setAcao] = useState(null);      // { tipo: 'isentar', notas }
   const [detalhe, setDetalhe] = useState(null);
+  const [loteAberto, setLoteAberto] = useState(null);
   const [importCD, setImportCD] = useState(false);
   const [aviso, setAviso] = useState('');
   const [gerando, setGerando] = useState(false);
+  const [montando, setMontando] = useState(false);
 
   const carregar = useCallback(async () => {
     setErro('');
     try {
-      const d = await dbGetCobrancas();
+      const [d, l] = await Promise.all([dbGetCobrancas(), dbGetCobrancaLotes()]);
       setRows(d.map(r => ({ ...r, _dias: diasDesde(r.dt_lancamento_protheus) })));
-    } catch (e) { setErro(e.message); setRows(r => r || []); }
+      setLotes(l);
+    } catch (e) { setErro(e.message); setRows(r => r || []); setLotes(l => l || []); }
   }, []);
   useEffect(() => { carregar(); }, [carregar]);
 
@@ -318,29 +254,34 @@ export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
 
   const todas = useMemo(() => rows || [], [rows]);
   const naFila = (r, f = fila) => f === 'todas' || (f === 'pendentes' ? ehPendente(r) : r.situacao === f);
+  const motivos = useMemo(() => [...new Set(todas.map(r => r.motivo_devolucao).filter(Boolean))].sort(), [todas]);
 
   /* Números do topo (sempre sobre tudo, sem filtro) */
   const resumo = useMemo(() => {
     const z = () => ({ q: 0, v: 0, nf: 0 });
-    const o = { pend: z(), velhas: z(), cobrado: z(), isento: z() };
+    const o = { pend: z(), velhas: z(), cobrado: z(), isento: z(), aguard: z() };
     const por = Object.fromEntries(Object.keys(SIT).map(k => [k, z()]));
     todas.forEach(r => {
       const p = por[r.situacao]; if (p) { p.q++; p.v += valorACobrar(r); p.nf += Number(r.valor) || 0; }
-      if (ehPendente(r)) {
+      if (aCobrarAinda(r)) {
         o.pend.q++; o.pend.v += Number(r.valor_sugerido) || 0;
-        if ((r._dias ?? 0) > 60) { o.velhas.q++; o.velhas.v += Number(r.valor_sugerido) || 0; }
+        if (ehPendente(r) && (r._dias ?? 0) > 60) { o.velhas.q++; o.velhas.v += Number(r.valor_sugerido) || 0; }
       }
       if (r.situacao === 'cobrado') { o.cobrado.q++; o.cobrado.v += valorACobrar(r); }
       if (r.situacao === 'isento') { o.isento.q++; o.isento.v += Number(r.valor) || 0; }
     });
+    let maisVelhaPedido = 0;
+    (lotes || []).filter(l => l.etapa === 'pedido').forEach(l => { o.aguard.q++; o.aguard.v += Number(l.valor_total) || 0; maisVelhaPedido = Math.max(maisVelhaPedido, l.dias_etapa || 0); });
     const maisVelha = Math.max(0, ...todas.filter(ehPendente).map(r => r._dias || 0));
-    return { ...o, por, maisVelha };
-  }, [todas]);
+    return { ...o, por, maisVelha, maisVelhaPedido };
+  }, [todas, lotes]);
+
+  const filtrada = (x) => (!fMotivo || x.motivo_devolucao === fMotivo) && (!fFilial || x.filial === fFilial);
 
   /* Transportadores (na fila atual) */
   const transportadores = useMemo(() => {
     const m = new Map();
-    todas.filter(r => naFila(r)).forEach(r => {
+    todas.filter(r => naFila(r) && filtrada(r)).forEach(r => {
       const k = chaveTransp(r);
       const g = m.get(k) || { k, nomes: {}, q: 0, v: 0, velha: 0 };
       const n = r.transportador_cobranca || 'Sem transportador';
@@ -349,32 +290,57 @@ export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
     });
     return [...m.values()].map(g => ({ ...g, nome: Object.entries(g.nomes).sort((a, b) => b[1] - a[1] || b[0].length - a[0].length)[0][0] }))
       .sort((a, b) => b.v - a.v || b.q - a.q);
-  }, [todas, fila]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [todas, fila, fMotivo, fFilial]); // eslint-disable-line react-hooks/exhaustive-deps
   const maxT = Math.max(1, ...transportadores.map(t => t.v));
 
   /* Lista */
   const visiveis = useMemo(() => {
     const q = busca.trim().toLowerCase();
-    let r = todas.filter(x => naFila(x) && (!transp || chaveTransp(x) === transp));
-    if (q) r = r.filter(x => [x.nf_numero, x.nf_venda, x.nome_emitente, x.cnpj_emitente, x.transportador_cobranca, x.motivo_devolucao, x.nf_debito, x.uf_emitente]
+    let r = todas.filter(x => naFila(x) && filtrada(x) && (!transp || chaveTransp(x) === transp));
+    if (q) r = r.filter(x => [x.nf_numero, x.nf_venda, x.nome_emitente, x.cnpj_emitente, x.transportador_cobranca, x.motivo_devolucao, x.nf_debito, x.lote_pedido, x.uf_emitente]
       .some(v => String(v ?? '').toLowerCase().includes(q)));
     const col = COLS.find(c => c.k === ord.k) || COLS[4];
     return [...r].sort((a, b) => { const va = col.s(a), vb = col.s(b); return (va > vb ? 1 : va < vb ? -1 : 0) * ord.dir; });
-  }, [todas, fila, transp, busca, ord]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [todas, fila, transp, busca, ord, fMotivo, fFilial]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const totVis = visiveis.reduce((a, r) => ({ v: a.v + (Number(r.valor) || 0), c: a.c + valorACobrar(r) }), { v: 0, c: 0 });
+  const totVis = visiveis.reduce((a, r) => ({ v: a.v + (Number(r.valor_produtos) || 0), c: a.c + valorACobrar(r) }), { v: 0, c: 0 });
   const sel = todas.filter(r => selIds.has(r.id));
   const todasMarcadas = visiveis.length > 0 && visiveis.every(r => selIds.has(r.id));
   const alternar = (id) => setSelIds(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const marcarTodas = () => setSelIds(s => { const n = new Set(s); if (todasMarcadas) visiveis.forEach(r => n.delete(r.id)); else visiveis.forEach(r => n.add(r.id)); return n; });
 
-  const mudarFila = (f) => { setFila(f); setTransp(null); setSelIds(new Set()); };
-  const depoisDeAcao = (msg) => { setAcao(null); setSelIds(new Set()); setAviso(msg); carregar(); onChanged?.(); };
+  const mudarFila = (f) => { setModo('notas'); setFila(f); setTransp(null); setSelIds(new Set()); };
+  const depoisDeAcao = (msg) => { setAcao(null); setSelIds(new Set()); if (msg) setAviso(msg); carregar(); onChanged?.(); };
 
   const reabrir = async (notas) => {
     if (!window.confirm(`Reabrir ${plural(notas.length, 'nota', 'notas')}? A NF de débito e o valor cobrado serão apagados e as notas voltam para pendentes.`)) return;
     try { await dbCobrancaAcao(notas.map(r => r.id), 'reabrir'); depoisDeAcao(`${plural(notas.length, 'nota reaberta', 'notas reabertas')}.`); }
     catch (e) { alert(e.message); }
+  };
+
+  /* Montar uma NF de débito com as notas marcadas */
+  const montar = async (notas) => {
+    if (montando) return;
+    const transps = new Set(notas.map(chaveTransp));
+    if (transps.size > 1) { alert('As notas marcadas são de transportadores diferentes. Cada NF de débito é de um transportador só: filtre por transportador e marque de novo.'); return; }
+    const filiais = new Set(notas.map(r => r.filial || '?'));
+    if (filiais.size > 1) { alert('As notas marcadas são de filiais diferentes (Anápolis e Extrema). A NF de débito sai pela filial que vendeu: separe por filial.'); return; }
+    if (notas.length > 3 && !window.confirm(`Você marcou ${notas.length} notas. Normalmente vocês juntam até 3 numa NF de débito. Montar com as ${notas.length} mesmo assim?`)) return;
+    setMontando(true);
+    try {
+      let id;
+      try { id = await dbCobrancaLoteCriar(notas.map(r => r.id)); }
+      catch (e) {
+        if (!String(e.message).includes('MOTIVOS_DIFERENTES')) throw e;
+        const ms = [...new Set(notas.map(r => r.motivo_devolucao || 'sem motivo'))];
+        if (!window.confirm(`As notas têm motivos diferentes (${ms.join(', ')}). O combinado é juntar só notas do mesmo motivo. Juntar mesmo assim?`)) { setMontando(false); return; }
+        id = await dbCobrancaLoteCriar(notas.map(r => r.id), true);
+      }
+      setSelIds(new Set());
+      await carregar(); onChanged?.();
+      setLoteAberto(id);
+    } catch (e) { alert(e.message); }
+    setMontando(false);
   };
 
   const espelho = async (lista, rotulo) => {
@@ -393,26 +359,38 @@ export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
   const verSit = fila === 'pendentes' || fila === 'todas';
   const cols = verSit ? COLS : COLS.filter(c => c.k !== 'sit');
   const nomeTransp = transp ? transportadores.find(t => t.k === transp)?.nome : null;
+  const nLotesAbertos = (lotes || []).filter(l => l.etapa === 'montando' || l.etapa === 'pedido').length;
 
   return (
     <div className="cob" style={{ paddingBottom: sel.length ? 84 : 0 }}>
       {/* ── Números ── */}
       <div className="cob-kpis">
         <Kpi rotulo="A cobrar" cor="#C2413B" valor={fmtK(resumo.pend.v)} onClick={() => mudarFila('pendentes')}
-          nota={`${plural(resumo.pend.q, 'nota pendente', 'notas pendentes')} · valor sugerido`}/>
+          nota={`${plural(resumo.pend.q, 'nota', 'notas')} ainda não faturadas · só produtos`}/>
         <Kpi rotulo="Pendentes há mais de 60 dias" cor="#B45309" valor={plural(resumo.velhas.q, 'nota', 'notas')}
-          nota={resumo.pend.q ? `${fmtK(resumo.velhas.v)} · a mais antiga tem ${resumo.maisVelha} dias` : 'nada pendente'}
+          nota={resumo.velhas.q ? `${fmtK(resumo.velhas.v)} · a mais antiga tem ${resumo.maisVelha} dias` : 'nada atrasado'}
           onClick={resumo.velhas.q ? () => { mudarFila('pendentes'); setOrd({ k: 'dias', dir: -1 }); } : undefined}/>
+        <Kpi rotulo="Aguardando faturamento" cor={ETAPA.pedido.cor} valor={plural(resumo.aguard.q, 'pedido', 'pedidos')}
+          nota={resumo.aguard.q ? `${fmtK(resumo.aguard.v)} · o mais antigo há ${resumo.maisVelhaPedido} dias` : 'nenhum pedido parado no financeiro'}
+          onClick={() => setModo('nfs')}/>
         <Kpi rotulo="Cobrado" cor="#2F855A" valor={fmtK(resumo.cobrado.v)} onClick={() => mudarFila('cobrado')}
           nota={`${plural(resumo.cobrado.q, 'nota', 'notas')} com NF de débito`}/>
-        <Kpi rotulo="Isento" cor="#6B7280" valor={plural(resumo.isento.q, 'nota', 'notas')} onClick={() => mudarFila('isento')}
-          nota={`${fmtK(resumo.isento.v)} em notas não cobradas`}/>
       </div>
 
+      <div className="cob-modo" role="tablist" aria-label="Ver">
+        <button role="tab" aria-selected={modo === 'notas'} className={modo === 'notas' ? 'on' : ''} onClick={() => setModo('notas')}>Notas a cobrar</button>
+        <button role="tab" aria-selected={modo === 'nfs'} className={modo === 'nfs' ? 'on' : ''} onClick={() => setModo('nfs')}>
+          NFs de débito{nLotesAbertos > 0 && <span className="cob-fila-n">{nLotesAbertos} em aberto</span>}
+        </button>
+      </div>
+
+      {modo === 'nfs' && <ListaLotes lotes={lotes} onAbrir={setLoteAberto} onAviso={setAviso}/>}
+
+      {modo === 'notas' && <>
       {/* ── Filas ── */}
       <div className="cob-filas" role="tablist" aria-label="Situação da cobrança">
         {FILAS.map(f => {
-          const n = f.k === 'pendentes' ? resumo.pend.q : f.k === 'todas' ? todas.length : resumo.por[f.k]?.q || 0;
+          const n = f.k === 'pendentes' ? todas.filter(ehPendente).length : f.k === 'todas' ? todas.length : resumo.por[f.k]?.q || 0;
           const cor = SIT[f.k]?.cor;
           return (
             <button key={f.k} role="tab" aria-selected={fila === f.k} className={`cob-fila${fila === f.k ? ' ativa' : ''}`} onClick={() => mudarFila(f.k)}
@@ -425,7 +403,7 @@ export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
       </div>
       {fila === 'pendentes' && (
         <div className="cob-guia" style={{ borderLeftColor: 'var(--text)' }}>
-          <strong style={{ color: 'var(--text)' }}>Como funciona:</strong> notas da área TRANSPORTE já lançadas no Protheus entram aqui. Cada uma cai numa fila conforme o retorno ao CD, com o valor a cobrar já sugerido. Marque as notas de um transportador e registre a cobrança com uma única NF de débito.
+          <span><strong style={{ color: 'var(--text)' }}>Como funciona:</strong> marque até 3 notas do mesmo transportador, filial e motivo e clique em <b>Montar NF de débito</b>. A tela seguinte mostra o CNPJ, a observação e os itens (código Linea, quantidade e valor unitário) para digitar o pedido no Protheus, e guarda o nº do pedido e, depois, o da NF de débito.</span>
         </div>
       )}
       {sitAtual && (
@@ -461,9 +439,18 @@ export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
           <div className="cob-toolbar">
             <div className="cob-busca">
               <Ic d={I.busca} size={14} color="var(--text-3)"/>
-              <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar NF, cliente, transportador, motivo, NF de débito…" aria-label="Buscar"/>
+              <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar NF, cliente, transportador, pedido, NF de débito…" aria-label="Buscar"/>
               {busca && <button onClick={() => setBusca('')} aria-label="Limpar busca"><Ic d={I.x} size={12}/></button>}
             </div>
+            <select className="cob-filtro" value={fMotivo} onChange={e => setFMotivo(e.target.value)} aria-label="Filtrar por motivo">
+              <option value="">Todos os motivos</option>
+              {motivos.map(m => <option key={m} value={m}>{m}</option>)}
+            </select>
+            <select className="cob-filtro" value={fFilial} onChange={e => setFFilial(e.target.value)} aria-label="Filtrar por filial">
+              <option value="">Anápolis e Extrema</option>
+              <option value="Anápolis">Anápolis</option>
+              <option value="Extrema">Extrema</option>
+            </select>
             <div className="cob-toolbar-info">
               {rows ? <>{plural(visiveis.length, 'nota', 'notas')}{nomeTransp ? ` de ${nomeTransp}` : ''} · <b>{fmtBRL(totVis.c)}</b> {fila === 'cobrado' ? 'cobrado' : fila === 'isento' ? '' : 'a cobrar'}</> : 'Carregando…'}
             </div>
@@ -486,7 +473,7 @@ export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
                 {!leitura && <th style={{ width: 36 }}><input type="checkbox" checked={todasMarcadas} onChange={marcarTodas} aria-label="Selecionar todas as notas da lista"/></th>}
                 {cols.map(c => (
                   <th key={c.k} className={c.right ? 'dir' : undefined} aria-sort={ord.k === c.k ? (ord.dir > 0 ? 'ascending' : 'descending') : 'none'}>
-                    <button onClick={() => setOrd(o => ({ k: c.k, dir: o.k === c.k ? -o.dir : (['valor', 'cobrar', 'dias'].includes(c.k) ? -1 : 1) }))}>
+                    <button onClick={() => setOrd(o => ({ k: c.k, dir: o.k === c.k ? -o.dir : (['valor', 'cobrar', 'dias', 'ent'].includes(c.k) ? -1 : 1) }))}>
                       {c.t}{ord.k === c.k ? (ord.dir > 0 ? ' ↑' : ' ↓') : ''}
                     </button>
                   </th>
@@ -496,7 +483,7 @@ export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
                 {rows === null && <tr><td colSpan={cols.length + 1} className="cob-vazio"><Spinner/> Carregando cobranças…</td></tr>}
                 {rows && visiveis.length === 0 && (
                   <tr><td colSpan={cols.length + 1} className="cob-vazio">
-                    {busca || transp ? 'Nenhuma nota com esse filtro.' : fila === 'pendentes' ? 'Nenhuma cobrança pendente. 🎉' : 'Nenhuma nota nesta situação.'}
+                    {busca || transp || fMotivo || fFilial ? 'Nenhuma nota com esse filtro.' : fila === 'pendentes' ? 'Nenhuma cobrança pendente. 🎉' : 'Nenhuma nota nesta situação.'}
                   </td></tr>
                 )}
                 {visiveis.map(r => {
@@ -506,12 +493,15 @@ export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
                     <tr key={r.id} className={marcado ? 'sel' : undefined} onClick={() => setDetalhe(r)} style={{ '--cob-cor': sit?.cor }}>
                       {!leitura && <td onClick={e => e.stopPropagation()}><input type="checkbox" checked={marcado} onChange={() => alternar(r.id)} aria-label={`Selecionar NF ${r.nf_numero}`}/></td>}
                       <td>
-                        <div className="cob-nf">{r.lancamento_manual ? '—' : r.nf_numero}</div>
+                        <div className="cob-nf">{r.lancamento_manual ? 'Dev. total' : r.nf_numero}</div>
                         <div className="cob-sub">{r.nf_venda ? `Venda ${r.nf_venda}` : 'sem NF de venda'}</div>
                       </td>
-                      <td style={{ maxWidth: 210 }}>
+                      <td style={{ maxWidth: 220 }}>
                         <div className="ellipsis" title={r.nome_emitente} style={{ fontWeight: 500, color: 'var(--text)' }}>{r.nome_emitente || '—'}</div>
-                        <div className="cob-sub">{[r.municipio_emitente, r.uf_emitente].filter(Boolean).join(' / ')}</div>
+                        <div className="cob-sub">
+                          {[r.municipio_emitente, r.uf_emitente].filter(Boolean).join(' / ')}
+                          {r.filial && <span className="cob-filial" style={r.filial === 'Extrema' ? { background: '#EDE7FB', color: '#5B3FB0' } : { background: 'var(--surface-3)', color: 'var(--text-2)' }}>{r.filial}</span>}
+                        </div>
                       </td>
                       <td style={{ maxWidth: 200 }}>
                         {r.transportador_cobranca
@@ -519,19 +509,24 @@ export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
                           : <span style={{ color: 'var(--text-3)', fontStyle: 'italic' }}>Não identificado</span>}
                         <div className="cob-sub ellipsis" title={r.motivo_devolucao}>{r.motivo_devolucao || 'sem motivo'}</div>
                       </td>
+                      <td title={r.dt_entrega_fonte ? `Fonte: ${r.dt_entrega_fonte}` : 'Sem registro de entrega da NF de venda'}>
+                        {r.dt_entrega ? <span style={{ color: 'var(--text)' }}>{fmtDate(r.dt_entrega)}</span> : <span style={{ color: 'var(--text-3)' }}>—</span>}
+                        {r.dt_entrega && r.dt_emissao && <div className="cob-sub">NFD {fmtDate(r.dt_emissao)}</div>}
+                      </td>
                       <td>
                         <Idade dias={r._dias}/>
                         <div className="cob-sub">{fmtDate(r.dt_lancamento_protheus)}</div>
                       </td>
                       <td style={{ maxWidth: 150 }}><RetornoCD r={r}/></td>
-                      <td className="dir" style={{ color: 'var(--text-2)' }}>{fmtBRL(r.valor)}</td>
+                      <td className="dir" style={{ color: 'var(--text-2)' }}>{fmtBRL(r.valor_produtos)}</td>
                       <td className="dir">
                         {r.situacao === 'isento' ? <span style={{ color: 'var(--text-3)' }}>—</span>
                           : r.situacao !== 'cobrado' && r.valor_sugerido == null ? <span style={{ color: '#1E4DB7', fontSize: 11.5 }}>a definir</span>
                           : <>
                               <div style={{ fontWeight: 700, color: 'var(--text)' }}>{fmtBRL(valorACobrar(r))}</div>
                               {r.situacao === 'cobrado' && <div className="cob-sub">NF déb. {r.nf_debito}</div>}
-                              {r.situacao === 'cobrar_parcial' && Number(r.valor) > 0 && valorACobrar(r) < Number(r.valor) - 0.005 && <div className="cob-sub">{Math.round(valorACobrar(r) / Number(r.valor) * 100)}% da nota</div>}
+                              {r.situacao === 'em_lote' && <div className="cob-sub">{r.lote_pedido ? `Pedido ${r.lote_pedido}` : `Lote ${r.lote_numero} · sem pedido`}</div>}
+                              {r.situacao === 'cobrar_parcial' && Number(r.valor_produtos) > 0 && valorACobrar(r) < Number(r.valor_produtos) - 0.005 && <div className="cob-sub">{Math.round(valorACobrar(r) / Number(r.valor_produtos) * 100)}% da nota</div>}
                             </>}
                       </td>
                       {verSit && <td><ChipSituacao s={r.situacao}/></td>}
@@ -543,24 +538,31 @@ export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
           </div>
         </section>
       </div>
+      </>}
 
       {aviso && createPortal(<div className="cob-toast" role="status"><Ic d={I.check} size={14} color="#6EE7A8" sw={2.4}/>{aviso}</div>, document.body)}
 
-      {sel.length > 0 && (
+      {modo === 'notas' && sel.length > 0 && (
         <BarraAcoes sel={sel} leitura={leitura}
-          onCobrar={notas => setAcao({ tipo: 'cobrar', notas })}
+          onMontar={montar}
           onIsentar={notas => setAcao({ tipo: 'isentar', notas })}
           onReabrir={reabrir}
           onEspelho={lista => espelho(lista, 'selecionadas')}
           onLimpar={() => setSelIds(new Set())}/>
       )}
-      {acao?.tipo === 'cobrar' && <ModalCobrar notas={acao.notas} onClose={() => setAcao(null)} onFeito={depoisDeAcao}/>}
       {acao?.tipo === 'isentar' && <ModalIsentar notas={acao.notas} onClose={() => setAcao(null)} onFeito={depoisDeAcao}/>}
 
       {detalhe && (
         <ModalCobranca row={detalhe} user={user}
           onClose={() => setDetalhe(null)}
+          onMontar={(r) => { setDetalhe(null); montar([r]); }}
+          onAbrirLote={(id) => { setDetalhe(null); setLoteAberto(id); }}
           onSaved={(msg) => { setDetalhe(null); if (msg) setAviso(msg); carregar(); onChanged?.(); }}/>
+      )}
+      {loteAberto && (
+        <ModalLote loteId={loteAberto} user={user}
+          onClose={() => { setLoteAberto(null); carregar(); }}
+          onChanged={(msg) => { if (msg) setAviso(msg); onChanged?.(); }}/>
       )}
       {importCD && <ModalImportRetornoCD onClose={() => setImportCD(false)} onDone={() => carregar()}/>}
     </div>
@@ -568,3 +570,80 @@ export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
 }
 
 function ehPendenteFila(f) { return f === 'pendentes' || PENDENTES.includes(f); }
+
+/* ─── NFs de débito ────────────────────────────────────────── */
+function ListaLotes({ lotes, onAbrir, onAviso }) {
+  const [etapa, setEtapa] = useState('abertas');
+  const [busca, setBusca] = useState('');
+  const [sel, setSel] = useState(() => new Set());
+  const lista = useMemo(() => {
+    const q = busca.trim().toLowerCase();
+    return (lotes || []).filter(l => (etapa === 'todas' || (etapa === 'abertas' ? ['montando', 'pedido', 'faturado'].includes(l.etapa) : l.etapa === etapa))
+      && (!q || [l.transportador_nome, l.pedido, l.nf_debito, l.motivo, l.numero, ...(l.notas || []).flatMap(n => [n.nf_numero, n.nf_venda, n.nome_emitente])]
+        .some(v => String(v ?? '').toLowerCase().includes(q))));
+  }, [lotes, etapa, busca]);
+  const conta = (k) => (lotes || []).filter(l => k === 'todas' || (k === 'abertas' ? ['montando', 'pedido', 'faturado'].includes(l.etapa) : l.etapa === k)).length;
+  const marcados = (lotes || []).filter(l => sel.has(l.id));
+  const relacao = async () => {
+    try { await baixarRelacaoLotes(marcados, `Relação NFs de débito - ${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}`); onAviso('Relação gerada.'); }
+    catch (e) { alert(e.message); }
+  };
+  const ABAS = [{ k: 'abertas', l: 'Em andamento' }, ...ETAPAS.map(e => ({ k: e.k, l: e.l })), { k: 'todas', l: 'Todas' }];
+  return (
+    <section className="cob-lista">
+      <div className="cob-filas" role="tablist" aria-label="Etapa" style={{ padding: '0 8px' }}>
+        {ABAS.map(a => (
+          <button key={a.k} role="tab" aria-selected={etapa === a.k} className={`cob-fila${etapa === a.k ? ' ativa' : ''}`} onClick={() => { setEtapa(a.k); setSel(new Set()); }}
+            style={etapa === a.k && ETAPA[a.k] ? { boxShadow: `inset 0 -2px 0 ${ETAPA[a.k].cor}` } : undefined}>
+            {ETAPA[a.k] && <span className="cob-dot" style={{ background: ETAPA[a.k].cor }}/>}{a.l}<span className="cob-fila-n">{conta(a.k)}</span>
+          </button>
+        ))}
+      </div>
+      <div className="cob-toolbar">
+        <div className="cob-busca">
+          <Ic d={I.busca} size={14} color="var(--text-3)"/>
+          <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar transportador, pedido, NF de débito, NFD, cliente…" aria-label="Buscar NF de débito"/>
+        </div>
+        <div className="cob-toolbar-info">{plural(lista.length, 'NF de débito', 'NFs de débito')} · <b>{fmtBRL(lista.reduce((a, l) => a + (Number(l.valor_total) || (l.notas || []).reduce((s, n) => s + (Number(n.valor_sugerido) || 0), 0)), 0))}</b></div>
+        <button className="btn btn-outline btn-sm" style={{ marginLeft: 'auto' }} disabled={!marcados.length} onClick={relacao} title="Excel com qual NFD foi cobrada em qual NF de débito, com os itens">
+          <Ic d={I.baixar} size={13}/>Relação para o transportador{marcados.length ? ` (${marcados.length})` : ''}
+        </button>
+      </div>
+      <div className="cob-tabela-wrap">
+        <table className="cob-tabela">
+          <thead><tr>
+            <th style={{ width: 36 }}><input type="checkbox" aria-label="Marcar todas" checked={lista.length > 0 && lista.every(l => sel.has(l.id))}
+              onChange={() => setSel(s => lista.every(l => s.has(l.id)) ? new Set() : new Set(lista.map(l => l.id)))}/></th>
+            {['Lote', 'Transportador', 'Notas', 'Motivo', 'Valor', 'Etapa', 'Pedido', 'NF de débito', 'Na etapa há'].map((t, i) => <th key={t} className={i === 4 ? 'dir' : undefined}><button>{t}</button></th>)}
+          </tr></thead>
+          <tbody>
+            {lotes === null && <tr><td colSpan={10} className="cob-vazio"><Spinner/> Carregando…</td></tr>}
+            {lotes && lista.length === 0 && <tr><td colSpan={10} className="cob-vazio">Nenhuma NF de débito {etapa === 'abertas' ? 'em andamento' : 'nesta etapa'}. Monte uma em "Notas a cobrar".</td></tr>}
+            {lista.map(l => {
+              const e = ETAPA[l.etapa] || ETAPAS[0];
+              const valor = l.valor_total != null ? Number(l.valor_total) : (l.notas || []).reduce((s, n) => s + (Number(n.valor_sugerido) || 0), 0);
+              return (
+                <tr key={l.id} onClick={() => onAbrir(l.id)} style={{ '--cob-cor': e.cor }} className={sel.has(l.id) ? 'sel' : undefined}>
+                  <td onClick={ev => ev.stopPropagation()}><input type="checkbox" checked={sel.has(l.id)} aria-label={`Marcar lote ${l.numero}`}
+                    onChange={() => setSel(s => { const n = new Set(s); n.has(l.id) ? n.delete(l.id) : n.add(l.id); return n; })}/></td>
+                  <td><div className="cob-nf">{l.numero}</div><div className="cob-sub">{FILIAL_NOME[l.filial] || '—'}</div></td>
+                  <td style={{ maxWidth: 170 }}><div className="ellipsis" style={{ fontWeight: 500, color: 'var(--text)' }} title={l.transportador_nome}>{l.transportador_nome}</div></td>
+                  <td style={{ maxWidth: 180 }}>
+                    <div className="ellipsis" title={(l.notas || []).map(refNota).join(', ')}>{(l.notas || []).map(n => n.lancamento_manual ? `Venda ${n.nf_venda}` : n.nf_numero).join(', ')}</div>
+                    <div className="cob-sub ellipsis">{[...new Set((l.notas || []).map(n => n.nome_emitente))].join(', ')}</div>
+                  </td>
+                  <td style={{ maxWidth: 130 }}><div className="ellipsis" title={l.motivo}>{l.motivo}</div></td>
+                  <td className="dir" style={{ fontWeight: 700, color: 'var(--text)' }}>{fmtBRL(valor)}</td>
+                  <td><span className="cob-chip" style={{ color: e.cor, background: e.bg }}><span style={{ background: e.cor }}/>{e.curto}</span></td>
+                  <td>{l.pedido || <span style={{ color: 'var(--text-3)' }}>—</span>}{l.dt_pedido && <div className="cob-sub">{fmtDate(l.dt_pedido)}</div>}</td>
+                  <td>{l.nf_debito ? <b style={{ color: 'var(--text)' }}>{l.nf_debito}</b> : <span style={{ color: 'var(--text-3)' }}>—</span>}{l.dt_nf_debito && <div className="cob-sub">{fmtDate(l.dt_nf_debito)}</div>}</td>
+                  <td>{l.etapa === 'enviado' ? <span style={{ color: 'var(--text-3)' }}>—</span> : <Idade dias={l.dias_etapa}/>}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}

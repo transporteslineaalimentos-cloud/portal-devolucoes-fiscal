@@ -675,6 +675,30 @@ export async function dbCobrancaAcao(ids, acao, { nf_debito = null, obs = null, 
   return data;
 }
 
+// NFs de débito (lotes): pedido de venda → faturamento → envio ao transportador
+export async function dbGetCobrancaLotes() {
+  syncAuthToken();
+  const { data, error } = await supabase.rpc('get_cobranca_lotes');
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+export async function dbCobrancaLoteCriar(ids, forcar = false) {
+  syncAuthToken();
+  const { data, error } = await supabase.rpc('cobranca_lote_criar', { p_ids: ids, p_forcar: forcar });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function dbCobrancaLoteAcao(lote, acao, { numero = null, data = null, obs = null, ids = null, forcar = false } = {}) {
+  syncAuthToken();
+  const { data: r, error } = await supabase.rpc('cobranca_lote_acao', {
+    p_lote: lote, p_acao: acao, p_numero: numero, p_data: data, p_obs: obs, p_ids: ids, p_forcar: forcar,
+  });
+  if (error) throw new Error(error.message);
+  return r;
+}
+
 // Registrar a baixa da cobrança ao transportador (NF de débito)
 export async function dbRegistrarCobranca(id, { nf_debito, obs_cobranca, userName }) {
   syncAuthToken();

@@ -3,6 +3,7 @@ import { dbCobrancaAcao, dbGetDevolucaoDetail, dbGetXmlUrl } from '../config/sup
 import { somenteLeitura } from '../lib/permissoes.js';
 import { SITUACAO_TXT, valorACobrar } from '../utils/espelhoCobranca.js';
 import { fmtBRL, fmtDate, fmtCNPJ, fmtDateTime, BadgeCobranca } from '../utils.jsx';
+import { numProtheus, qtdTxt } from '../utils/notaDebito.js';
 import RetornoCDSection from './RetornoCDSection.jsx';
 
 const Ic = ({ d, size = 14, color = 'currentColor' }) => (
@@ -39,18 +40,18 @@ function DataItem({ label, value, accent, full }) {
   );
 }
 
-export default function ModalCobranca({ row, user, onClose, onSaved }) {
-  const [nfDebito, setNfDebito] = useState(row.nf_debito || '');
+export default function ModalCobranca({ row, user, onClose, onSaved, onMontar, onAbrirLote }) {
   const [obs, setObs]           = useState(row.obs_cobranca || '');
   const [saving, setSaving]     = useState(false);
   const [err, setErr]           = useState('');
-  const [mode, setMode]         = useState(null); // 'cobrar' | 'isentar'
-  const [valor, setValor]       = useState(row.valor_sugerido != null ? Number(row.valor_sugerido).toFixed(2) : '');
+  const [mode, setMode]         = useState(null); // 'isentar'
+  const [verXml, setVerXml]     = useState(false);
   const leitura = somenteLeitura(user);
   const [detail, setDetail]     = useState(null);
-  const [loading, setLoading]   = useState(true);
+  const [, setLoading]          = useState(true);
 
-  const isPendente = row.status_cobranca === 'pendente_cobranca_transportador';
+  const isPendente = row.status_cobranca === 'pendente_cobranca_transportador' && !row.lote_id;
+  const itensCobrar = Array.isArray(row.itens_cobrar) ? row.itens_cobrar : [];
 
   useEffect(() => {
     let active = true;
@@ -69,18 +70,6 @@ export default function ModalCobranca({ row, user, onClose, onSaved }) {
   const handleXml = async () => {
     try { const url = await dbGetXmlUrl(dev.xml_path); if (url) window.open(url, '_blank'); }
     catch (e) { alert('Erro: ' + e.message); }
-  };
-
-  const handleCobrar = async () => {
-    if (!nfDebito.trim()) { setErr('Informe o número da NF de débito.'); return; }
-    setSaving(true); setErr('');
-    try {
-      const n = Number(String(valor).replace(',', '.'));
-      await dbCobrancaAcao([row.id], 'cobrar', { nf_debito: nfDebito.trim(), obs: obs.trim() || null,
-        valores: valor !== '' && Number.isFinite(n) ? { [row.id]: n } : {} });
-      onSaved?.(`NF ${row.nf_numero} cobrada na NF de débito ${nfDebito.trim()}.`);
-    } catch (e) { setErr(e.message); }
-    finally { setSaving(false); }
   };
 
   const handleIsentar = async () => {
@@ -138,7 +127,7 @@ export default function ModalCobranca({ row, user, onClose, onSaved }) {
               <span className="dd-kpi-value" style={{ color: '#fff' }}>
                 {row.situacao && row.situacao !== 'cobrado' && row.valor_sugerido == null ? 'a definir' : fmtBRL(row.situacao ? valorACobrar(row) : dev.valor)}
               </span>
-              <span style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.55)' }}>nota de {fmtBRL(dev.valor)}</span>
+              <span style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.55)' }}>produtos {fmtBRL(row.valor_produtos ?? dev.valor)} · nota {fmtBRL(dev.valor)}</span>
             </div>
             <div className="dd-kpi">
               <span className="dd-kpi-label">Motivo</span>
@@ -169,7 +158,7 @@ export default function ModalCobranca({ row, user, onClose, onSaved }) {
           {row.situacao && SITUACAO_TXT[row.situacao] && (
             <div style={{ fontSize: 12.5, color: 'var(--text-2)', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 14px', marginBottom: 12, lineHeight: 1.5 }}>
               <strong style={{ color: 'var(--text)' }}>{SITUACAO_TXT[row.situacao]}.</strong>{' '}
-              {row.situacao === 'cobrar_integral' && 'O produto não voltou ao CD, então o valor sugerido é o valor da nota.'}
+              {row.situacao === 'cobrar_integral' && 'O produto não voltou ao CD, então cobra todos os itens da nota (só o valor dos produtos, sem impostos).'}
               {row.situacao === 'cobrar_parcial' && 'O valor sugerido é só o dos itens que o CD conferiu como avaria, falta ou impróprio (veja abaixo em Retorno ao CD).'}
               {row.situacao === 'conferir_cd' && 'Consta retorno ao CD, mas sem a conferência dos itens. Importe a planilha do CD ou informe o valor ao cobrar.'}
               {row.situacao === 'isentar' && 'Todos os itens voltaram em bom estado: não há o que cobrar.'}
@@ -194,18 +183,10 @@ export default function ModalCobranca({ row, user, onClose, onSaved }) {
             )}
           </SectionCard>
 
-          {/* ── Itens devolvidos ── */}
-          {loading ? (
-            <div style={{ padding: '24px 0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, color: 'var(--text-3)', fontSize: 12.5 }}>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" strokeWidth="2" style={{ animation: 'spin 0.9s linear infinite' }}>
-                <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-                <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" strokeLinecap="round"/>
-              </svg>
-              Carregando itens da nota...
-            </div>
-          ) : itens.length > 0 ? (
-            <SectionCard title="Itens devolvidos" icon="M4 6h16M4 10h16M4 14h16M4 18h16" color="var(--blue)"
-              action={<span style={{ fontSize: 10, fontWeight: 700, background: 'var(--blue-dim)', color: 'var(--blue)', padding: '2px 8px', borderRadius: 20 }}>{itens.length} {itens.length === 1 ? 'item' : 'itens'}</span>}>
+          {/* ── Itens a cobrar (código Linea, valor da NF de venda) ── */}
+          <SectionCard title="Itens a cobrar" icon="M4 6h16M4 10h16M4 14h16M4 18h16" color="var(--blue)"
+            action={<span style={{ fontSize: 10.5, color: 'var(--text-3)' }}>código Linea · valor líquido da NF de venda</span>}>
+            {itensCobrar.length > 0 ? (
               <div style={{ overflowX: 'auto', marginTop: 4 }}>
                 <table className="items-table">
                   <thead>
@@ -213,48 +194,73 @@ export default function ModalCobranca({ row, user, onClose, onSaved }) {
                       <th>Código</th>
                       <th>Produto</th>
                       <th style={{ textAlign: 'right' }}>Qtd</th>
-                      <th style={{ textAlign: 'right' }}>Vl. Unit.</th>
+                      <th style={{ textAlign: 'right' }}>Vl. unit.</th>
                       <th style={{ textAlign: 'right' }}>Total</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {itens.map((it, i) => (
+                    {itensCobrar.map((it, i) => (
                       <tr key={i}>
-                        <td style={{ fontFamily: 'monospace', fontSize: 10.5, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>{it.codigo || '—'}</td>
-                        <td style={{ fontWeight: 500 }} title={it.descricao}>{it.descricao}</td>
+                        <td style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--text)', fontWeight: 600, whiteSpace: 'nowrap' }}>{it.codigo || '—'}</td>
+                        <td style={{ fontWeight: 500 }} title={it.descricao}>
+                          {it.descricao}
+                          {it.motivo && it.motivo !== 'Não voltou ao CD' && <div style={{ fontSize: 10.5, color: 'var(--text-3)' }}>{it.motivo.toLowerCase()}</div>}
+                          {it.alerta && <div style={{ fontSize: 10.5, color: '#B45309' }}>{it.alerta}</div>}
+                        </td>
                         <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
-                          {it.quantidade} <span style={{ color: 'var(--text-3)' }}>{it.unidade}</span>
+                          {qtdTxt(it.qtd)} <span style={{ color: 'var(--text-3)' }}>{it.unidade}</span>
                         </td>
                         <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: 'var(--text-2)' }}>
-                          {it.valor_unitario != null ? fmtBRL(it.valor_unitario) : '—'}
+                          {it.valor_unitario != null ? numProtheus(it.valor_unitario) : '—'}
                         </td>
-                        <td style={{ textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{fmtBRL(it.valor_total)}</td>
+                        <td style={{ textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{it.valor_total != null ? fmtBRL(it.valor_total) : 'a definir'}</td>
                       </tr>
                     ))}
                   </tbody>
                   <tfoot>
                     <tr style={{ background: 'var(--surface-2)' }}>
-                      <td colSpan={4} style={{ padding: '8px 10px', fontSize: 11, fontWeight: 700, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '.04em' }}>Total devolvido</td>
-                      <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 800, fontVariantNumeric: 'tabular-nums', color: 'var(--blue)', fontSize: 13 }}>{fmtBRL(totalItens)}</td>
+                      <td colSpan={4} style={{ padding: '8px 10px', fontSize: 11, fontWeight: 700, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '.04em' }}>Total a cobrar (só produtos)</td>
+                      <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 800, fontVariantNumeric: 'tabular-nums', color: 'var(--blue)', fontSize: 13 }}>{fmtBRL(itensCobrar.reduce((s, it) => s + (Number(it.valor_total) || 0), 0))}</td>
                     </tr>
                   </tfoot>
                 </table>
               </div>
-            </SectionCard>
-          ) : (
-            <SectionCard title="Itens devolvidos" icon="M4 6h16M4 10h16M4 14h16M4 18h16" color="var(--blue)">
+            ) : (
               <div style={{ padding: '12px 0', fontSize: 12, color: 'var(--text-3)', fontStyle: 'italic' }}>
-                Itens não disponíveis no XML desta nota. Valor total da devolução: <strong style={{ color: 'var(--text)' }}>{fmtBRL(dev.valor)}</strong>.
+                {row.situacao === 'conferir_cd' ? 'Voltou ao CD e ainda não tem conferência: importe a planilha do CD para saber o que cobrar.'
+                  : row.situacao === 'isentar' ? 'Tudo voltou ao CD em bom estado: nada a cobrar.'
+                  : 'Sem itens do Protheus para esta nota.'}
               </div>
-            </SectionCard>
-          )}
+            )}
+            {itens.length > 0 && (
+              <div style={{ marginTop: 8 }}>
+                <button className="btn btn-ghost btn-xs" onClick={() => setVerXml(v => !v)}>{verXml ? 'Esconder' : 'Ver'} itens como vieram na NFD do cliente ({itens.length})</button>
+                {verXml && (
+                  <table className="items-table" style={{ marginTop: 6 }}>
+                    <thead><tr><th>Cód. cliente</th><th>Produto</th><th style={{ textAlign: 'right' }}>Qtd</th><th style={{ textAlign: 'right' }}>Total</th></tr></thead>
+                    <tbody>
+                      {itens.map((it, i) => (
+                        <tr key={i}>
+                          <td style={{ fontFamily: 'monospace', fontSize: 10.5, color: 'var(--text-3)' }}>{it.codigo || '—'}</td>
+                          <td>{it.descricao}</td>
+                          <td style={{ textAlign: 'right' }}>{it.quantidade} {it.unidade}</td>
+                          <td style={{ textAlign: 'right' }}>{fmtBRL(it.valor_total)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot><tr><td colSpan={3} style={{ fontSize: 11, color: 'var(--text-3)' }}>Total na NFD do cliente</td><td style={{ textAlign: 'right' }}>{fmtBRL(totalItens)}</td></tr></tfoot>
+                  </table>
+                )}
+              </div>
+            )}
+          </SectionCard>
 
           {/* ── NF original de venda ── */}
           {nfV && (
             <SectionCard title="NF original de venda" icon="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" color="var(--purple)">
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
-                <DataItem label="NF / Série" value={`${nfV.nf_numero} · Série ${nfV.nf_serie}`}/>
-                <DataItem label="Data de entrega" value={fmtDate(nfV.dt_entrega)} accent={nfV.dt_entrega ? 'var(--green)' : undefined}/>
+                <DataItem label="NF / Série" value={`${nfV.nf_numero}${nfV.nf_serie ? ` · Série ${nfV.nf_serie}` : ''}`}/>
+                <DataItem label="Data de entrega" value={nfV.dt_entrega ? `${fmtDate(nfV.dt_entrega)}${nfV.dt_entrega_fonte ? ` · ${nfV.dt_entrega_fonte}` : ''}` : 'sem registro'} accent={nfV.dt_entrega ? 'var(--green)' : 'var(--text-3)'}/>
                 <DataItem label="Valor da venda" value={fmtBRL(nfV.valor_produtos)} accent="var(--blue)"/>
                 <DataItem label="Destino" value={nfV.cidade_destino && nfV.uf_destino ? `${nfV.cidade_destino} / ${nfV.uf_destino}` : nfV.uf_destino}/>
                 <DataItem label="Pedido" value={nfV.pedido}/>
@@ -265,8 +271,18 @@ export default function ModalCobranca({ row, user, onClose, onSaved }) {
           {/* ── Retorno ao CD ── */}
           <RetornoCDSection dev={dev}/>
 
+          {/* ── Em NF de débito ainda não faturada ── */}
+          {row.lote_id && row.situacao === 'em_lote' && (
+            <SectionCard title={`Em NF de débito · lote ${row.lote_numero}`} icon="M9 12l2 2 4-4M21 12a9 9 0 11-18 0 9 9 0 0118 0z" color="#6D4FC2">
+              <DataItem label="Etapa" value={row.lote_pedido ? `Pedido ${row.lote_pedido} emitido · aguardando faturamento` : 'Montando (pedido ainda não registrado)'}/>
+              <div style={{ paddingTop: 10 }}>
+                <button onClick={() => onAbrirLote?.(row.lote_id)} className="btn btn-primary btn-sm">Abrir NF de débito</button>
+              </div>
+            </SectionCard>
+          )}
+
           {/* ── Estado: já cobrado / isento ── */}
-          {!isPendente && (
+          {!isPendente && row.situacao !== 'em_lote' && (
             <SectionCard
               title={row.status_cobranca === 'cobrado' ? 'Cobrança registrada' : 'Cobrança isenta'}
               icon="M9 12l2 2 4-4M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
@@ -281,52 +297,29 @@ export default function ModalCobranca({ row, user, onClose, onSaved }) {
               {row.data_cobranca && (
                 <DataItem label="Registrado por" value={`${row.cobrado_por ? row.cobrado_por + ' · ' : ''}${fmtDateTime(row.data_cobranca)}`} full/>
               )}
-              {!leitura && <div style={{ paddingTop: 10 }}>
-                <button onClick={handleReabrir} disabled={saving} className="btn btn-outline btn-sm">
-                  Reabrir cobrança
-                </button>
-              </div>}
+              {row.lote_pedido && <DataItem label="Pedido de venda" value={row.lote_pedido}/>}
+              <div style={{ paddingTop: 10, display: 'flex', gap: 8 }}>
+                {row.lote_id && <button onClick={() => onAbrirLote?.(row.lote_id)} className="btn btn-outline btn-sm">Abrir NF de débito</button>}
+                {!leitura && !row.lote_id && <button onClick={handleReabrir} disabled={saving} className="btn btn-outline btn-sm">Reabrir cobrança</button>}
+                {!leitura && row.lote_id && row.status_cobranca === 'isento' && <button onClick={handleReabrir} disabled={saving} className="btn btn-outline btn-sm">Reabrir</button>}
+              </div>
             </SectionCard>
           )}
 
           {/* ── Ações para pendente ── */}
           {isPendente && !leitura && (
-            <SectionCard title="Registrar cobrança" icon="M12 8v8m-4-4h8M21 12a9 9 0 11-18 0 9 9 0 0118 0z" color="var(--blue)">
+            <SectionCard title="Cobrar ou isentar" icon="M12 8v8m-4-4h8M21 12a9 9 0 11-18 0 9 9 0 0118 0z" color="var(--blue)">
               <div style={{ display: 'flex', gap: 8, margin: '6px 0 4px' }}>
-                <button onClick={() => { setMode('cobrar'); setErr(''); }} className={`btn btn-sm ${mode === 'cobrar' ? 'btn-primary' : 'btn-outline'}`} style={{ flex: 1 }}>
+                <button onClick={() => onMontar?.(row)} disabled={row.valor_sugerido == null} className="btn btn-sm btn-primary" style={{ flex: 1 }}
+                  title={row.valor_sugerido == null ? 'Falta a conferência do CD' : 'Abre a NF de débito com esta nota; dá para juntar outras depois na lista'}>
                   <Ic d="M9 12l2 2 4-4M21 12a9 9 0 11-18 0 9 9 0 0118 0z" size={13}/>
-                  Marcar como cobrado
+                  Montar NF de débito com esta nota
                 </button>
                 <button onClick={() => { setMode('isentar'); setErr(''); }} className={`btn btn-sm ${mode === 'isentar' ? 'btn-primary' : 'btn-outline'}`} style={{ flex: 1 }}>
                   Isentar
                 </button>
               </div>
-
-              {mode === 'cobrar' && (
-                <div style={{ background: 'var(--blue-dim)', border: '1px solid var(--blue-mid)', borderRadius: 10, padding: '14px 16px', marginTop: 10 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
-                    <div>
-                      <label className="input-label">Número da NF de débito *</label>
-                      <input type="text" value={nfDebito} onChange={e => setNfDebito(e.target.value)} className="input" placeholder="Ex: 12345" autoFocus/>
-                    </div>
-                    <div>
-                      <label className="input-label">Valor cobrado</label>
-                      <input type="text" inputMode="decimal" value={valor} onChange={e => setValor(e.target.value)} className="input" placeholder="0,00"/>
-                    </div>
-                  </div>
-                  <div style={{ marginBottom: 10 }}>
-                    <label className="input-label">Observação (opcional)</label>
-                    <textarea value={obs} onChange={e => setObs(e.target.value)} className="input" rows={2} style={{ resize: 'vertical' }}/>
-                  </div>
-                  {err && <div style={{ color: 'var(--red)', fontSize: 11.5, marginBottom: 8 }}>{err}</div>}
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button onClick={() => setMode(null)} className="btn btn-ghost btn-sm">Cancelar</button>
-                    <button onClick={handleCobrar} disabled={saving} className="btn btn-primary btn-sm">
-                      {saving ? 'Salvando...' : 'Confirmar cobrança'}
-                    </button>
-                  </div>
-                </div>
-              )}
+              <div style={{ fontSize: 11.5, color: 'var(--text-3)', marginTop: 4 }}>Para juntar até 3 notas na mesma NF de débito, marque-as na lista e use "Montar NF de débito".</div>
 
               {mode === 'isentar' && (
                 <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 10, padding: '14px 16px', marginTop: 10 }}>

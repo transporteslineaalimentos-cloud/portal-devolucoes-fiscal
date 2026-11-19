@@ -1027,3 +1027,75 @@ tr.drill-row:hover td { background: var(--blue-dim); }
 .cob-mini-tabela th { position: sticky; top: 0; background: var(--surface-2); text-align: left; font-size: 11px; font-weight: 600; color: var(--text-3); padding: 7px 10px; border-bottom: 1px solid var(--border); }
 .cob-mini-tabela td { padding: 6px 10px; border-bottom: 1px solid var(--border); font-variant-numeric: tabular-nums; }
 .cob-mini-tabela tfoot td { position: sticky; bottom: 0; background: var(--surface-2); font-weight: 700; color: var(--text); }
+
+/* ── NF de débito (lote de cobrança) ─────────────────────────── */
+.nd { max-width: 1020px; width: 100%; max-height: calc(100vh - 32px); display: flex; flex-direction: column; overflow: hidden; }
+.nd-topo { display: flex; justify-content: space-between; gap: 12px; padding: 16px 20px 10px; }
+.nd-sobre { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--text-3); }
+.nd-titulo { display: flex; align-items: center; gap: 10px; font-size: 18px; font-weight: 750; color: var(--text); letter-spacing: -0.01em; margin-top: 3px; min-width: 0; }
+.nd-etapa { font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 99px; white-space: nowrap; flex-shrink: 0; }
+.nd-sub { font-size: 12px; color: var(--text-3); margin-top: 4px; }
+.nd-sub b { color: var(--text); }
+.nd-fechar { color: var(--text-2) !important; background: var(--surface-3) !important; }
+.nd-passos { list-style: none; margin: 0; padding: 8px 20px 12px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; border-bottom: 1px solid var(--border); }
+.nd-passos li { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 8px; align-items: center; padding: 8px 10px; border-radius: 8px; background: var(--surface-2); color: var(--text-3); font-size: 12px; }
+.nd-passos li.atual { background: var(--surface); box-shadow: inset 0 0 0 1.5px var(--c); color: var(--text); font-weight: 650; }
+.nd-passos li.feito { color: var(--text-2); }
+.nd-passo-n { grid-row: span 2; width: 20px; height: 20px; border-radius: 99px; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; background: var(--surface-3); color: var(--text-2); }
+.nd-passos li.atual .nd-passo-n { background: var(--c); color: #fff; }
+.nd-passos li.feito .nd-passo-n { background: #2F855A; color: #fff; }
+.nd-passo-t { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nd-passo-d { font-size: 10.5px; color: var(--text-3); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nd-corpo { overflow-y: auto; padding: 14px 20px; display: flex; flex-direction: column; gap: 14px; }
+.nd-bloco { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; background: var(--surface); }
+.nd-bloco-tit { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 10px; }
+.nd-bloco-dica { font-size: 11px; font-weight: 500; color: var(--text-3); }
+.nd-grade { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+.nd-campo-rot { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--text-3); margin-bottom: 4px; }
+.nd-campo-rot span { text-transform: none; letter-spacing: 0; font-weight: 500; }
+.nd-campo-val { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 650; color: var(--text); font-variant-numeric: tabular-nums; }
+.nd-obs { display: flex; gap: 6px; align-items: flex-start; }
+.nd-obs textarea { flex: 1; font-size: 12.5px; resize: vertical; }
+.nd-copiar { all: unset; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 4px; border-radius: 6px; color: var(--text-3); font-size: 10.5px; font-weight: 600; flex-shrink: 0; }
+.nd-copiar:hover { background: var(--blue-dim); color: var(--blue); }
+.nd-copiar:focus-visible { outline: 2px solid var(--blue); }
+.nd-copiar.ok { color: #2F855A; background: #E6F4EC; }
+.nd-itens-topo { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 14px 0 8px; }
+.nd-itens-tit { font-size: 12.5px; font-weight: 700; color: var(--text); }
+.nd-itens-tit span { font-weight: 500; color: var(--text-3); font-size: 11.5px; }
+.nd-seg { display: inline-flex; background: var(--surface-3); border-radius: 8px; padding: 2px; }
+.nd-seg button { all: unset; cursor: pointer; font-size: 11.5px; padding: 4px 10px; border-radius: 6px; color: var(--text-2); }
+.nd-seg button.on { background: var(--surface); color: var(--text); font-weight: 650; box-shadow: var(--shadow-xs); }
+.nd-tabela-wrap { border: 1px solid var(--border); border-radius: 8px; overflow: auto; max-height: 48vh; }
+.nd-tabela { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.nd-tabela th { position: sticky; top: 0; z-index: 1; background: var(--surface-2); text-align: left; font-size: 11px; font-weight: 600; color: var(--text-2); padding: 7px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.nd-tabela td { padding: 5px 10px; border-bottom: 1px solid var(--border); color: var(--text-2); font-variant-numeric: tabular-nums; vertical-align: middle; }
+.nd-tabela .dir { text-align: right; }
+.nd-tabela td.mono { font-family: ui-monospace, Menlo, monospace; color: var(--text); font-weight: 600; white-space: nowrap; }
+.nd-tabela tr.alerta td:first-child { box-shadow: inset 3px 0 0 #D97706; }
+.nd-tabela tr.nd-nota-linha td { background: var(--surface-2); color: var(--text); font-size: 12px; padding-top: 7px; padding-bottom: 7px; }
+.nd-tabela tfoot td { position: sticky; bottom: 0; background: var(--surface-2); font-weight: 750; color: var(--text); padding: 8px 10px; }
+.nd-cel { display: inline-flex; align-items: center; gap: 2px; }
+.nd-cel.dir { justify-content: flex-end; width: 100%; }
+.nd-linha-sub { font-size: 10.5px; color: var(--text-3); }
+.nd-alertas { margin: 10px 0 0; padding: 10px 12px 10px 28px; font-size: 12px; color: #7A4E00; background: #FFF6E0; border: 1px solid #F5D78E; border-radius: 8px; display: flex; flex-direction: column; gap: 3px; }
+.nd-reg-linha { display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--text-2); padding: 6px 0; border-bottom: 1px solid var(--border); }
+.nd-reg-linha b { color: var(--text); font-size: 14px; }
+.nd-reg-dt { color: var(--text-3); }
+.nd-form { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+.nd-form label { display: flex; flex-direction: column; gap: 4px; font-size: 11px; font-weight: 600; color: var(--text-2); }
+.nd-form label .input { min-width: 170px; }
+.nd-nota { font-size: 11.5px; color: var(--text-3); margin-top: 8px; }
+.nd-erro { font-size: 12px; color: var(--red); margin-top: 8px; }
+.nd-rodape { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+@media (max-width: 720px) {
+  .nd-passos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* ── Aba Cobrança: NFs de débito ─────────────────────────────── */
+.cob-modo { display: inline-flex; background: var(--surface-3); border-radius: 10px; padding: 3px; align-self: flex-start; }
+.cob-modo button { all: unset; cursor: pointer; font-size: 13px; padding: 6px 14px; border-radius: 8px; color: var(--text-2); display: inline-flex; gap: 7px; align-items: center; }
+.cob-modo button.on { background: var(--surface); color: var(--text); font-weight: 650; box-shadow: var(--shadow-xs); }
+.cob-modo button:focus-visible { outline: 2px solid var(--blue); }
+.cob-filtro { font-size: 12px; padding: 5px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); max-width: 220px; }
+.cob-filial { display: inline-block; font-size: 10px; font-weight: 700; padding: 0 6px; border-radius: 4px; margin-left: 6px; vertical-align: 1px; }
