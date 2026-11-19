@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { login as apiLogin, refreshToken, dbGetUser, syncAuthToken } from '../config/supabase';
+import { login as apiLogin, refreshToken, dbGetUser, syncAuthToken, aplicarSessao } from '../config/supabase';
 
 const AuthCtx = createContext(null);
 
@@ -21,7 +21,7 @@ export function AuthProvider({ children }) {
         }
         localStorage.setItem('df_token', refreshed.token);
         localStorage.setItem('df_refresh', refreshed.refresh);
-        syncAuthToken();
+        await aplicarSessao();
         const stored = localStorage.getItem('df_user');
         if (stored) {
           const u = JSON.parse(stored);
@@ -49,7 +49,7 @@ export function AuthProvider({ children }) {
     //    (faz isso ANTES de salvar o token — auth já foi validado acima)
     localStorage.setItem('df_token', result.token);
     localStorage.setItem('df_refresh', result.refresh);
-    syncAuthToken();
+    await aplicarSessao();
 
     const profile = await dbGetUser(email);
     if (!profile) {

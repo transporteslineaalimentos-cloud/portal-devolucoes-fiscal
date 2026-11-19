@@ -30,15 +30,23 @@ supabase.auth.onAuthStateChange((evento, sessao) => {
   } catch { /* ignore */ }
 });
 
+let sessaoPendente = Promise.resolve();
 export function syncAuthToken() {
   try {
     const token   = localStorage.getItem('df_token');
     const refresh = localStorage.getItem('df_refresh');
     if (token && refresh && token !== tokenAplicado) {
       tokenAplicado = token;
-      supabase.auth.setSession({ access_token: token, refresh_token: refresh }).catch(() => {});
+      sessaoPendente = supabase.auth.setSession({ access_token: token, refresh_token: refresh }).catch(() => {});
     }
   } catch { /* ignore */ }
+  return sessaoPendente;
+}
+
+/** Aplica o login salvo e espera ficar pronto. Usado logo depois de entrar: sem esperar,
+ *  a primeira consulta saía sem login e o portal respondia "Acesso não autorizado". */
+export async function aplicarSessao() {
+  await syncAuthToken();
 }
 
 export async function login(email, password) {
