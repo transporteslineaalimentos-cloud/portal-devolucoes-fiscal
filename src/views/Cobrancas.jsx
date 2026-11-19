@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { dbGetCobrancas, dbCobrancaAcao, dbGetCobrancaLotes, dbCobrancaLoteCriar } from '../config/supabase';
+import { dbGetCobrancas, dbCobrancaAcao, dbGetCobrancaLotes, dbCobrancaLoteCriar, dbGetMeusCanais, dbSalvarMeusCanais } from '../config/supabase';
 import { fmtBRL, fmtDate } from '../utils.jsx';
 import { somenteLeitura } from '../lib/permissoes.js';
 import ModalCobranca from '../components/ModalCobranca.jsx';
@@ -208,6 +208,50 @@ const COLS = [
   { k: 'sit',    t: 'Situação',       s: r => r.situacao },
 ];
 
+/* ─── Canais (centro de custo da NF de venda) ──────────────── */
+function FiltroCanais({ canais, sel, salvos, onMudar, onSalvar, salvando }) {
+  const [aberto, setAberto] = useState(false);
+  useEffect(() => {
+    if (!aberto) return;
+    const fechar = (e) => { if (!e.target.closest?.('.cob-canais')) setAberto(false); };
+    document.addEventListener('mousedown', fechar); return () => document.removeEventListener('mousedown', fechar);
+  }, [aberto]);
+  const igual = (a, b) => a.length === b.length && a.every(x => b.includes(x));
+  const ehMeus = salvos.length > 0 && igual(sel, salvos);
+  const rotulo = sel.length === 0 ? 'Todos os canais' : sel.length <= 2 ? sel.join(', ') : `${sel.length} canais`;
+  const alternar = (c) => onMudar(sel.includes(c) ? sel.filter(x => x !== c) : [...sel, c]);
+  return (
+    <div className="cob-canais">
+      <button type="button" className={`cob-canais-btn${sel.length ? ' on' : ''}`} onClick={() => setAberto(a => !a)} aria-expanded={aberto}>
+        <span className="cob-canais-rot">{ehMeus ? 'Meus canais' : 'Canais'}</span>
+        <b>{rotulo}</b><span aria-hidden="true">▾</span>
+      </button>
+      {aberto && (
+        <div className="cob-canais-pop" role="dialog" aria-label="Escolher canais">
+          <div className="cob-canais-tit">Canal (centro de custo da NF de venda)</div>
+          <div className="cob-canais-lista">
+            {canais.map(c => (
+              <label key={c.canal} className={sel.includes(c.canal) ? 'on' : ''}>
+                <input type="checkbox" checked={sel.includes(c.canal)} onChange={() => alternar(c.canal)}/>
+                <span>{c.canal}</span><small>{c.pend} pend.</small>
+              </label>
+            ))}
+          </div>
+          <div className="cob-canais-acoes">
+            <button className="btn btn-ghost btn-xs" onClick={() => onMudar([])}>Ver todos</button>
+            {salvos.length > 0 && !ehMeus && <button className="btn btn-ghost btn-xs" onClick={() => onMudar(salvos)}>Voltar aos meus canais</button>}
+            <button className="btn btn-primary btn-xs" style={{ marginLeft: 'auto' }} disabled={salvando || igual(sel, salvos)}
+              onClick={() => onSalvar(sel)} title="O portal passa a abrir sempre com estes canais">
+              {salvando ? 'Salvando…' : sel.length ? 'Salvar como meus canais' : 'Abrir sempre com todos'}
+            </button>
+          </div>
+          <div className="cob-canais-dica">{salvos.length ? `Seus canais salvos: ${salvos.join(', ')}.` : 'Escolha os seus canais e salve: a aba Cobranças passa a abrir sempre com eles.'}</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
   const leitura = somenteLeitura(user);
   const [rows, setRows] = useState(null);
@@ -228,6 +272,9 @@ export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
   const [aviso, setAviso] = useState('');
   const [gerando, setGerando] = useState(false);
   const [montando, setMontando] = useState(false);
+  const [fCanais, setFCanais] = useState([]);       // [] = todos
+  const [canaisSalvos, setCanaisSalvos] = useState([]);
+  const [salvandoCanais, setSalvandoCanais] = useState(false);
 
   const carregar = useCallback(async () => {
     setErro('');
@@ -238,6 +285,16 @@ export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
     } catch (e) { setErro(e.message); setRows(r => r || []); setLotes(l => l || []); }
   }, []);
   useEffect(() => { carregar(); }, [carregar]);
+  // abre com os canais salvos da analista
+  useEffect(() => {
+    dbGetMeusCanais().then(c => { setCanaisSalvos(c); setFCanais(c); }).catch(() => {});
+  }, []);
+  const salvarCanais = async (c) => {
+    setSalvandoCanais(true);
+    try { await dbSalvarMeusCanais(c); setCanaisSalvos(c); setAviso(c.length ? 'Canais salvos: a aba vai abrir sempre com eles.' : 'Pronto: a aba vai abrir sempre com todos os canais.'); }
+    catch (e) { alert(e.message); }
+    setSalvandoCanais(false);
+  };
 
   // atalhos vindos de outras telas (ex.: painel de pendências)
   const initKey = JSON.stringify(initialFilters);
@@ -252,7 +309,14 @@ export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
 
   useEffect(() => { if (!aviso) return; const t = setTimeout(() => setAviso(''), 5000); return () => clearTimeout(t); }, [aviso]);
 
-  const todas = useMemo(() => rows || [], [rows]);
+  const todasSemFiltro = useMemo(() => rows || [], [rows]);
+  const lotesFiltrados = useMemo(() => !fCanais.length ? (lotes || []) : (lotes || []).filter(l => (l.notas || []).some(n => fCanais.includes(n.canal || 'Sem canal'))), [lotes, fCanais]);
+  const canaisDisp = useMemo(() => {
+    const m = new Map();
+    todasSemFiltro.forEach(r => { const k = r.canal || 'Sem canal'; const g = m.get(k) || { canal: k, pend: 0 }; if (ehPendente(r)) g.pend++; m.set(k, g); });
+    return [...m.values()].sort((a, b) => b.pend - a.pend || a.canal.localeCompare(b.canal));
+  }, [todasSemFiltro]);
+  const todas = useMemo(() => fCanais.length ? todasSemFiltro.filter(r => fCanais.includes(r.canal || 'Sem canal')) : todasSemFiltro, [todasSemFiltro, fCanais]);
   const naFila = (r, f = fila) => f === 'todas' || (f === 'pendentes' ? ehPendente(r) : r.situacao === f);
   const motivos = useMemo(() => [...new Set(todas.map(r => r.motivo_devolucao).filter(Boolean))].sort(), [todas]);
 
@@ -271,10 +335,10 @@ export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
       if (r.situacao === 'isento') { o.isento.q++; o.isento.v += Number(r.valor) || 0; }
     });
     let maisVelhaPedido = 0;
-    (lotes || []).filter(l => l.etapa === 'pedido').forEach(l => { o.aguard.q++; o.aguard.v += Number(l.valor_total) || 0; maisVelhaPedido = Math.max(maisVelhaPedido, l.dias_etapa || 0); });
+    lotesFiltrados.filter(l => l.etapa === 'pedido').forEach(l => { o.aguard.q++; o.aguard.v += Number(l.valor_total) || 0; maisVelhaPedido = Math.max(maisVelhaPedido, l.dias_etapa || 0); });
     const maisVelha = Math.max(0, ...todas.filter(ehPendente).map(r => r._dias || 0));
     return { ...o, por, maisVelha, maisVelhaPedido };
-  }, [todas, lotes]);
+  }, [todas, lotesFiltrados]);
 
   const filtrada = (x) => (!fMotivo || x.motivo_devolucao === fMotivo) && (!fFilial || x.filial === fFilial);
 
@@ -359,7 +423,7 @@ export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
   const verSit = fila === 'pendentes' || fila === 'todas';
   const cols = verSit ? COLS : COLS.filter(c => c.k !== 'sit');
   const nomeTransp = transp ? transportadores.find(t => t.k === transp)?.nome : null;
-  const nLotesAbertos = (lotes || []).filter(l => l.meu && ['montando', 'pedido', 'faturado'].includes(l.etapa)).length;
+  const nLotesAbertos = lotesFiltrados.filter(l => l.meu && ['montando', 'pedido', 'faturado'].includes(l.etapa)).length;
 
   return (
     <div className="cob" style={{ paddingBottom: sel.length ? 84 : 0 }}>
@@ -377,14 +441,17 @@ export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
           nota={`${plural(resumo.cobrado.q, 'nota', 'notas')} com NF de débito`}/>
       </div>
 
+      <div className="cob-linha-modo">
       <div className="cob-modo" role="tablist" aria-label="Ver">
         <button role="tab" aria-selected={modo === 'notas'} className={modo === 'notas' ? 'on' : ''} onClick={() => setModo('notas')}>Notas a cobrar</button>
         <button role="tab" aria-selected={modo === 'nfs'} className={modo === 'nfs' ? 'on' : ''} onClick={() => setModo('nfs')}>
           NFs de débito{nLotesAbertos > 0 && <span className="cob-fila-n">{nLotesAbertos} {nLotesAbertos === 1 ? 'sua em andamento' : 'suas em andamento'}</span>}
         </button>
       </div>
+      <FiltroCanais canais={canaisDisp} sel={fCanais} salvos={canaisSalvos} onMudar={(c) => { setFCanais(c); setSelIds(new Set()); setTransp(null); }} onSalvar={salvarCanais} salvando={salvandoCanais}/>
+      </div>
 
-      {modo === 'nfs' && <ListaLotes key={user?.email} lotes={lotes} onAbrir={setLoteAberto} onAviso={setAviso}/>}
+      {modo === 'nfs' && <ListaLotes key={user?.email} lotes={lotes === null ? null : lotesFiltrados} onAbrir={setLoteAberto} onAviso={setAviso}/>}
 
       {modo === 'notas' && <>
       {/* ── Filas ── */}
@@ -515,6 +582,7 @@ export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
                           ? <div className="ellipsis" title={r.transportador_cobranca}>{r.transportador_cobranca}</div>
                           : <span style={{ color: 'var(--text-3)', fontStyle: 'italic' }}>Não identificado</span>}
                         <div className="cob-sub ellipsis" title={r.motivo_devolucao}>{r.motivo_devolucao || 'sem motivo'}</div>
+                        {r.canal && <div className="cob-sub ellipsis" title="Canal (centro de custo da NF de venda)">{r.canal}</div>}
                       </td>
                       <td title={r.dt_entrega_fonte ? `Fonte: ${r.dt_entrega_fonte}` : 'Sem registro de entrega da NF de venda'}>
                         {r.dt_entrega ? <span style={{ color: 'var(--text)' }}>{fmtDate(r.dt_entrega)}</span> : <span style={{ color: 'var(--text-3)' }}>—</span>}

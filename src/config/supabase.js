@@ -713,6 +713,19 @@ export async function dbCobrancaLoteTransferir(lote, email) {
   if (error) throw new Error(error.message);
 }
 
+// Canais (centro de custo) que a analista acompanha nas cobranças: salvos no cadastro dela
+export async function dbGetMeusCanais() {
+  syncAuthToken();
+  const { data, error } = await supabase.rpc('get_meus_canais');
+  if (error) throw new Error(error.message);
+  return Array.isArray(data) ? data : [];
+}
+export async function dbSalvarMeusCanais(canais) {
+  syncAuthToken();
+  const { error } = await supabase.rpc('salvar_meus_canais', { p_canais: canais });
+  if (error) throw new Error(error.message);
+}
+
 // ── Usuários do portal ─────────────────────────────────────
 export async function dbGetUsuarios() {
   syncAuthToken();
