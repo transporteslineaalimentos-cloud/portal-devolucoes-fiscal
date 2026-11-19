@@ -37,7 +37,7 @@ export const PASSOS = [
       '**Protheus:** digite o pedido de venda e salve.',
       '**Portal:** registre o nº do pedido.',
       '**Protheus:** libere o pedido. Se cair em crédito, o **financeiro** libera. Depois gere a NF no Prep.doc.saída.',
-      '**Portal:** registre o nº da NF (uma ou várias de uma vez).',
+      '**Portal:** registre o nº da NF de débito (cada pedido vira uma NF).',
       '**Protheus:** baixe o PDF da NF (DANFE).',
       '**Portal:** baixe a relação em Excel, envie ao transportador e marque como enviada.',
     ],
@@ -182,18 +182,6 @@ export const PASSOS = [
     titulo: 'Registre o número da NF de débito',
     texto: ['Abra a NF de débito no portal (aba **NFs de débito**). No passo **4**, digite o número da NF e clique em **Registrar NF de débito**. As notas ficam como **cobradas**.'],
     imagens: [img('p-05-nf', 'Número da NF digitado e o botão Registrar NF de débito.')],
-  },
-  {
-    id: 'reg-varias', grupo: 'registrar', sistema: 'portal', onde: 'NFs de débito › Com pedido, sem NF de débito',
-    titulo: 'Várias faturadas? Registre todas de uma vez',
-    texto: [
-      'Na aba **NFs de débito**, clique no cartão **Com pedido, sem NF de débito**. Marque as que o financeiro faturou e clique em **Registrar NFs de débito** na barra de baixo.',
-      'Abre uma lista com cada pedido: digite o número da NF ao lado de cada um e clique em **Registrar**. As que ficarem em branco continuam aguardando.',
-    ],
-    imagens: [
-      img('p-09-pedidos', 'Pedidos marcados e o botão Registrar NFs de débito.'),
-      img('p-09b-registrar', 'Um número de NF para cada pedido.'),
-    ],
   },
 
   /* ── 5 · PDF da NF ── */
