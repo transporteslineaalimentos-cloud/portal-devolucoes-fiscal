@@ -1,7 +1,9 @@
 import { calcStatusOperacional } from '../utils.jsx';
 const CANAIS = { 'CANAL INDIRETO':'CNI - CANAL INDIRETO','CANAL DIRETO':'CND - CANAL DIRETO','FARMA KEY ACCOUNT':'FKA - FARMA KEY ACCOUNT','CASH & CARRY':'CRY - CASH & CARRY','KEY ACCOUNT':'KEY - KEY ACCOUNT','ECOMMERCE':'ECO - ECOMMERCE','NOVOS NEGÓCIOS':'NNG - NOVOS NEGÓCIOS','CANAL VERDE':'CNV - CANAL VERDE' };
 const canalDe = (cc) => cc ? (CANAIS[String(cc).toUpperCase()] || String(cc).toUpperCase()) : '';
-import * as XLSX from 'xlsx';
+// xlsx só é baixado quando alguém importa uma planilha (deixa as abas mais leves)
+let XLSX = null;
+const carregarXLSX = async () => (XLSX ??= await import('xlsx'));
 import { CNPJ_MAP } from '../utils.jsx';
 
 const fmtDateCell = (d) => {
@@ -91,7 +93,8 @@ export function mapDevolucaoRow(r) {
   });
 }
 
-export function exportDevolucoesToExcel(rows, { filename = 'devolucoes_fiscais' } = {}) {
+export async function exportDevolucoesToExcel(rows, { filename = 'devolucoes_fiscais' } = {}) {
+  await carregarXLSX();
   // ── Aba 1: Devoluções (uma linha por NF) ──────────────────
   const devSheet = rows.map(mapDevolucaoRow);
 
@@ -156,7 +159,6 @@ function calcAging(dtLancamento) {
 }
 
 export function exportCobrancasToExcel(rows, { filename = 'cobrancas_transportadores' } = {}) {
-  const XLSX = window._XLSX || null;
   // importa dinamicamente
   return import('xlsx').then(({ utils, writeFile }) => {
     const data = rows.map(r => ({
@@ -227,7 +229,8 @@ function sheetComTitulo(titulo, linhas) {
   return ws;
 }
 
-export function exportPainelGerencialExcel(painel, notas, { ano, mesIni, mesFim }) {
+export async function exportPainelGerencialExcel(painel, notas, { ano, mesIni, mesFim }) {
+  await carregarXLSX();
   const periodo = mesIni === mesFim ? `${MESES_PT[mesIni - 1]}/${ano}` : `${MESES_PT[mesIni - 1]} a ${MESES_PT[mesFim - 1]}/${ano}`;
   const meses = (painel.meses || []).filter(m => m.mes >= mesIni && m.mes <= mesFim);
   const fatMes = Object.fromEntries(meses.map(m => [m.mes, Number(m.faturamento) || 0]));

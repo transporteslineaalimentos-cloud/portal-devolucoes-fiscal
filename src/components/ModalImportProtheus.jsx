@@ -1,5 +1,7 @@
 import { useState, useRef } from 'react';
-import * as XLSX from 'xlsx';
+// xlsx só é baixado quando alguém importa uma planilha (deixa as abas mais leves)
+let XLSX = null;
+const carregarXLSX = async () => (XLSX ??= await import('xlsx'));
 import { dbImportProtheusLancamentos } from '../config/supabase';
 
 const Ic = ({ d, size = 14, color = 'currentColor' }) => (
@@ -35,7 +37,8 @@ function num(v) {
   return parseFloat(String(v).replace(',', '.')) || 0;
 }
 
-function parseWorkbook(arrayBuffer) {
+async function parseWorkbook(arrayBuffer) {
+  await carregarXLSX();
   const wb = XLSX.read(arrayBuffer, { type: 'array', cellDates: false });
   const ws = wb.Sheets[wb.SheetNames[0]];
   const rows = XLSX.utils.sheet_to_json(ws, { defval: null });
@@ -96,7 +99,7 @@ export default function ModalImportProtheus({ onClose, onImported }) {
     if (!f) return;
     try {
       const buf = await f.arrayBuffer();
-      const lancamentos = parseWorkbook(buf);
+      const lancamentos = await parseWorkbook(buf);
       if (!lancamentos.length) {
         setError('Nenhum lançamento encontrado. Verifique se a planilha tem a coluna "NF" preenchida.');
         return;

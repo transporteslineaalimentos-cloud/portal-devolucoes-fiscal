@@ -1,5 +1,7 @@
 import { useState, useRef } from 'react';
-import * as XLSX from 'xlsx';
+// xlsx só é baixado quando alguém importa uma planilha (deixa as abas mais leves)
+let XLSX = null;
+const carregarXLSX = async () => (XLSX ??= await import('xlsx'));
 import { dbImportRetornoCD } from '../config/supabase';
 
 const Ic = ({ d, size = 14, color = 'currentColor' }) => (
@@ -35,7 +37,8 @@ function getCol(row, ...names) {
   return null;
 }
 
-function parseWorkbook(arrayBuffer) {
+async function parseWorkbook(arrayBuffer) {
+  await carregarXLSX();
   const wb = XLSX.read(arrayBuffer, { type: 'array', cellDates: false });
   const ws = wb.Sheets[wb.SheetNames[0]];
   const rows = XLSX.utils.sheet_to_json(ws, { defval: null });
@@ -106,7 +109,7 @@ export default function ModalImportRetornoCD({ onClose, onDone }) {
     setErr('');
     try {
       const buf = await file.arrayBuffer();
-      const parsed = parseWorkbook(buf);
+      const parsed = await parseWorkbook(buf);
       setPreview(parsed);
       setStep('preview');
     } catch (e) {

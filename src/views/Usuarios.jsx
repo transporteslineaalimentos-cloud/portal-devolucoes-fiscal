@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useAbaAtiva } from '../lib/abaAtiva.js';
 import { dbGetUsuarios, dbUsuariosAcao } from '../config/supabase';
 import { fmtDateTime } from '../utils.jsx';
 import { ABAS, abasPadrao } from '../lib/permissoes.js';
@@ -83,6 +84,7 @@ function EscolhaAbas({ valor, onChange }) {
 const ordenarAbas = (lista) => ABAS.map(a => a.id).filter(id => lista.includes(id));
 
 export default function Usuarios({ user }) {
+  const ativa = useAbaAtiva();
   const [lista, setLista] = useState(null);
   const [erro, setErro] = useState('');
   const [aviso, setAviso] = useState('');
@@ -164,7 +166,7 @@ export default function Usuarios({ user }) {
         </div>
       </div>
 
-      {aviso && createPortal(<div className="cob-toast" role="status">{aviso}</div>, document.body)}
+      {aviso && ativa && createPortal(<div className="cob-toast" role="status">{aviso}</div>, document.body)}
 
       {modal?.tipo === 'novo' && (
         <Modal titulo="Novo usuário" sub="A pessoa entra com o e-mail corporativo e a senha inicial" onClose={() => !salvando && setModal(null)}

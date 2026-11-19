@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { dbAtualizarMassa, dbGetMotivos, dbGetTransportadoras } from '../config/supabase';
 import { STATUS_OP_MANUAIS } from '../utils.jsx';
+import { useAbaAtiva } from '../lib/abaAtiva.js';
 
 /* Barra que aparece quando há notas marcadas na lista.
    Muda de uma vez o que hoje se muda nota por nota. */
@@ -14,6 +15,7 @@ const CAMPOS = [
 ];
 
 export default function BarraSelecao({ ids, onLimpar, onAplicado }) {
+  const ativa = useAbaAtiva();
   const [campo, setCampo] = useState('status_operacional');
   const [valor, setValor] = useState('');
   const [motivos, setMotivos] = useState([]);
@@ -63,6 +65,7 @@ export default function BarraSelecao({ ids, onLimpar, onAplicado }) {
     return () => window.removeEventListener('resize', medir);
   }, []);
 
+  if (!ativa) return null;
   return createPortal(
     <div role="region" aria-label="Alterar notas marcadas" style={{ position: 'fixed', bottom: 16, left: pos?.left ?? 16, right: pos?.right ?? 16,
       zIndex: 400, background: 'var(--surface)', border: '1px solid var(--border)', borderTop: '3px solid var(--blue)',

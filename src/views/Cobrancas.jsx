@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { dbGetCobrancas, dbCobrancaAcao, dbGetCobrancaLotes, dbCobrancaLoteCriar, dbCobrancaLoteAcao, dbGetMeusCanais, dbSalvarMeusCanais } from '../config/supabase';
 import { fmtBRL, fmtDate } from '../utils.jsx';
@@ -7,6 +7,7 @@ import ModalCobranca from '../components/ModalCobranca.jsx';
 import ModalImportRetornoCD from '../components/ModalImportRetornoCD.jsx';
 import { baixarEspelhoCobranca, valorACobrar } from '../utils/espelhoCobranca.js';
 import ModalLote from '../components/ModalLote.jsx';
+import { useAbaAtiva, useAoVoltar } from '../lib/abaAtiva.js';
 import ModalTutorialNFDebito, { abrirTutorialJanela } from '../components/ModalTutorialNFDebito.jsx';
 import { ETAPA, ETAPAS, FILIAL_NOME, baixarRelacaoLotes, refNota } from '../utils/notaDebito.js';
 
@@ -179,7 +180,8 @@ function BarraAcoes({ sel, onMontar, onIsentar, onReabrir, onEspelho, onLimpar, 
     medir(); window.addEventListener('resize', medir);
     return () => window.removeEventListener('resize', medir);
   }, []);
-  if (!pos) return null;
+  const ativa = useAbaAtiva();
+  if (!pos || !ativa) return null;
   const pend = sel.filter(ehPendente), fech = sel.filter(r => !ehPendente(r) && r.situacao !== 'em_lote');
   const aCobrar = pend.reduce((a, r) => a + (Number(r.valor_sugerido) || 0), 0);
   return createPortal(
@@ -264,6 +266,7 @@ export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
   const [fila, setFila] = useState('pendentes');
   const [transp, setTransp] = useState(null);
   const [busca, setBusca] = useState('');
+  const buscaAdiada = useDeferredValue(busca);   // digitar não trava enquanto a lista refiltra
   const [fMotivo, setFMotivo] = useState('');
   const [fFilial, setFFilial] = useState('');
   const [ord, setOrd] = useState({ k: 'dias', dir: -1 });
@@ -289,6 +292,8 @@ export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
     } catch (e) { setErro(e.message); setRows(r => r || []); setLotes(l => l || []); }
   }, []);
   useEffect(() => { carregar(); }, [carregar]);
+  const ativa = useAbaAtiva();
+  useAoVoltar(carregar, 30000);   // voltou para a aba: atualiza em segundo plano
   // abre com os canais salvos da analista
   useEffect(() => {
     dbGetMeusCanais().then(c => { setCanaisSalvos(c); setFCanais(c); }).catch(() => {});
@@ -363,13 +368,13 @@ export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
 
   /* Lista */
   const visiveis = useMemo(() => {
-    const q = busca.trim().toLowerCase();
+    const q = buscaAdiada.trim().toLowerCase();
     let r = todas.filter(x => naFila(x) && filtrada(x) && (!transp || chaveTransp(x) === transp));
     if (q) r = r.filter(x => [x.nf_numero, x.nf_venda, x.nome_emitente, x.cnpj_emitente, x.transportador_cobranca, x.motivo_devolucao, x.nf_debito, x.lote_pedido, x.uf_emitente]
       .some(v => String(v ?? '').toLowerCase().includes(q)));
     const col = COLS.find(c => c.k === ord.k) || COLS[4];
     return [...r].sort((a, b) => { const va = col.s(a), vb = col.s(b); return (va > vb ? 1 : va < vb ? -1 : 0) * ord.dir; });
-  }, [todas, fila, transp, busca, ord, fMotivo, fFilial]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [todas, fila, transp, buscaAdiada, ord, fMotivo, fFilial]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const totVis = visiveis.reduce((a, r) => ({ v: a.v + (Number(r.valor_produtos) || 0), c: a.c + valorACobrar(r) }), { v: 0, c: 0 });
   const sel = todas.filter(r => selIds.has(r.id));
@@ -615,7 +620,7 @@ export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
       </div>
       </>}
 
-      {aviso && createPortal(<div className="cob-toast" role="status"><Ic d={I.check} size={14} color="#6EE7A8" sw={2.4}/>{aviso}</div>, document.body)}
+      {aviso && ativa && createPortal(<div className="cob-toast" role="status"><Ic d={I.check} size={14} color="#6EE7A8" sw={2.4}/>{aviso}</div>, document.body)}
 
       {modo === 'notas' && sel.length > 0 && (
         <BarraAcoes sel={sel} leitura={leitura}
@@ -645,7 +650,6 @@ export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
   );
 }
 
-function ehPendenteFila(f) { return f === 'pendentes' || PENDENTES.includes(f); }
 
 /* ─── NFs de débito ────────────────────────────────────────── */
 const RAPIDOS = [
@@ -656,19 +660,21 @@ const RAPIDOS = [
 ];
 
 function ListaLotes({ lotes, onAbrir, onAviso, onRecarregar, leitura }) {
+  const ativaL = useAbaAtiva();
   const temMinhas = (lotes || []).some(l => l.meu);
   const [escopo, setQuem] = useState('minhas');    // sempre abre em "Minhas NFs de débito"
   const [etapa, setEtapa] = useState('abertas');
   const [busca, setBusca] = useState('');
+  const buscaAdiada = useDeferredValue(busca);   // digitar não trava enquanto a lista refiltra
   const [sel, setSel] = useState(() => new Set());
   const base = useMemo(() => (lotes || []).filter(l => escopo === 'todas' || l.meu), [lotes, escopo]);
   const naEtapa = (l, k) => k === 'todas' || (k === 'abertas' ? ['montando', 'pedido', 'faturado'].includes(l.etapa) : l.etapa === k);
   const lista = useMemo(() => {
-    const q = busca.trim().toLowerCase();
+    const q = buscaAdiada.trim().toLowerCase();
     return base.filter(l => naEtapa(l, etapa)
       && (!q || [l.transportador_nome, l.pedido, l.nf_debito, l.motivo, l.numero, l.criado_por, ...(l.notas || []).flatMap(n => [n.nf_numero, n.nf_venda, n.nome_emitente])]
         .some(v => String(v ?? '').toLowerCase().includes(q))));
-  }, [base, etapa, busca]);
+  }, [base, etapa, buscaAdiada]);
   const conta = (k) => base.filter(l => naEtapa(l, k)).length;
   const marcados = (lotes || []).filter(l => sel.has(l.id));
   const [dtEnvio, setDtEnvio] = useState(() => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10));
@@ -791,7 +797,7 @@ function ListaLotes({ lotes, onAbrir, onAviso, onRecarregar, leitura }) {
           </table>
         </div>
       </section>
-      {marcados.length > 0 && createPortal(
+      {marcados.length > 0 && ativaL && createPortal(
         <div className="cob-barra ld-barra" role="region" aria-label="Ações nas NFs de débito marcadas">
           <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
             <strong style={{ fontSize: 13 }}>{plural(marcados.length, 'NF de débito marcada', 'NFs de débito marcadas')}</strong>

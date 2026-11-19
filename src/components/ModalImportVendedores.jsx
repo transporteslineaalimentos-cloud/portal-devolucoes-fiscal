@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
-import * as XLSX from 'xlsx';
+// xlsx só é baixado quando alguém importa uma planilha (deixa as abas mais leves)
+let XLSX = null;
+const carregarXLSX = async () => (XLSX ??= await import('xlsx'));
 import { dbImportarClientesVendedor, dbSyncVendedoresGobi, dbInfoClientesVendedor } from '../config/supabase';
 
 /* ─────────────────────────────────────────────────────────────
@@ -43,6 +45,7 @@ function documento(v) {
 }
 
 async function lerPlanilha(arquivo) {
+  await carregarXLSX();
   const wb = XLSX.read(await arquivo.arrayBuffer(), { type: 'array' });
   const ws = wb.Sheets[wb.SheetNames[0]];
   const rows = XLSX.utils.sheet_to_json(ws, { defval: null, raw: true });

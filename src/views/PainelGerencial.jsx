@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useAoVoltar } from '../lib/abaAtiva.js';
 import { dbGetPainelGerencial, dbExportDevolucoes, dbInfoClientesVendedor, dbGetSituacaoLanc, dbGetProtheusSemPortal } from '../config/supabase';
 import { baixarListaNotas } from '../utils/planilhaLista.js';
 import { exportPainelGerencialExcel } from '../utils/exportExcel.js';
@@ -681,6 +682,7 @@ export default function PainelGerencial({ onGoTo, user }) {
   }, [ano, ini, fim]);
 
   useEffect(() => { carregar(); }, [carregar]);
+  useAoVoltar(carregar, 60000);   // voltou para a aba: atualiza em segundo plano
   useEffect(() => { const t = setInterval(carregar, 5 * 60 * 1000); return () => clearInterval(t); }, [carregar]);
 
   const meses = useMemo(() => (data?.meses || []).map(m => ({ ...m, parcial: Number(m.parcial) || 0, total: Number(m.total) || 0, faturamento: m.faturamento == null ? null : Number(m.faturamento) })), [data]);
@@ -700,7 +702,7 @@ export default function PainelGerencial({ onGoTo, user }) {
         dt_inicio: `${ano}-${String(ini).padStart(2, '0')}-01`,
         dt_fim:    `${ano}-${String(fim).padStart(2, '0')}-${String(ult).padStart(2, '0')}`,
       } });
-      exportPainelGerencialExcel(data, notas, { ano, mesIni: ini, mesFim: fim });
+      await exportPainelGerencialExcel(data, notas, { ano, mesIni: ini, mesFim: fim });
     } catch (e) { alert('Erro ao gerar o Excel: ' + e.message); }
     setBaixando('');
   };

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useAoVoltar } from '../lib/abaAtiva.js';
 import { dbListDevolucoes, dbExportDevolucoes, dbGetTransportadoras, dbGetDevolucoesResumo } from '../config/supabase';
 import { fmtBRL, fmtDate, CNPJ_MAP, Badge, calcFarolProtheus, calcStatusOperacional } from '../utils.jsx';
 import DetalheDrawer from '../components/DetalheDrawer.jsx';
@@ -351,6 +352,7 @@ export default function Devolucoes({ user, initialFilters = {} }) {
   }, []);
 
   useEffect(() => { load(filters, page); }, [filters, page]); // eslint-disable-line
+  useAoVoltar(() => dbListDevolucoes({ page, filters }).then(r => { setRows(r.rows); setTotal(r.total); }).catch(() => {}), 60000);
 
   // Resumo do conjunto filtrado — independe da página
   const filtrosKey = JSON.stringify(filters);
@@ -397,7 +399,7 @@ export default function Devolucoes({ user, initialFilters = {} }) {
     setExporting(true);
     try {
       const todas = await dbExportDevolucoes({ filters });
-      exportDevolucoesToExcel(todas, { filename: hasFilters ? 'devolucoes_fiscais_filtrado' : 'devolucoes_fiscais' });
+      await exportDevolucoesToExcel(todas, { filename: hasFilters ? 'devolucoes_fiscais_filtrado' : 'devolucoes_fiscais' });
     } catch (e) { alert('Erro ao exportar: ' + e.message); }
     finally { setExporting(false); }
   };

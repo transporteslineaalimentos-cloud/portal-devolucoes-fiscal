@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './hooks/useAuth';
 import Login from './views/Login';
 import Sidebar from './components/Sidebar';
 import { dbGetCobrancasCount, dbGetPendencias } from './config/supabase';
+import { AbaAtivaContext } from './lib/abaAtiva.js';
 
 const Devolucoes = lazy(() => import('./views/Devolucoes'));
 const Cobrancas  = lazy(() => import('./views/Cobrancas'));
@@ -38,6 +39,7 @@ import { abaPermitida, primeiraAba, somenteLeitura } from './lib/permissoes.js';
 function Portal() {
   const { user, logout } = useAuth();
   const [tab, setTab] = useState(() => (abaPermitida(user, 'painel') ? 'painel' : primeiraAba(user)));
+  const [visitadas, setVisitadas] = useState(() => new Set());
   const leitura = somenteLeitura(user);
   const [tabFilters, setTabFilters] = useState({});
   const [counts, setCounts] = useState({});
@@ -60,6 +62,15 @@ function Portal() {
   };
 
   useEffect(() => { refreshCounts(); refreshPendencias(); }, []);
+
+  // Depois que a primeira tela aparece, baixa em segundo plano o código das outras abas liberadas:
+  // abrir uma aba pela primeira vez deixa de esperar o download.
+  useEffect(() => {
+    const pre = { painel: () => import('./views/PainelGerencial'), devolucoes: () => import('./views/Devolucoes'),
+      cobrancas: () => import('./views/Cobrancas'), fretes: () => import('./views/CustosFrete'), usuarios: () => import('./views/Usuarios') };
+    const t = setTimeout(() => Object.entries(pre).forEach(([k, f]) => abaPermitida(user, k) && f().catch(() => {})), 2500);
+    return () => clearTimeout(t);
+  }, [user]);
 
   // Fechar painel pendências ao clicar fora
   useEffect(() => {
@@ -104,6 +115,17 @@ function Portal() {
     : 0;
 
   const meta = PAGE_META[tab] || { title: tab, sub: null };
+
+  // Abas já abertas continuam montadas (escondidas): voltar para elas é instantâneo,
+  // e cada uma se atualiza sozinha em segundo plano quando volta para a tela.
+  if (!visitadas.has(tab)) setVisitadas(v => new Set(v).add(tab));
+  const ABAS_VIEW = [
+    { id: 'painel',     render: () => <PainelGerencial onGoTo={changeTab} user={user} /> },
+    { id: 'devolucoes', render: () => <Devolucoes user={user} initialFilters={tabFilters.devolucoes || {}} /> },
+    { id: 'cobrancas',  render: () => <Cobrancas user={user} initialFilters={tabFilters.cobrancas || {}} onChanged={refreshCounts} /> },
+    { id: 'fretes',     render: () => <CustosFrete user={user} /> },
+    { id: 'usuarios',   render: () => <Usuarios user={user} /> },
+  ];
 
   return (
     <div className="app-layout">
@@ -247,32 +269,13 @@ function Portal() {
 
         {/* Conteúdo */}
         <main className="app-content">
-          {tab === 'painel' && abaPermitida(user, 'painel') && (
-            <Suspense fallback={<Fallback />}>
-              <PainelGerencial onGoTo={changeTab} user={user} />
-            </Suspense>
-          )}
-          {tab === 'devolucoes' && abaPermitida(user, 'devolucoes') && (
-            <Suspense fallback={<Fallback />}>
-              <Devolucoes user={user} initialFilters={tabFilters.devolucoes || {}} />
-            </Suspense>
-          )}
-          {tab === 'cobrancas' && abaPermitida(user, 'cobrancas') && (
-            <Suspense fallback={<Fallback />}>
-              <Cobrancas user={user} initialFilters={tabFilters.cobrancas || {}}
-                onChanged={refreshCounts} />
-            </Suspense>
-          )}
-          {tab === 'fretes' && abaPermitida(user, 'fretes') && (
-            <Suspense fallback={<Fallback />}>
-              <CustosFrete user={user} />
-            </Suspense>
-          )}
-          {tab === 'usuarios' && abaPermitida(user, 'usuarios') && (
-            <Suspense fallback={<Fallback />}>
-              <Usuarios user={user} />
-            </Suspense>
-          )}
+          {ABAS_VIEW.map(({ id, render }) => visitadas.has(id) && abaPermitida(user, id) && (
+            <div key={id} hidden={tab !== id} style={tab !== id ? { display: 'none' } : undefined}>
+              <AbaAtivaContext.Provider value={tab === id}>
+                <Suspense fallback={<Fallback />}>{render()}</Suspense>
+              </AbaAtivaContext.Provider>
+            </div>
+          ))}
         </main>
       </div>
     </div>
