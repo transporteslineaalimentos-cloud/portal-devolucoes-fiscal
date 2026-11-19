@@ -961,12 +961,6 @@ tr.drill-row:hover td { background: var(--blue-dim); }
 .cob-guia { font-size: 12.5px; color: var(--text-2); background: var(--surface); border: 1px solid var(--border); border-left: 3px solid; border-radius: 8px; padding: 9px 12px; display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
 
 .cob-corpo { display: grid; grid-template-columns: 270px minmax(0, 1fr); gap: 14px; align-items: start; }
-@container (max-width: 1280px) {
-  .cob-corpo { grid-template-columns: minmax(0, 1fr); }
-  .cob-transps { position: static; }
-  .cob-transps-lista { display: flex; gap: 6px; overflow-x: auto; max-height: none; }
-  .cob-transp { flex: 0 0 220px; width: 220px; border: 1px solid var(--border); }
-}
 .cob-transps { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow-xs); overflow: hidden; position: sticky; top: 12px; }
 .cob-transps-tit { display: flex; align-items: center; justify-content: space-between; padding: 11px 14px; font-size: 12px; font-weight: 700; color: var(--text); border-bottom: 1px solid var(--border); }
 .cob-transps-lista { max-height: calc(100vh - 260px); overflow-y: auto; padding: 6px; }
@@ -1142,7 +1136,6 @@ tr.drill-row:hover td { background: var(--blue-dim); }
 .cob-filtro { font-size: 12px; padding: 5px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); max-width: 220px; }
 .cob-filial { display: inline-block; font-size: 10px; font-weight: 700; padding: 0 6px; border-radius: 4px; margin-left: 6px; vertical-align: 1px; }
 .cob-como { display: block; }
-.cob-como ol { margin: 6px 0 0; padding-left: 20px; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 4px 24px; }
 .cob-como li { font-size: 12.5px; color: var(--text-2); }
 .cob-como li b { color: var(--text); }
 .nd-corpo > * { flex-shrink: 0; }
@@ -1264,3 +1257,49 @@ tr.drill-row:hover td { background: var(--blue-dim); }
 .cob-como .cob-link { margin-left: 12px; }
 .nd-sec-tit-linha { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
 .nd-sec-tit-linha .cob-link { text-transform: none; letter-spacing: 0; }
+
+/* ── Cobranças em tela de notebook (área útil até ~1280 px) ───── */
+.cob .so-curto, .cob-transp-sel { display: none; }
+.cob-como { display: block; line-height: 1.5; }
+.cob-como b { color: var(--text); }
+.cob-transp-sel { max-width: 300px; }
+@container (max-width: 1280px) {
+  .cob { gap: 10px; }
+  .cob .so-largo { display: none; }
+  .cob .so-curto { display: inline; }
+  .cob-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+  .cob-kpi { padding: 8px 12px; gap: 1px; border-radius: 10px; }
+  .cob-kpi-rot { font-size: 11px; }
+  .cob-kpi-val { font-size: 17px; }
+  .cob-kpi-nota { font-size: 10.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cob-modo button { padding: 5px 12px; font-size: 12.5px; }
+  .cob-filas { overflow: visible; flex-wrap: wrap; }
+  .cob-fila { padding: 7px 9px; font-size: 12px; gap: 5px; }
+  .cob-fila-n { padding: 0 6px; font-size: 10.5px; }
+  .cob-fila .cob-dot { display: none; }
+  .cob-fila { padding: 7px 8px; }
+  .cob-como { display: none; }
+  .cob-guia { padding: 6px 10px; font-size: 12px; }
+  .cob-corpo { grid-template-columns: minmax(0, 1fr); }
+  .cob-transps { display: none; }
+  .cob-transp-sel { display: inline-block; }
+  .cob-toolbar { padding: 8px 10px; gap: 8px; }
+  .cob-busca { flex: 1 1 200px; padding: 5px 9px; }
+  .cob-tabela th > button { padding: 7px 8px; }
+  .cob-tabela td { padding: 6px 8px; }
+  .cob-col-cd, .cob-col-valor { display: none; }
+  .ld-rapidos { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+  .ld-rapido { padding: 7px 12px; flex-direction: row; align-items: center; justify-content: space-between; gap: 8px; border-radius: 10px; }
+  .ld-rapido-rot { font-size: 11.5px; min-width: 0; }
+  .ld-rapido-n { font-size: 17px; }
+  .ld-rapido-d { display: none; }
+}
+@container (max-width: 1100px) {
+  .cob-col-ent { display: none; }
+  .cob-fila { padding: 6px 6px; font-size: 11.5px; }
+  .cob-tabela .ellipsis { max-width: 190px; }
+}
+@container (max-width: 900px) {
+  .cob-kpis, .ld-rapidos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cob-transp-sel { max-width: 100%; flex: 1 1 100%; }
+}

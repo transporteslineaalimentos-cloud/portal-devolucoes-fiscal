@@ -64,7 +64,9 @@ const SIT = {
   isento:            { l: 'Isentas',                curto: 'Isento',                 cor: '#6B7280', bg: '#F1F2F4', faz: 'Não serão cobradas do transportador.' },
 };
 const PENDENTES = ['cobrar_integral', 'cobrar_parcial', 'conferir_cd', 'isentar', 'sem_transportador'];
-const FILAS = [{ k: 'pendentes', l: 'Todas pendentes' }, ...PENDENTES.map(k => ({ k, l: SIT[k].l })), { k: 'em_lote', l: 'Em NF de débito' }, { k: 'cobrado', l: 'Cobradas' }, { k: 'isento', l: 'Isentas' }, { k: 'todas', l: 'Todas' }];
+const CURTO_FILA = { pendentes: 'Pendentes', cobrar_integral: 'Valor da nota', cobrar_parcial: 'Itens avariados', conferir_cd: 'Conferir CD', sem_transportador: 'Sem transp.', em_lote: 'Em NF débito' };
+const FILAS = [{ k: 'pendentes', l: 'Todas pendentes' }, ...PENDENTES.map(k => ({ k, l: SIT[k].l })), { k: 'em_lote', l: 'Em NF de débito' }, { k: 'cobrado', l: 'Cobradas' }, { k: 'isento', l: 'Isentas' }, { k: 'todas', l: 'Todas' }]
+  .map(f => ({ ...f, c: CURTO_FILA[f.k] || f.l }));
 const ehPendente = (r) => PENDENTES.includes(r.situacao);
 const aCobrarAinda = (r) => ehPendente(r) || r.situacao === 'em_lote';
 
@@ -201,10 +203,10 @@ const COLS = [
   { k: 'nf',     t: 'NF Dev.',        s: r => Number(r.nf_numero) || 0 },
   { k: 'cli',    t: 'Cliente',        s: r => r.nome_emitente || '' },
   { k: 'transp', t: 'Transportador · motivo', s: r => r.transportador_cobranca || '' },
-  { k: 'ent',    t: 'Entregue em',    s: r => r.dt_entrega || '' },
+  { k: 'ent',    t: 'Entregue em',    s: r => r.dt_entrega || '', cls: 'cob-col-ent' },
   { k: 'dias',   t: 'Lançada há',     s: r => r._dias ?? -1 },
-  { k: 'cd',     t: 'Retorno ao CD',  s: r => (r.retornou_cd ? 1 : 0) + (r.conferido ? 1 : 0) },
-  { k: 'valor',  t: 'Valor produtos', s: r => Number(r.valor_produtos) || 0, right: true },
+  { k: 'cd',     t: 'Retorno ao CD',  cls: 'cob-col-cd',  s: r => (r.retornou_cd ? 1 : 0) + (r.conferido ? 1 : 0) },
+  { k: 'valor',  t: 'Valor produtos', s: r => Number(r.valor_produtos) || 0, right: true, cls: 'cob-col-valor' },
   { k: 'cobrar', t: 'A cobrar',       s: r => valorACobrar(r), right: true },
   { k: 'sit',    t: 'Situação',       s: r => r.situacao },
 ];
@@ -471,22 +473,15 @@ export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
             <button key={f.k} role="tab" aria-selected={fila === f.k} className={`cob-fila${fila === f.k ? ' ativa' : ''}`} onClick={() => mudarFila(f.k)}
               style={fila === f.k && cor ? { boxShadow: `inset 0 -2px 0 ${cor}` } : undefined}>
               {cor && <span className="cob-dot" style={{ background: cor }}/>}
-              {f.l}<span className="cob-fila-n">{n}</span>
+              <span className="so-largo">{f.l}</span><span className="so-curto">{f.c}</span><span className="cob-fila-n">{n}</span>
             </button>
           );
         })}
       </div>
       {fila === 'pendentes' && (
-        <div className="cob-guia cob-como" style={{ borderLeftColor: 'var(--text)' }}>
-          <strong style={{ color: 'var(--text)' }}>Como emitir uma NF de débito</strong>
-          <button className="cob-link" onClick={() => setTutorial(true)}>Ver o tutorial completo, com as telas do Protheus →</button>
-          <ol>
-            <li>Marque até 3 notas do <b>mesmo transportador, filial e motivo</b>.</li>
-            <li>Clique em <b>Montar NF de débito</b>.</li>
-            <li>Siga o passo a passo da tela para digitar o pedido de venda no Protheus.</li>
-            <li>Registre o nº do pedido e, quando o financeiro faturar, o nº da NF de débito.</li>
-            <li>Envie ao transportador a NF de débito com a relação das notas (Excel).</li>
-          </ol>
+        <div className="cob-guia cob-como">
+          <strong style={{ color: 'var(--text)' }}>Como emitir:</strong>&nbsp;marque até 3 notas do <b>mesmo transportador, filial e motivo</b> e clique em <b>Montar NF de débito</b>. A tela seguinte mostra o que digitar no Protheus.
+          <button className="cob-link" onClick={() => setTutorial(true)}>Ver o passo a passo com as telas →</button>
         </div>
       )}
       {sitAtual && (
@@ -525,6 +520,10 @@ export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
               <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar NF, cliente, transportador, pedido, NF de débito…" aria-label="Buscar"/>
               {busca && <button onClick={() => setBusca('')} aria-label="Limpar busca"><Ic d={I.x} size={12}/></button>}
             </div>
+            <select className="cob-filtro cob-transp-sel" value={transp || ''} onChange={e => { setTransp(e.target.value || null); setSelIds(new Set()); }} aria-label="Filtrar por transportador">
+              <option value="">Todos os transportadores ({transportadores.length})</option>
+              {transportadores.map(t => <option key={t.k} value={t.k}>{t.nome} · {fmtK(t.v)} · {plural(t.q, 'nota', 'notas')}{ehPendenteFila(fila) && t.velha > 60 ? ` · mais antiga ${t.velha} d` : ''}</option>)}
+            </select>
             <select className="cob-filtro" value={fMotivo} onChange={e => setFMotivo(e.target.value)} aria-label="Filtrar por motivo">
               <option value="">Todos os motivos</option>
               {motivos.map(m => <option key={m} value={m}>{m}</option>)}
@@ -539,7 +538,7 @@ export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
             </div>
             <div style={{ display: 'flex', gap: 6, marginLeft: 'auto' }}>
               <button className="btn btn-outline btn-sm" onClick={() => espelho(visiveis)} disabled={!visiveis.length || gerando} title="Excel com o resumo por transportador, as notas e os itens a cobrar">
-                <Ic d={I.baixar} size={13}/>{gerando ? 'Gerando…' : 'Espelho de cobrança'}
+                <Ic d={I.baixar} size={13}/>{gerando ? 'Gerando…' : <><span className="so-largo">Espelho de cobrança</span><span className="so-curto">Espelho</span></>}
               </button>
               {!leitura && <button className="btn btn-outline btn-sm" onClick={() => setImportCD(true)} title="Importar a planilha de conferência do retorno ao CD">
                 <Ic d={I.importar} size={13}/>Importar CD
@@ -555,7 +554,7 @@ export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
               <thead><tr>
                 {!leitura && <th style={{ width: 36 }}><input type="checkbox" checked={todasMarcadas} onChange={marcarTodas} aria-label="Selecionar todas as notas da lista"/></th>}
                 {cols.map(c => (
-                  <th key={c.k} className={c.right ? 'dir' : undefined} aria-sort={ord.k === c.k ? (ord.dir > 0 ? 'ascending' : 'descending') : 'none'}>
+                  <th key={c.k} className={[c.right && 'dir', c.cls].filter(Boolean).join(' ') || undefined} aria-sort={ord.k === c.k ? (ord.dir > 0 ? 'ascending' : 'descending') : 'none'}>
                     <button onClick={() => setOrd(o => ({ k: c.k, dir: o.k === c.k ? -o.dir : (['valor', 'cobrar', 'dias', 'ent'].includes(c.k) ? -1 : 1) }))}>
                       {c.t}{ord.k === c.k ? (ord.dir > 0 ? ' ↑' : ' ↓') : ''}
                     </button>
@@ -586,14 +585,13 @@ export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
                           {r.filial && <span className="cob-filial" style={r.filial === 'Extrema' ? { background: '#EDE7FB', color: '#5B3FB0' } : { background: 'var(--surface-3)', color: 'var(--text-2)' }}>{r.filial}</span>}
                         </div>
                       </td>
-                      <td style={{ maxWidth: 200 }}>
+                      <td style={{ maxWidth: 240 }}>
                         {r.transportador_cobranca
                           ? <div className="ellipsis" title={r.transportador_cobranca}>{r.transportador_cobranca}</div>
                           : <span style={{ color: 'var(--text-3)', fontStyle: 'italic' }}>Não identificado</span>}
-                        <div className="cob-sub ellipsis" title={r.motivo_devolucao}>{r.motivo_devolucao || 'sem motivo'}</div>
-                        {r.canal && <div className="cob-sub ellipsis" title="Canal (centro de custo da NF de venda)">{r.canal}</div>}
+                        <div className="cob-sub ellipsis" title={[r.motivo_devolucao, r.canal && `Canal: ${r.canal}`].filter(Boolean).join(' · ')}>{r.motivo_devolucao || 'sem motivo'}{r.canal ? ` · ${r.canal}` : ''}</div>
                       </td>
-                      <td title={r.dt_entrega_fonte ? `Fonte: ${r.dt_entrega_fonte}` : 'Sem registro de entrega da NF de venda'}>
+                      <td className="cob-col-ent" title={r.dt_entrega_fonte ? `Fonte: ${r.dt_entrega_fonte}` : 'Sem registro de entrega da NF de venda'}>
                         {r.dt_entrega ? <span style={{ color: 'var(--text)' }}>{fmtDate(r.dt_entrega)}</span> : <span style={{ color: 'var(--text-3)' }}>—</span>}
                         {r.dt_entrega && r.dt_emissao && <div className="cob-sub">NFD {fmtDate(r.dt_emissao)}</div>}
                       </td>
@@ -601,8 +599,8 @@ export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
                         <Idade dias={r._dias}/>
                         <div className="cob-sub">{fmtDate(r.dt_lancamento_protheus)}</div>
                       </td>
-                      <td style={{ maxWidth: 150 }}><RetornoCD r={r}/></td>
-                      <td className="dir" style={{ color: 'var(--text-2)' }}>{fmtBRL(r.valor_produtos)}</td>
+                      <td className="cob-col-cd" style={{ maxWidth: 150 }}><RetornoCD r={r}/></td>
+                      <td className="dir cob-col-valor" style={{ color: 'var(--text-2)' }}>{fmtBRL(r.valor_produtos)}</td>
                       <td className="dir">
                         {r.situacao === 'isento' ? <span style={{ color: 'var(--text-3)' }}>—</span>
                           : r.situacao !== 'cobrado' && r.valor_sugerido == null ? <span style={{ color: '#1E4DB7', fontSize: 11.5 }}>a definir</span>
