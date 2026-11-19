@@ -201,11 +201,14 @@ function BarraAcoes({ sel, onMontar, onIsentar, onReabrir, onEspelho, onLimpar, 
 }
 
 /* ─── Tela ─────────────────────────────────────────────────── */
+/** Data da NFD (emissão). Na devolução total lançada à mão não existe NFD: vale a data da devolução. */
+const dtNfd = (r) => (r.lancamento_manual ? (r.dt_devolucao || r.dt_emissao) : r.dt_emissao) || null;
+
 const COLS = [
   { k: 'nf',     t: 'NF Dev.',        s: r => Number(r.nf_numero) || 0 },
   { k: 'cli',    t: 'Cliente',        s: r => r.nome_emitente || '' },
   { k: 'transp', t: 'Transportador · motivo', s: r => r.transportador_cobranca || '' },
-  { k: 'ent',    t: 'Entregue em',    s: r => r.dt_entrega || '', cls: 'cob-col-ent' },
+  { k: 'emi',    t: 'Emissão NFD',    s: r => dtNfd(r) || '' },
   { k: 'dias',   t: 'Lançada há',     s: r => r._dias ?? -1 },
   { k: 'cd',     t: 'Retorno ao CD',  cls: 'cob-col-cd',  s: r => (r.retornou_cd ? 1 : 0) + (r.conferido ? 1 : 0) },
   { k: 'valor',  t: 'Valor produtos', s: r => Number(r.valor_produtos) || 0, right: true, cls: 'cob-col-valor' },
@@ -553,7 +556,7 @@ export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
                 {!leitura && <th style={{ width: 36 }}><input type="checkbox" checked={todasMarcadas} onChange={marcarTodas} aria-label="Selecionar todas as notas da lista"/></th>}
                 {cols.map(c => (
                   <th key={c.k} className={[c.right && 'dir', c.cls].filter(Boolean).join(' ') || undefined} aria-sort={ord.k === c.k ? (ord.dir > 0 ? 'ascending' : 'descending') : 'none'}>
-                    <button onClick={() => setOrd(o => ({ k: c.k, dir: o.k === c.k ? -o.dir : (['valor', 'cobrar', 'dias', 'ent'].includes(c.k) ? -1 : 1) }))}>
+                    <button onClick={() => setOrd(o => ({ k: c.k, dir: o.k === c.k ? -o.dir : (['valor', 'cobrar', 'dias', 'emi'].includes(c.k) ? -1 : 1) }))}>
                       {c.t}{ord.k === c.k ? (ord.dir > 0 ? ' ↑' : ' ↓') : ''}
                     </button>
                   </th>
@@ -589,9 +592,9 @@ export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
                           : <span style={{ color: 'var(--text-3)', fontStyle: 'italic' }}>Não identificado</span>}
                         <div className="cob-sub ellipsis" title={[r.motivo_devolucao, r.canal && `Canal: ${r.canal}`].filter(Boolean).join(' · ')}>{r.motivo_devolucao || 'sem motivo'}{r.canal ? ` · ${r.canal}` : ''}</div>
                       </td>
-                      <td className="cob-col-ent" title={r.dt_entrega_fonte ? `Fonte: ${r.dt_entrega_fonte}` : 'Sem registro de entrega da NF de venda'}>
-                        {r.dt_entrega ? <span style={{ color: 'var(--text)' }}>{fmtDate(r.dt_entrega)}</span> : <span style={{ color: 'var(--text-3)' }}>—</span>}
-                        {r.dt_entrega && r.dt_emissao && <div className="cob-sub">NFD {fmtDate(r.dt_emissao)}</div>}
+                      <td title={r.dt_entrega ? `NF de venda entregue ao cliente em ${fmtDate(r.dt_entrega)}${r.dt_entrega_fonte ? ` (fonte: ${r.dt_entrega_fonte})` : ''}` : 'Sem registro de entrega da NF de venda'}>
+                        {dtNfd(r) ? <span style={{ color: 'var(--text)' }}>{fmtDate(dtNfd(r))}</span> : <span style={{ color: 'var(--text-3)' }}>—</span>}
+                        <div className="cob-sub">{r.dt_entrega ? `venda entregue ${fmtDate(r.dt_entrega).slice(0, 5)}` : 'venda sem entrega'}</div>
                       </td>
                       <td>
                         <Idade dias={r._dias}/>
