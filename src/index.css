@@ -1206,3 +1206,61 @@ tr.drill-row:hover td { background: var(--blue-dim); }
 .ld-barra { left: 16px; right: 16px; }
 @media (min-width: 900px) { .ld-barra { left: 260px; } }
 .ld-data { width: 150px; padding: 5px 8px; font-size: 12px; background: #fff; }
+
+/* ─── Tutorial NF de débito ──────────────────────────────── */
+.tut { max-width: 1120px; width: 100%; height: calc(100vh - 48px); display: flex; flex-direction: column; overflow: hidden; }
+.tut-topo { display: flex; justify-content: space-between; gap: 12px; padding: 16px 22px 14px; border-bottom: 1px solid var(--border); }
+.tut-sobre { font-size: 11px; font-weight: 700; color: var(--text-3); text-transform: uppercase; letter-spacing: .07em; }
+.tut-titulo { font-size: 19px; font-weight: 750; color: var(--text); margin-top: 2px; letter-spacing: -.01em; }
+.tut-sub { font-size: 12.5px; color: var(--text-2); margin-top: 3px; }
+.tut-meio { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: 290px 1fr; }
+.tut-nav { border-right: 1px solid var(--border); background: var(--surface-2); overflow-y: auto; padding: 12px 10px 16px; }
+.tut-grupo + .tut-grupo { margin-top: 12px; }
+.tut-grupo-tit { font-size: 10.5px; font-weight: 700; color: var(--text-3); text-transform: uppercase; letter-spacing: .07em; padding: 4px 8px 6px; }
+.tut-item { display: flex; align-items: flex-start; gap: 9px; width: 100%; text-align: left; background: none; border: 0; border-radius: 8px; padding: 7px 8px; cursor: pointer; font: inherit; color: var(--text-2); }
+.tut-item:hover { background: var(--surface-3); }
+.tut-item.on { background: var(--surface); box-shadow: var(--shadow-xs); color: var(--text); }
+.tut-item-n { flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; border: 1.5px solid var(--border-2); color: var(--text-3); background: var(--surface); }
+.tut-item.on .tut-item-n { background: var(--blue); border-color: var(--blue); color: #fff; }
+.tut-item.feito .tut-item-n { background: var(--green-dim); border-color: transparent; color: var(--green); }
+.tut-item-t { font-size: 12.5px; line-height: 1.35; padding-top: 2px; }
+.tut-item.on .tut-item-t { font-weight: 650; }
+.tut-nav-mob { display: none; }
+.tut-conteudo { overflow-y: auto; padding: 22px 28px 28px; min-width: 0; }
+.tut-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.tut-passo { font-size: 12px; font-weight: 650; color: var(--text-3); }
+.tut-sis { font-size: 11.5px; font-weight: 700; padding: 2px 9px; border-radius: 999px; }
+.tut-onde { font-size: 12px; color: var(--text-2); font-family: ui-monospace, Menlo, monospace; background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; padding: 1px 8px; }
+.tut-h { font-size: 20px; font-weight: 750; color: var(--text); margin: 10px 0 10px; letter-spacing: -.01em; line-height: 1.25; }
+.tut-p { font-size: 14px; line-height: 1.6; color: var(--text-2); max-width: 72ch; margin-bottom: 8px; }
+.tut-p b { color: var(--text); }
+.tut-code { font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; background: var(--surface-3); border-radius: 4px; padding: 1px 6px; color: var(--text); }
+.tut-campos { border-collapse: collapse; width: 100%; max-width: 720px; margin: 10px 0 6px; font-size: 13px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.tut-campos th { text-align: left; font-size: 11px; font-weight: 700; color: var(--text-3); text-transform: uppercase; letter-spacing: .05em; background: var(--surface-2); padding: 7px 12px; border-bottom: 1px solid var(--border); }
+.tut-campos td { padding: 8px 12px; border-bottom: 1px solid var(--border); color: var(--text-2); vertical-align: top; }
+.tut-campos tr:last-child td { border-bottom: 0; }
+.tut-campos td:first-child { font-weight: 650; color: var(--text); white-space: nowrap; }
+.tut-valor { display: inline-block; background: #FFF6E0; border: 1px solid #F5D78E; color: #5C3A00; font-weight: 700; font-family: ui-monospace, Menlo, monospace; border-radius: 6px; padding: 0 8px; white-space: nowrap; }
+.tut-atencao { max-width: 720px; margin: 10px 0 4px; font-size: 13px; line-height: 1.5; color: #7A4E00; background: #FFF8E6; border: 1px solid #F5D78E; border-left: 3px solid #D97706; border-radius: 8px; padding: 9px 12px; }
+.tut-fig { margin: 16px 0 0; }
+.tut-fig a { display: block; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: #111; box-shadow: var(--shadow-xs); width: fit-content; max-width: 100%; }
+.tut-fig img { display: block; max-width: 100%; max-height: 460px; height: auto; }
+.tut-fig figcaption { font-size: 12px; color: var(--text-3); margin-top: 6px; }
+.tut-rodape { position: relative; display: flex; align-items: center; gap: 8px; padding: 12px 22px 14px; border-top: 1px solid var(--border); }
+.tut-progresso { position: absolute; left: 0; right: 0; top: -1px; height: 3px; background: transparent; }
+.tut-progresso span { display: block; height: 100%; background: var(--blue); transition: width .2s; }
+.cob-tutorial-btn { display: inline-flex; align-items: center; gap: 6px; }
+@media (max-width: 760px) {
+  .modal-overlay:has(.tut) { padding: 0; }
+  .tut { height: 100vh; max-height: 100vh; border-radius: 0; }
+  .tut-meio { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+  .tut-nav { display: none; }
+  .tut-nav-mob { display: block; margin: 10px 16px 0; width: calc(100% - 32px); }
+  .tut-conteudo { padding: 14px 16px 20px; }
+  .tut-campos td:first-child { white-space: normal; }
+}
+.cob-link { background: none; border: 0; padding: 0; font: inherit; font-size: 12.5px; font-weight: 600; color: var(--blue); cursor: pointer; }
+.cob-link:hover { text-decoration: underline; }
+.cob-como .cob-link { margin-left: 12px; }
+.nd-sec-tit-linha { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.nd-sec-tit-linha .cob-link { text-transform: none; letter-spacing: 0; }

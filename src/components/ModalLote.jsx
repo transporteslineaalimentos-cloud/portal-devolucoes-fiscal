@@ -3,7 +3,8 @@ import { createPortal } from 'react-dom';
 import { dbGetCobrancaLotes, dbCobrancaLoteAcao, dbCobrancaLoteTransferir, dbGetUsuarios } from '../config/supabase';
 import { fmtBRL, fmtDate, fmtCNPJ } from '../utils.jsx';
 import { somenteLeitura } from '../lib/permissoes.js';
-import { ETAPAS, ETAPA, FILIAL_NOME, PROTHEUS, notasDoLote, textoObservacao, numProtheus, qtdTxt, refNota, baixarRelacaoLotes } from '../utils/notaDebito.js';
+import ModalTutorialNFDebito from './ModalTutorialNFDebito.jsx';
+import { ETAPAS, ETAPA, FILIAL_NOME, FILIAL_PROTHEUS, PROTHEUS, dataEntregaProtheus, notasDoLote, textoObservacao, numProtheus, qtdTxt, refNota, baixarRelacaoLotes } from '../utils/notaDebito.js';
 
 /* ─────────────────────────────────────────────────────────────
    NF de débito (lote de cobrança) em forma de passo a passo:
@@ -74,6 +75,7 @@ export default function ModalLote({ loteId, user, onClose, onChanged }) {
   const [editando, setEditando] = useState(null);   // 'pedido' | 'nf_debito'
   const [abertos, setAbertos] = useState({});        // passos já feitos que a pessoa reabriu
   const [usuarios, setUsuarios] = useState(null);    // para passar a NF de débito para outra pessoa
+  const [tutorial, setTutorial] = useState(null);    // passo do tutorial aberto (índice) ou null
 
   const carregar = useCallback(async () => {
     try {
@@ -197,16 +199,21 @@ export default function ModalLote({ loteId, user, onClose, onChanged }) {
           </div>
 
           {/* ── Passo a passo ── */}
-          <div className="nd-sec-tit" style={{ marginTop: 6 }}>Passo a passo no Protheus</div>
+          <div className="nd-sec-tit nd-sec-tit-linha" style={{ marginTop: 6 }}>
+            <span>Passo a passo no Protheus</span>
+            <button type="button" className="cob-link" onClick={() => setTutorial(2)}>Ver o tutorial com as telas do Protheus →</button>
+          </div>
 
           <Passo n={1} titulo="Abra um pedido de venda e preencha o cabeçalho" estado={fase >= 1 ? 'feito' : 'atual'}
-            resumo={fase >= 1 ? 'Cliente, operação e observação' : null}
+            resumo={fase >= 1 ? 'Filial, cliente, operação, entrega e mensagem' : null}
             aberto={vePasso('p1', fase < 1)} onAlternar={fase >= 1 ? alterna('p1', false) : null}>
             <div className="nd-cps">
-              <CampoProtheus campo="Cliente" dica="Pesquise o código do transportador pelo CNPJ" valor={fmtCNPJ(lote.transportador_cnpj)} copiar={cnpjDig}/>
-              <CampoProtheus campo="Operação" dica="Sempre 50" valor={PROTHEUS.operacao} fixo/>
-              <CampoProtheus campo="Observação da nota" dica="Pode copiar o texto pronto" copiar={obs}>
-                <textarea className="input nd-cp-obs" rows={2} value={obs} onChange={e => setObs(e.target.value)} readOnly={!podeMexer || fase > 0} aria-label="Observação da nota"/>
+              {FILIAL_PROTHEUS[lote.filial] && <CampoProtheus campo="Filial ao entrar" dica={`${FILIAL_NOME[lote.filial]} · Grupo 01 · Ambiente ${PROTHEUS.ambiente}`} valor={FILIAL_PROTHEUS[lote.filial]} fixo/>}
+              <CampoProtheus campo="Cliente" dica="Na lupa, pesquise pelo CNPJ e escolha o transportador" valor={fmtCNPJ(lote.transportador_cnpj)} copiar={cnpjDig}/>
+              <CampoProtheus campo="Operacao" dica="Sempre 50" valor={PROTHEUS.operacao} fixo/>
+              <CampoProtheus campo="Dt. Entrega" dica={`Hoje + ${PROTHEUS.diasEntrega} dias corridos`} valor={dataEntregaProtheus()}/>
+              <CampoProtheus campo="Mens.p/ Nota" dica="Cole aqui o texto. Não use o campo OBSERVACAO" copiar={obs}>
+                <textarea className="input nd-cp-obs" rows={2} value={obs} onChange={e => setObs(e.target.value)} readOnly={!podeMexer || fase > 0} aria-label="Mens.p/ Nota"/>
               </CampoProtheus>
             </div>
           </Passo>
@@ -216,9 +223,9 @@ export default function ModalLote({ loteId, user, onClose, onChanged }) {
             aberto={vePasso('p2', fase < 1)} onAlternar={fase >= 1 ? alterna('p2', false) : null}>
             <div className="nd-fixos">
               <span className="nd-fixos-tit">Em todas as linhas:</span>
-              <span className="nd-fixo"><em>Prc lista</em><b>{PROTHEUS.prcLista}</b><small>deixe zero, sem desconto</small></span>
-              <span className="nd-fixo"><em>Tipo de saída</em><b>{PROTHEUS.tipoSaida}</b></span>
-              <span className="nd-fixo"><em>Armazém</em><b>{PROTHEUS.armazem}</b></span>
+              <span className="nd-fixo"><em>Prc lista</em><b>{PROTHEUS.prcLista}</b><small>vem o preço de tabela: apague</small></span>
+              <span className="nd-fixo"><em>Tipo de saída</em><b>{PROTHEUS.tipoSaida}</b><small>vem 531: troque</small></span>
+              <span className="nd-fixo"><em>Armazém</em><b>{PROTHEUS.armazem}</b><small>confira no fim da linha</small></span>
             </div>
             <div className="nd-tabela-wrap">
               <table className="nd-tabela">
@@ -274,6 +281,7 @@ export default function ModalLote({ loteId, user, onClose, onChanged }) {
                   </button>
                 </div>
                 {semValor.length > 0 && <div className="nd-nota-txt">Antes, tire a nota sem conferência desta NF (no quadro de notas acima).</div>}
+                <div className="nd-nota-txt">Para liberar: <b>Pedidos › Liberação de Pedidos de Venda</b>, pesquise o número, <b>Liberar</b> e <b>Salvar</b>.</div>
               </>
             )}
           </Passo>
@@ -286,7 +294,8 @@ export default function ModalLote({ loteId, user, onClose, onChanged }) {
                 <div className="nd-feito">NF de débito <b>{lote.nf_debito}</b> emitida em {fmtDate(lote.dt_nf_debito)}. As notas ficaram como cobradas.
                   {!leitura && <button className="btn btn-ghost btn-xs" onClick={() => iniciarEdicao('nf_debito')}>corrigir</button>}</div>
               )
-            ) : !leitura && (
+            ) : !leitura && (<>
+              {fase === 1 && <div className="nd-nota-txt" style={{ marginTop: 0, marginBottom: 8 }}>Em <b>Pedidos de Venda</b>, bolinha branca no pedido = regra de crédito: peça a liberação ao financeiro. Liberado, use <b>Prep.doc.saída</b> para gerar o nº da NF.</div>}
               <div className="nd-form">
                 <label>Nº da NF de débito<input className="input" value={numero} onChange={e => setNumero(e.target.value)} placeholder="Ex.: 245310"/></label>
                 <label>Emissão<input className="input" type="date" value={data} onChange={e => setData(e.target.value)}/></label>
@@ -295,7 +304,7 @@ export default function ModalLote({ loteId, user, onClose, onChanged }) {
                   {salvando ? 'Salvando…' : 'Registrar NF de débito'}
                 </button>
               </div>
-            )}
+            </>)}
           </Passo>
 
           <Passo n={5} titulo="Envie ao transportador a NF de débito com a relação das notas" estado={fase >= 3 ? 'feito' : fase === 2 ? 'atual' : 'depois'}
@@ -334,5 +343,6 @@ export default function ModalLote({ loteId, user, onClose, onChanged }) {
           <button className="btn btn-primary btn-sm" onClick={onClose}>Fechar</button>
         </div>
       </div>
+      {tutorial != null && <ModalTutorialNFDebito inicio={tutorial} onClose={() => setTutorial(null)}/>}
     </div>, document.body);
 }

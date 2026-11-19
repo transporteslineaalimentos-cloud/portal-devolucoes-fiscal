@@ -15,7 +15,16 @@ export const ETAPA = Object.fromEntries(ETAPAS.map(e => [e.k, e]));
 export const FILIAL_NOME = { '05207076000297': 'Anápolis', '05207076000459': 'Extrema' };
 
 /** Campos fixos do pedido de venda da NF de débito no Protheus. */
-export const PROTHEUS = { operacao: '50', prcLista: '0', tipoSaida: '627', armazem: '50' };
+export const PROTHEUS = { operacao: '50', prcLista: '0', tipoSaida: '627', armazem: '50', ambiente: '05', diasEntrega: 10 };
+
+/** Filial do Protheus em que o pedido deve ser lançado (a mesma da NF de venda). */
+export const FILIAL_PROTHEUS = { '05207076000297': '0102', '05207076000459': '0106' };
+
+/** Dt. Entrega do pedido: hoje + 10 dias corridos, no formato do Protheus (dd/mm/aaaa). */
+export function dataEntregaProtheus(base = new Date()) {
+  const d = new Date(base.getFullYear(), base.getMonth(), base.getDate() + PROTHEUS.diasEntrega);
+  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+}
 
 /** Número no formato do Protheus (vírgula decimal, sem separador de milhar), sem zeros à direita. */
 export function numProtheus(v, maxDec = 6) {

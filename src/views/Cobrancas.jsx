@@ -7,6 +7,7 @@ import ModalCobranca from '../components/ModalCobranca.jsx';
 import ModalImportRetornoCD from '../components/ModalImportRetornoCD.jsx';
 import { baixarEspelhoCobranca, valorACobrar } from '../utils/espelhoCobranca.js';
 import ModalLote from '../components/ModalLote.jsx';
+import ModalTutorialNFDebito from '../components/ModalTutorialNFDebito.jsx';
 import { ETAPA, ETAPAS, FILIAL_NOME, baixarRelacaoLotes, refNota } from '../utils/notaDebito.js';
 
 /* ─────────────────────────────────────────────────────────────
@@ -272,6 +273,7 @@ export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
   const [aviso, setAviso] = useState('');
   const [gerando, setGerando] = useState(false);
   const [montando, setMontando] = useState(false);
+  const [tutorial, setTutorial] = useState(false);
   const [fCanais, setFCanais] = useState([]);       // [] = todos
   const [canaisSalvos, setCanaisSalvos] = useState([]);
   const [salvandoCanais, setSalvandoCanais] = useState(false);
@@ -448,7 +450,13 @@ export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
           NFs de débito{nLotesAbertos > 0 && <span className="cob-fila-n">{nLotesAbertos} {nLotesAbertos === 1 ? 'sua em andamento' : 'suas em andamento'}</span>}
         </button>
       </div>
-      <FiltroCanais canais={canaisDisp} sel={fCanais} salvos={canaisSalvos} onMudar={(c) => { setFCanais(c); setSelIds(new Set()); setTransp(null); }} onSalvar={salvarCanais} salvando={salvandoCanais}/>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <button className="btn btn-outline btn-sm cob-tutorial-btn" onClick={() => setTutorial(true)} title="Passo a passo do portal ao Protheus">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 4h6a4 4 0 014 4v13a3 3 0 00-3-3H2z"/><path d="M22 4h-6a4 4 0 00-4 4v13a3 3 0 013-3h7z"/></svg>
+          Como lançar NF de débito
+        </button>
+        <FiltroCanais canais={canaisDisp} sel={fCanais} salvos={canaisSalvos} onMudar={(c) => { setFCanais(c); setSelIds(new Set()); setTransp(null); }} onSalvar={salvarCanais} salvando={salvandoCanais}/>
+      </div>
       </div>
 
       {modo === 'nfs' && <ListaLotes key={user?.email} lotes={lotes === null ? null : lotesFiltrados} onAbrir={setLoteAberto} onAviso={setAviso} onRecarregar={() => { carregar(); onChanged?.(); }} leitura={leitura}/>}
@@ -471,6 +479,7 @@ export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
       {fila === 'pendentes' && (
         <div className="cob-guia cob-como" style={{ borderLeftColor: 'var(--text)' }}>
           <strong style={{ color: 'var(--text)' }}>Como emitir uma NF de débito</strong>
+          <button className="cob-link" onClick={() => setTutorial(true)}>Ver o tutorial completo, com as telas do Protheus →</button>
           <ol>
             <li>Marque até 3 notas do <b>mesmo transportador, filial e motivo</b>.</li>
             <li>Clique em <b>Montar NF de débito</b>.</li>
@@ -640,6 +649,7 @@ export default function Cobrancas({ user, initialFilters = {}, onChanged }) {
           onChanged={(msg) => { if (msg) setAviso(msg); onChanged?.(); }}/>
       )}
       {importCD && <ModalImportRetornoCD onClose={() => setImportCD(false)} onDone={() => carregar()}/>}
+      {tutorial && <ModalTutorialNFDebito onClose={() => setTutorial(false)}/>}
     </div>
   );
 }
